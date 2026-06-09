@@ -1,0 +1,75 @@
+# generated: 2026-06-09T17:36
+# last_updated: 2026-06-09T17:36
+# project: guess
+# project_key: NOKEY
+# tracking_system: file-system
+# story_location: _bmad-output/implementation-artifacts
+
+# STATUS DEFINITIONS:
+# ==================
+# Epic Status:
+#   - backlog: Epic not yet started
+#   - in-progress: Epic actively being worked on
+#   - done: All stories in epic completed
+#
+# Epic Status Transitions:
+#   - backlog → in-progress: Automatically when first story is created (via create-story)
+#   - in-progress → done: Manually when all stories reach 'done' status
+#
+# Story Status:
+#   - backlog: Story only exists in epic file
+#   - ready-for-dev: Story file created in stories folder
+#   - in-progress: Developer actively working on implementation
+#   - review: Ready for code review (via Dev's code-review workflow)
+#   - done: Story completed
+#
+# Retrospective Status:
+#   - optional: Can be completed but not required
+#   - done: Retrospective has been completed
+#
+# WORKFLOW NOTES:
+# ===============
+# - Epic transitions to 'in-progress' automatically when first story is created
+# - Stories can be worked in parallel if team capacity allows
+# - Developer typically creates next story after previous one is 'done' to incorporate learnings
+# - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
+
+generated: 2026-06-09T17:36
+last_updated: 2026-06-09T17:39
+project: guess
+project_key: NOKEY
+tracking_system: file-system
+story_location: _bmad-output/implementation-artifacts
+
+development_status:
+  # Epic 1: User Authentication & Platform Foundation
+  epic-1: in-progress
+  1-1-project-initialization: review
+  1-2-design-tokens-navigation: backlog
+  1-3-invite-code-system: backlog
+  1-4-user-registration: backlog
+  1-5a-backend-auth-api: backlog
+  1-5b-frontend-login-guest: backlog
+  1-6-password-recovery: backlog
+  1-7-a11y-loading-microcopy: backlog
+  epic-1-retrospective: optional
+
+  # Epic 2: Horse Library & Race Management
+  epic-2: backlog
+  2-1-horse-data-model-management: backlog
+  2-2-horse-search-selector: backlog
+  2-3-race-creation-management: backlog
+  2-4-race-deletion-horse-details: backlog
+  2-5-horse-auto-update-framework: backlog
+  epic-2-retrospective: optional
+
+  # Epic 3: Voting, Scoring Engine & Leaderboard
+  epic-3: backlog
+  3-1-scoring-engine: backlog
+  3-2-voting-system-backend: backlog
+  3-3-voting-frontend-interaction: backlog
+  3-4-result-entry-drag-sort: backlog
+  3-5-point-settlement-leaderboard: backlog
+  3-6-race-details-public: backlog
+  3-7-result-modification-recalculation: backlog
+  epic-3-retrospective: optional

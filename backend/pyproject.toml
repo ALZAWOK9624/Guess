@@ -1,0 +1,9 @@
+[project]
+name = "guess-backend"
+version = "0.1.0"
+description = "Guess - 赛马竞猜投票平台后端"
+requires-python = ">=3.12"
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
