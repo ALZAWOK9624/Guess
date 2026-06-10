@@ -71,7 +71,12 @@ _This file contains critical rules and patterns that AI agents must follow when 
 - Layout components in `src/layouts/`, page components in `src/pages/`, reusable components in `src/components/`
 - Composable functions in `src/composables/` (`useAuth.ts`, `useVote.ts`, `useDragSort.ts`)
 - Admin routes prefixed `/admin/`, using `AdminLayout` with 240px sidebar
-- Auth guard placeholder in `router/index.ts` — full implementation in Story 1.5b
+- Auth guard implementation in `router/index.ts`: `beforeEach` with `useAuthStore()` for three guard layers:
+  1. `isAdmin` → redirect to home for non-admin users
+  2. `requiresAuth` → redirect to `/login?redirect={path}` for unauthenticated users
+  3. Guest pages (login/register/reset-password) → redirect to home for logged-in users
+- **RouteMeta must be extended** for custom meta fields used in guards: add `declare module 'vue-router' { interface RouteMeta { requiresAuth?: boolean; isAdmin?: boolean } }` in router/index.ts. This avoids `as Record<string, unknown>` type assertions.
+- Guest page name list (`guestPageNames: string[]`) extracted to module-level constant in router/index.ts — NOT defined inside beforeEach.
 - `@` path alias configured in both `vite.config.ts` and `tsconfig.app.json` — use `@/pages/`, `@/components/`, etc.
 - Responsive navigation via `AppLayout` (global wrapper in `App.vue`): desktop top nav (≥768px, green bg) and mobile bottom nav (<768px, with SVG icons + text). Both hidden on admin routes via `v-if="!isAdminRoute"`
 - `safe-area-inset-bottom` applied via `viewport-fit=cover` meta + CSS `env(safe-area-inset-bottom)` — always add to mobile fixed elements
@@ -172,11 +177,12 @@ _This file contains critical rules and patterns that AI agents must follow when 
 - Do NOT implement dark mode — v1 is light mode only
 - Do NOT wrap admin routes with AppLayout nav — AppLayout already hides desktop header and mobile nav on `/admin` paths via `v-if="!isAdminRoute"`
 - Do NOT use `!important` globally except in utility classes (`.hidden`, `.mobile-only`, `.desktop-only`) and reduced-motion override
+- **Do NOT import `useAuthStore` in `client.ts`** — circular dependency (authStore → api/auth.ts → client.ts). Auth token source of truth is **localStorage**, read by request interceptor. Store's `accessToken` ref is synced via `persistAuth()`/`clearAuth()`/`restoreSession()`.
 
 **Security:**
 - JWT secrets (`SECRET_KEY`, `JWT_SECRET`) MUST be changed from defaults before production
 - CORS must be tightened for production (methods, headers)
-- Login failure returns generic error: `"用户名或密码错误"` — no field-specific leak
+- Login failure returns generic error: `"用户名或密码错误"` — no field-specific leak. However, LoginPage.vue catch block also handles Network Error (→ "网络错误，请重试"), 422 validation errors (→ field-level messages), and 500 (→ "服务器错误，请稍后重试").
 - Passwords hashed via bcrypt (passlib CryptContext)
 - Guests are read-only — voting requires authentication
 - Admin seed account: `app/utils/seed.py` creates default admin (username: `admin`, password: `admin123`, `is_admin=True`) on app startup. Idempotent — skips if already exists. Protected with `IntegrityError` guard for concurrent startup.

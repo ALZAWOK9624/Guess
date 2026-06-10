@@ -1,4 +1,15 @@
 import { createRouter, createWebHistory, type RouteRecordRaw } from 'vue-router'
+import { useAuthStore } from '@/stores/authStore'
+
+// Extend RouteMeta to support custom meta fields
+declare module 'vue-router' {
+  interface RouteMeta {
+    requiresAuth?: boolean
+    isAdmin?: boolean
+  }
+}
+
+const guestPageNames: string[] = ['login', 'register', 'reset-password']
 
 const routes: RouteRecordRaw[] = [
   {
@@ -80,10 +91,23 @@ const router = createRouter({
   routes
 })
 
-// Auth guard placeholder — will be fully implemented in Story 1.5b
+// Auth guard: protect admin routes, redirect logged-in users away from auth pages
 router.beforeEach((to) => {
-  if (to.meta.requiresAuth) {
-    // TODO: Check auth store state
+  const authStore = useAuthStore()
+
+  // Admin-only routes — requires admin privileges
+  if (to.meta.isAdmin && !authStore.isAdmin) {
+    return { name: 'home' }
+  }
+
+  // Auth-required routes — requires login
+  if (to.meta.requiresAuth && !authStore.isLoggedIn) {
+    return { path: '/login', query: { redirect: to.fullPath } }
+  }
+
+  // Redirect logged-in users away from login/register/reset-password
+  if (authStore.isLoggedIn && guestPageNames.includes(String(to.name))) {
+    return { name: 'home' }
   }
 })
 

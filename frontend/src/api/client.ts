@@ -48,7 +48,9 @@ apiClient.interceptors.response.use(
           }
         } catch {
           localStorage.removeItem('auth')
-          // redirect to login handled by router guard in Story 1.5b
+          // Redirect to login with current path as redirect target
+          const currentPath = window.location.pathname + window.location.search
+          window.location.href = `/login?redirect=${encodeURIComponent(currentPath)}`
         }
       }
     }

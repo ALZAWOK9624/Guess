@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
-import { register as registerApi } from '@/api/auth'
-import type { RegisterRequest, UserInfo } from '@/types/auth'
+import { register as registerApi, login as loginApi } from '@/api/auth'
+import type { LoginRequest, RegisterRequest, UserInfo } from '@/types/auth'
 
 export const useAuthStore = defineStore('auth', () => {
   const user = ref<UserInfo | null>(null)
@@ -26,6 +26,13 @@ export const useAuthStore = defineStore('auth', () => {
     localStorage.setItem('auth', JSON.stringify(data))
   }
 
+  function clearAuth() {
+    user.value = null
+    accessToken.value = null
+    refreshToken.value = null
+    localStorage.removeItem('auth')
+  }
+
   async function register(data: RegisterRequest) {
     const result = await registerApi(data)
     persistAuth({
@@ -35,11 +42,17 @@ export const useAuthStore = defineStore('auth', () => {
     })
   }
 
+  async function login(data: LoginRequest) {
+    const result = await loginApi(data)
+    persistAuth({
+      accessToken: result.access_token,
+      refreshToken: result.refresh_token,
+      user: result.user,
+    })
+  }
+
   function logout() {
-    user.value = null
-    accessToken.value = null
-    refreshToken.value = null
-    localStorage.removeItem('auth')
+    clearAuth()
   }
 
   // Restore session from localStorage on init
@@ -65,7 +78,9 @@ export const useAuthStore = defineStore('auth', () => {
     setUser,
     setTokens,
     persistAuth,
+    clearAuth,
     register,
+    login,
     logout,
     restoreSession,
   }

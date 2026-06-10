@@ -1,11 +1,17 @@
 <script setup lang="ts">
 import { useAuthStore } from '@/stores/authStore'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { computed } from 'vue'
 
 const authStore = useAuthStore()
 const route = useRoute()
+const router = useRouter()
 const isAdminRoute = computed(() => route.path.startsWith('/admin'))
+
+function handleLogout() {
+  authStore.logout()
+  router.push('/')
+}
 </script>
 
 <template>
@@ -25,8 +31,12 @@ const isAdminRoute = computed(() => route.path.startsWith('/admin'))
         </nav>
 
         <div class="user-area">
-          <!-- Placeholder: full auth implementation in Story 1.5b -->
-          <router-link to="/login" class="login-btn">登录</router-link>
+          <template v-if="authStore.isLoggedIn">
+            <router-link v-if="authStore.isAdmin" to="/admin" class="admin-link">管理</router-link>
+            <span class="username">{{ authStore.user?.username }}</span>
+            <button class="logout-btn" @click="handleLogout">退出</button>
+          </template>
+          <router-link v-else to="/login" class="login-btn">登录</router-link>
         </div>
       </div>
     </header>
@@ -140,6 +150,9 @@ const isAdminRoute = computed(() => route.path.startsWith('/admin'))
 
 .user-area {
   margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-3);
 }
 
 .login-btn {
@@ -151,10 +164,52 @@ const isAdminRoute = computed(() => route.path.startsWith('/admin'))
   color: #fff;
   font-size: var(--text-body-sm);
   transition: background var(--transition-fast);
+  text-decoration: none;
 }
 
 .login-btn:hover {
   background: rgba(255, 255, 255, 0.25);
+}
+
+.admin-link {
+  display: inline-flex;
+  align-items: center;
+  padding: var(--spacing-1) var(--spacing-3);
+  border-radius: var(--rounded-sm);
+  color: rgba(255, 255, 255, 0.85);
+  font-size: var(--text-body-sm);
+  text-decoration: none;
+  transition: background var(--transition-fast);
+}
+
+.admin-link:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+}
+
+.username {
+  font-size: var(--text-body-sm);
+  font-weight: 600;
+  color: #fff;
+}
+
+.logout-btn {
+  display: inline-flex;
+  align-items: center;
+  padding: var(--spacing-1) var(--spacing-3);
+  border-radius: var(--rounded-md);
+  background: rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.85);
+  font-size: var(--text-body-sm);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  cursor: pointer;
+  transition: background var(--transition-fast);
+  min-height: 32px;
+}
+
+.logout-btn:hover {
+  background: rgba(255, 255, 255, 0.2);
+  color: #fff;
 }
 
 /* =========================================

@@ -24,3 +24,9 @@
 - `response_model=dict` pattern — same pattern used in admin.py (Story 1.3), not introduced by this change
 - Service layer directly raising HTTPException — same pattern used in invite_code_service.py, not introduced by this change
 - Test dependency override cleanup not in try/finally — low risk as tests run in isolation
+
+## Deferred from: code review of Story 1.5b - 前端登录与游客访问 (2026-06-10)
+
+- useAuthStore 在路由守卫中调用 [router/index.ts:85] — Pinia + Vue Router 标准模式，Store 在 `main.ts` 的 `app.use(pinia)` 后可用。pre-existing
+- restoreSession() 未校验 token 有效性 [authStore.ts:59-69] — v1 设计中过期 token 由 Axios 401 + refresh 机制处理。pre-existing
+- AC-5 投票按钮跳转「点击投票 → /login?redirect=/races/{id}」未实现 — VoteButton/RaceDetailPage 属 Epic 3，将在 Epic 3 中实现。
