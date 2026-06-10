@@ -14,3 +14,9 @@
 - `InviteCodeListResponse` wrapper is redundant — no functional impact
 - `navigator.clipboard` fallback `execCommand('copy')` is deprecated — still supported in all major browsers
 - SQLite in-memory tests don't cover real DB concurrency — known limitation
+
+## Deferred from: code review of Story 1.4 - 用户注册 (2026-06-10)
+
+- `response_model=dict` pattern — same pattern used in admin.py (Story 1.3), not introduced by this change
+- Service layer directly raising HTTPException — same pattern used in invite_code_service.py, not introduced by this change
+- Test dependency override cleanup not in try/finally — low risk as tests run in isolation
