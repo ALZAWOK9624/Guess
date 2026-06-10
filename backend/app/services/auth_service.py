@@ -1,7 +1,7 @@
 """Authentication service — registration, login, token management."""
 
 from fastapi import HTTPException, status
-from jose import JWTError, jwt
+from jose import ExpiredSignatureError, JWTError, jwt
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -11,10 +11,135 @@ from app.core.security import (
     create_access_token,
     create_refresh_token,
     get_password_hash,
+    verify_password,
 )
 from app.models.invite_code import InviteCode
 from app.models.user import User
-from app.schemas.auth import RegisterRequest, RegisterResponse, UserInfo
+from app.schemas.auth import (
+    LoginRequest,
+    LoginResponse,
+    RegisterRequest,
+    RegisterResponse,
+    TokenRefreshRequest,
+    TokenRefreshResponse,
+    UserInfo,
+)
+
+
+async def login(db: AsyncSession, request: LoginRequest) -> LoginResponse:
+    """Authenticate user credentials and return JWT tokens.
+
+    Flow:
+    1. Look up user by username
+    2. Verify password hash
+    3. Generate JWT tokens
+    4. Return response with user info
+
+    Returns 401 for both wrong username and wrong password
+    (no field-specific leak).
+    """
+    # Step 1: Look up user
+    result = await db.execute(
+        select(User).where(User.username == request.username)
+    )
+    user = result.scalar_one_or_none()
+
+    if user is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail={
+                "code": "INVALID_CREDENTIALS",
+                "message": "用户名或密码错误",
+            },
+        )
+
+    # Step 2: Verify password
+    if not verify_password(request.password, user.password_hash):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail={
+                "code": "INVALID_CREDENTIALS",
+                "message": "用户名或密码错误",
+            },
+        )
+
+    # Step 3: Generate JWT tokens
+    access_token = create_access_token(data={"sub": user.username})
+    refresh_token = create_refresh_token(data={"sub": user.username})
+
+    return LoginResponse(
+        access_token=access_token,
+        refresh_token=refresh_token,
+        user=UserInfo(
+            id=user.id,
+            username=user.username,
+            qq=user.qq,
+            is_admin=user.is_admin,
+        ),
+    )
+
+
+async def refresh_token(
+    db: AsyncSession, request: TokenRefreshRequest
+) -> TokenRefreshResponse:
+    """Validate refresh token and issue a new access token.
+
+    Flow:
+    1. Decode refresh_token and extract username (sub claim)
+    2. Verify the user still exists in DB
+    3. Generate a new access_token
+    4. Return the new token
+
+    Handles expired and invalid refresh tokens separately.
+    """
+    try:
+        payload = jwt.decode(
+            request.refresh_token,
+            settings.jwt_secret,
+            algorithms=[settings.jwt_algorithm],
+        )
+        username: str = payload.get("sub")
+        if username is None:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail={
+                    "code": "INVALID_REFRESH_TOKEN",
+                    "message": "刷新令牌无效或已过期",
+                },
+            )
+    except ExpiredSignatureError:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail={
+                "code": "INVALID_REFRESH_TOKEN",
+                "message": "刷新令牌无效或已过期",
+            },
+        )
+    except JWTError:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail={
+                "code": "INVALID_REFRESH_TOKEN",
+                "message": "刷新令牌无效或已过期",
+            },
+        )
+
+    # Verify user still exists
+    result = await db.execute(select(User).where(User.username == username))
+    user = result.scalar_one_or_none()
+    if user is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail={
+                "code": "INVALID_REFRESH_TOKEN",
+                "message": "刷新令牌无效或已过期",
+            },
+        )
+
+    # Generate new access_token
+    access_token = create_access_token(data={"sub": username})
+
+    return TokenRefreshResponse(access_token=access_token)
 
 
 async def register(

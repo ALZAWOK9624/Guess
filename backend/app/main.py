@@ -6,12 +6,17 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.v1 import router as api_v1_router
 from app.core.config import settings
-from app.core.database import engine
+from app.core.database import async_session_factory, engine
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     # Startup: database engine is initialized via module import
+    # Seed default admin account (idempotent)
+    async with async_session_factory() as db:
+        from app.utils.seed import seed_admin
+        await seed_admin(db)
+        await db.commit()
     yield
     # Shutdown: dispose database engine
     await engine.dispose()

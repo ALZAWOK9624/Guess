@@ -5,7 +5,7 @@ date: '2026-06-10'
 sections_completed:
   ['technology_stack', 'language_rules', 'framework_rules', 'testing_rules', 'code_quality', 'workflow', 'critical_rules']
 status: 'complete'
-rule_count: 60
+rule_count: 63
 optimized_for_llm: true
 ---
 
@@ -81,9 +81,10 @@ _This file contains critical rules and patterns that AI agents must follow when 
 **FastAPI:**
 - App entry: `app/main.py` with `lifespan` for DB engine lifecycle
 - Config: `app/core/config.py` via Pydantic Settings (reads from `.env`)
-- Dependencies: `app/api/deps.py` — `get_db` (session), `get_current_user` (auth placeholder), `get_current_admin` (requires admin)
-- Auth check: `get_current_user` returns `None` for guests, raises `TOKEN_EXPIRED` for expired tokens, 401 for invalid tokens
-- Admin check: `get_current_admin` depends on `get_current_user`, verifies `is_admin` flag, raises 403 for non-admins
+- Dependencies: `app/api/deps.py` — `get_db` (session), `get_current_user` (queries DB → User ORM), `get_current_admin` (requires admin)
+- Auth check: `get_current_user` returns `None` for guests (no token), raises `TOKEN_EXPIRED` for expired tokens, `INVALID_TOKEN` for invalid tokens, `NOT_AUTHENTICATED` for valid token but user not found in DB. Returns full `User` ORM object.
+- Admin check: `get_current_admin` depends on `get_current_user`, checks `user.is_admin` ORM property, raises 403 `FORBIDDEN` for non-admins
+- Auth endpoints: `POST /api/v1/auth/login` (returns access_token + refresh_token + user), `POST /api/v1/auth/refresh` (returns new access_token from valid refresh_token). Both unauthenticated.
 - Endpoints: `app/api/v1/endpoints/` — one file per domain (auth, races, horses, votes, results, leaderboard, admin)
 - API router: `app/api/v1/__init__.py` creates the APIRouter and includes all endpoint routers; `main.py` calls `app.include_router(api_v1_router)`
 - Business logic: `app/services/` — one service per domain; uses `db.flush()` + `get_db` auto-commit pattern
@@ -96,7 +97,10 @@ _This file contains critical rules and patterns that AI agents must follow when 
 **Backend (pytest):**
 - Config: `asyncio_mode = auto` in `pyproject.toml`, `testpaths = ["tests"]`
 - Test directory: `backend/tests/`, one file per domain (`test_scoring_engine.py`, `test_auth.py`, etc.)
-- `conftest.py` provides basic fixtures; for isolated tests, create an in-memory SQLite engine with `aiosqlite` (`sqlite+aiosqlite:///:memory:`) — override `get_db` dependency and `get_current_admin` for API tests
+- `conftest.py` provides shared fixtures:
+  - `db_session` — in-memory SQLite engine (`sqlite+aiosqlite:///:memory:`) with `StaticPool`, tables created via `Base.metadata.create_all`, engine disposed after each test
+  - `async_client` — `httpx.AsyncClient` with `ASGITransport` pointing to the app, `get_db` overridden with `db_session`. Automatically clears `dependency_overrides` after each test
+- For new test files, import shared fixtures from `conftest.py`; for API integration tests, use `async_client` fixture to automatically get DB injection
 - Scoring engine (`scoring_engine.py`) must be pure function, zero external dependencies — unit test only
 - HTTP integration tests use `httpx.AsyncClient` with FastAPI's `TestClient`
 - All async tests run with `pytest-asyncio`
@@ -175,6 +179,7 @@ _This file contains critical rules and patterns that AI agents must follow when 
 - Login failure returns generic error: `"用户名或密码错误"` — no field-specific leak
 - Passwords hashed via bcrypt (passlib CryptContext)
 - Guests are read-only — voting requires authentication
+- Admin seed account: `app/utils/seed.py` creates default admin (username: `admin`, password: `admin123`, `is_admin=True`) on app startup. Idempotent — skips if already exists. Protected with `IntegrityError` guard for concurrent startup.
 
 **Performance:**
 - No Redis/cache layer needed for v1 — direct DB queries suffice for ~100 users

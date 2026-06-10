@@ -15,6 +15,10 @@
 - `navigator.clipboard` fallback `execCommand('copy')` is deprecated — still supported in all major browsers
 - SQLite in-memory tests don't cover real DB concurrency — known limitation
 
+## Deferred from: code review of Story 1.5a - 后端认证 API (2026-06-10)
+
+- DB 查询在 JWT decode try/except 之外 [deps.py:57] — `get_current_user` 的 DB 查询在 JWT 解码的 `try/except` 块之外。异常由 FastAPI 返回 500，与原有模式一致，非本故事引入。pre-existing
+
 ## Deferred from: code review of Story 1.4 - 用户注册 (2026-06-10)
 
 - `response_model=dict` pattern — same pattern used in admin.py (Story 1.3), not introduced by this change
