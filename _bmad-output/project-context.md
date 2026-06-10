@@ -5,7 +5,7 @@ date: '2026-06-10'
 sections_completed:
   ['technology_stack', 'language_rules', 'framework_rules', 'testing_rules', 'code_quality', 'workflow', 'critical_rules']
 status: 'complete'
-rule_count: 63
+rule_count: 68
 optimized_for_llm: true
 ---
 
@@ -51,6 +51,9 @@ _This file contains critical rules and patterns that AI agents must follow when 
 - TypeScript types in `src/types/`, organized by domain (auth.ts, race.ts, horse.ts, vote.ts, leaderboard.ts)
 - CSS variables: **kebab-case** (`--color-primary`, `--spacing-4`)
 - API字段在前后端之间使用 **snake_case**（不转换 camelCase）
+- **PageState 枚举模式**：所有列表页面使用 `type PageState = 'loading' | 'empty' | 'error' | 'success'` 统一管理状态，替代多个布尔值 ref。骨架屏显示 loading 态，精确微文案显示 empty 态，"加载失败，请刷新重试"+刷新按钮显示 error 态。
+- `RaceCard.vue` 支持 `skeleton` prop，未来故事可直接使用 `<RaceCard skeleton />` 渲染骨架屏。
+- 全局 `@keyframes skeleton-shimmer` 定义在 `base.css` 中，所有骨架屏复用此动画。
 
 **Python/FastAPI:**
 - Files and variables: **snake_case** (`get_current_user`, `race_service.py`)
@@ -80,7 +83,8 @@ _This file contains critical rules and patterns that AI agents must follow when 
 - `@` path alias configured in both `vite.config.ts` and `tsconfig.app.json` — use `@/pages/`, `@/components/`, etc.
 - Responsive navigation via `AppLayout` (global wrapper in `App.vue`): desktop top nav (≥768px, green bg) and mobile bottom nav (<768px, with SVG icons + text). Both hidden on admin routes via `v-if="!isAdminRoute"`
 - `safe-area-inset-bottom` applied via `viewport-fit=cover` meta + CSS `env(safe-area-inset-bottom)` — always add to mobile fixed elements
-- `prefers-reduced-motion: reduce` respected globally in `base.css` — overrides all animations/transitions
+- `prefers-reduced-motion: reduce` respected globally in `base.css` — overrides all animations/transitions. 全局 `scroll-behavior: smooth` 也被覆盖为 `auto`。
+- `*:focus-visible` 全局统一样式在 `base.css` 中定义（2px 竞马绿 outline + 2px offset），所有可聚焦元素自动继承。组件内如需自定义 focus 样式，使用 scoped CSS 覆盖。
 - `AdminLayout` sidebar (`z-index: 200`): desktop fixed 240px, mobile hamburger-triggered overlay with body scroll lock
 
 **FastAPI:**
@@ -178,6 +182,8 @@ _This file contains critical rules and patterns that AI agents must follow when 
 - Do NOT wrap admin routes with AppLayout nav — AppLayout already hides desktop header and mobile nav on `/admin` paths via `v-if="!isAdminRoute"`
 - Do NOT use `!important` globally except in utility classes (`.hidden`, `.mobile-only`, `.desktop-only`) and reduced-motion override
 - **Do NOT import `useAuthStore` in `client.ts`** — circular dependency (authStore → api/auth.ts → client.ts). Auth token source of truth is **localStorage**, read by request interceptor. Store's `accessToken` ref is synced via `persistAuth()`/`clearAuth()`/`restoreSession()`.
+- Do NOT use bare `catch` blocks on async functions — always use `catch (err)` to enable error differentiation. Future stories should follow the async/await + structured error handling pattern.
+- Do NOT duplicate `@keyframes skeleton-shimmer` in component scoped styles — use the global animation from `base.css` instead.
 
 **Security:**
 - JWT secrets (`SECRET_KEY`, `JWT_SECRET`) MUST be changed from defaults before production

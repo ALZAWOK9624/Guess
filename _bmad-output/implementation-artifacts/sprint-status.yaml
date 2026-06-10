@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: 2026-06-09T17:36
-last_updated: 2026-06-10T14:26
+last_updated: 2026-06-10T17:17
 project: guess
 project_key: NOKEY
 tracking_system: file-system
@@ -43,7 +43,7 @@ story_location: _bmad-output/implementation-artifacts
 
 development_status:
   # Epic 1: User Authentication & Platform Foundation
-  epic-1: in-progress
+  epic-1: done
   1-1-project-initialization: done
   1-2-design-tokens-navigation: done
   1-3-invite-code-system: done
@@ -51,7 +51,7 @@ development_status:
   1-5a-backend-auth-api: done
   1-5b-frontend-login-guest: done
   1-6-password-recovery: done
-  1-7-a11y-loading-microcopy: backlog
+  1-7-a11y-loading-microcopy: done
   epic-1-retrospective: optional
 
   # Epic 2: Horse Library & Race Management
