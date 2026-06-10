@@ -31,11 +31,11 @@ _This file contains critical rules and patterns that AI agents must follow when 
 | ORM | SQLAlchemy 2.0 | >=2.0 | Async mode with asyncpg |
 | Migration | Alembic | >=1.13 | Async template (`-t async`) |
 | Database | PostgreSQL 16 | Docker image `postgres:16-alpine` | Local dev via Docker Compose |
-| Auth | JWT (python-jose) | >=3.3 | access_token 30min + refresh 7d |
+| Auth | JWT (python-jose) | >=3.3 | access_token 30min + refresh 7d; `ExpiredSignatureError` vs `JWTError` handled separately |
 | Password Hashing | passlib[bcrypt] | >=1.7 | CryptContext |
 | Async Driver | asyncpg | >=0.29 | — |
 | Python | Python | >=3.12 | — |
-| Testing (Backend) | pytest + pytest-asyncio | >=8 / >=0.23 | `asyncio_mode = auto` |
+| Testing (Backend) | pytest + pytest-asyncio + aiosqlite | >=8 / >=0.23 / >=0.19 | `asyncio_mode = auto`; in-memory SQLite for isolated tests |
 | Testing (Frontend) | vitest | — | Optional, not yet configured |
 | Container | Docker Compose | — | PostgreSQL only; frontend/backend run locally |
 
@@ -81,11 +81,14 @@ _This file contains critical rules and patterns that AI agents must follow when 
 **FastAPI:**
 - App entry: `app/main.py` with `lifespan` for DB engine lifecycle
 - Config: `app/core/config.py` via Pydantic Settings (reads from `.env`)
-- Dependencies: `app/api/deps.py` — `get_db` (session), `get_current_user` (auth placeholder)
-- Auth check: `get_current_user` returns `None` for guests, raises 401 for invalid tokens
+- Dependencies: `app/api/deps.py` — `get_db` (session), `get_current_user` (auth placeholder), `get_current_admin` (requires admin)
+- Auth check: `get_current_user` returns `None` for guests, raises `TOKEN_EXPIRED` for expired tokens, 401 for invalid tokens
+- Admin check: `get_current_admin` depends on `get_current_user`, verifies `is_admin` flag, raises 403 for non-admins
 - Endpoints: `app/api/v1/endpoints/` — one file per domain (auth, races, horses, votes, results, leaderboard, admin)
-- Business logic: `app/services/` — one service per domain
+- API router: `app/api/v1/__init__.py` creates the APIRouter and includes all endpoint routers; `main.py` calls `app.include_router(api_v1_router)`
+- Business logic: `app/services/` — one service per domain; uses `db.flush()` + `get_db` auto-commit pattern
 - Data models: `app/models/` — SQLAlchemy declarative models extending `Base`
+- **CRITICAL**: `models/__init__.py` MUST import `Base` from `app.core.database`, NOT redefine it. Alembic `env.py` uses `from app.core.database import Base` as its metadata source — duplicate Base classes cause migrations to miss models.
 - CORS: configured in `main.py` (TODO: tighten for production deployment)
 
 ### Testing Rules
@@ -93,7 +96,7 @@ _This file contains critical rules and patterns that AI agents must follow when 
 **Backend (pytest):**
 - Config: `asyncio_mode = auto` in `pyproject.toml`, `testpaths = ["tests"]`
 - Test directory: `backend/tests/`, one file per domain (`test_scoring_engine.py`, `test_auth.py`, etc.)
-- `conftest.py` provides fixtures — full async DB fixtures added in Story 1.5a
+- `conftest.py` provides basic fixtures; for isolated tests, create an in-memory SQLite engine with `aiosqlite` (`sqlite+aiosqlite:///:memory:`) — override `get_db` dependency and `get_current_admin` for API tests
 - Scoring engine (`scoring_engine.py`) must be pure function, zero external dependencies — unit test only
 - HTTP integration tests use `httpx.AsyncClient` with FastAPI's `TestClient`
 - All async tests run with `pytest-asyncio`
@@ -104,8 +107,8 @@ _This file contains critical rules and patterns that AI agents must follow when 
 
 **Coverage expectation:**
 - Scoring engine: 100% branch coverage for all 4 rule types (G1, G2, 2Y-G1, custom) + edge cases
-- Service layer: cover all business logic paths
-- Endpoint layer: integration tests for main flows + error cases
+- Service layer: cover all business logic paths (CRUD, search, error branches)
+- Endpoint layer: integration tests for main flows + error cases (use dependency overrides for auth)
 
 ### Code Quality & Style Rules
 
@@ -116,7 +119,7 @@ _This file contains critical rules and patterns that AI agents must follow when 
 | Python files/variables | snake_case | `get_current_user()`, `auth_service.py` |
 | Database table names | snake_case plural | `users`, `races`, `horses`, `invite_codes` |
 | DB columns / foreign keys | snake_case | `user_id`, `race_name`, `created_at` |
-| TS/Vue component files | PascalCase | `RaceCard.vue`, `AdminLayout.vue` |
+| TS/Vue component files | PascalCase | `RaceCard.vue`, `AdminLayout.vue`, `InviteCodeTable.vue` |
 | TS non-component files | camelCase | `useAuth.ts`, `apiClient.ts`, `authStore.ts` |
 | TS functions/variables | camelCase | `getUserData()`, `currentUser` |
 | Pinia stores | `use{Name}Store` | `useAuthStore`, `useRaceStore` |

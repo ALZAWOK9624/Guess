@@ -4,6 +4,7 @@ from typing import AsyncGenerator
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.api.v1 import router as api_v1_router
 from app.core.config import settings
 from app.core.database import engine
 
@@ -35,3 +36,7 @@ app.add_middleware(
 @app.get("/api/v1/health")
 async def health_check():
     return {"status": "ok", "version": "0.1.0"}
+
+
+# Register API v1 router
+app.include_router(api_v1_router)
