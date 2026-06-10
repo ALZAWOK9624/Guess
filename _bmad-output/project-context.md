@@ -197,6 +197,8 @@ _This file contains critical rules and patterns that AI agents must follow when 
 - Settled races cannot be deleted — only result modification with full rollback/recalculate
 - DNF/scratched horses score 0 points and are excluded from deduction calculation denominators
 - Custom scoring rules apply only to the current race — not saved as templates
+- Password reset uses **invite_code bound_username** as verification (no email/phone) — all failure cases (user not found, invite_code mismatch, disabled code) return the same `INVITE_CODE_MISMATCH` error to prevent user enumeration
+- ResetPasswordPage uses a **two-step form**: step 1 collects username + invite_code (frontend-only validation), step 2 collects new password (triggers API call). 400 errors fall back to step 1.
 
 ---
 

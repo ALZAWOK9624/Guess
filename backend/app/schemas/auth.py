@@ -70,3 +70,36 @@ class TokenRefreshRequest(BaseModel):
 
 class TokenRefreshResponse(BaseModel):
     access_token: str
+
+
+class ResetPasswordRequest(BaseModel):
+    username: str
+    invite_code: str
+    new_password: str
+
+    @field_validator("username")
+    @classmethod
+    def validate_username(cls, v: str) -> str:
+        if len(v) < 3 or len(v) > 20:
+            raise ValueError("用户名长度需在 3-20 个字符之间")
+        return v
+
+    @field_validator("invite_code")
+    @classmethod
+    def validate_invite_code(cls, v: str) -> str:
+        if len(v) != 8:
+            raise ValueError("邀请码必须为 8 位字符")
+        return v
+
+    @field_validator("new_password")
+    @classmethod
+    def validate_new_password(cls, v: str) -> str:
+        if len(v) < 6:
+            raise ValueError("密码至少需要 6 个字符")
+        if len(v) > 128:
+            raise ValueError("密码长度不能超过 128 个字符")
+        return v
+
+
+class ResetPasswordResponse(BaseModel):
+    user: UserInfo

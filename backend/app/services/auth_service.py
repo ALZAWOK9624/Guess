@@ -20,6 +20,8 @@ from app.schemas.auth import (
     LoginResponse,
     RegisterRequest,
     RegisterResponse,
+    ResetPasswordRequest,
+    ResetPasswordResponse,
     TokenRefreshRequest,
     TokenRefreshResponse,
     UserInfo,
@@ -241,6 +243,88 @@ async def register(
     return RegisterResponse(
         access_token=access_token,
         refresh_token=refresh_token,
+        user=UserInfo(
+            id=user.id,
+            username=user.username,
+            qq=user.qq,
+            is_admin=user.is_admin,
+        ),
+    )
+
+
+async def reset_password(
+    db: AsyncSession, request: ResetPasswordRequest
+) -> ResetPasswordResponse:
+    """Reset password using username + bound invite code verification.
+
+    Flow:
+    1. Look up user by username
+    2. Look up invite_code by code string
+    3. Verify invite_code is bound to this user
+    4. Hash new password
+    5. Update user's password_hash
+    6. Return response with user info
+
+    Returns 400 for all mismatch cases (no field-specific leak).
+    """
+    # Step 1: Look up user
+    result = await db.execute(
+        select(User).where(User.username == request.username)
+    )
+    user = result.scalar_one_or_none()
+
+    if user is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "code": "INVITE_CODE_MISMATCH",
+                "message": "邀请码与用户不匹配",
+            },
+        )
+
+    # Step 2: Look up invite code
+    invite_result = await db.execute(
+        select(InviteCode).where(InviteCode.code == request.invite_code)
+    )
+    invite_code = invite_result.scalar_one_or_none()
+
+    if invite_code is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "code": "INVITE_CODE_MISMATCH",
+                "message": "邀请码与用户不匹配",
+            },
+        )
+
+    # Step 3: Verify invite_code is bound to this user
+    if invite_code.bound_username != user.username:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "code": "INVITE_CODE_MISMATCH",
+                "message": "邀请码与用户不匹配",
+            },
+        )
+
+    # Step 4: Verify invite_code is not disabled
+    if invite_code.status == "disabled":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "code": "INVITE_CODE_MISMATCH",
+                "message": "邀请码与用户不匹配",
+            },
+        )
+
+    # Step 5: Hash new password
+    new_password_hash = get_password_hash(request.new_password)
+
+    # Step 6: Update user's password_hash
+    user.password_hash = new_password_hash
+    await db.flush()
+
+    return ResetPasswordResponse(
         user=UserInfo(
             id=user.id,
             username=user.username,

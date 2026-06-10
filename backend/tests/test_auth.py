@@ -598,3 +598,168 @@ class TestAdminSeed:
         )
         admins = result.scalars().all()
         assert len(admins) == 1
+
+
+# =============================================================================
+# Password Reset Tests (Story 1.6)
+# =============================================================================
+
+class TestResetPassword:
+    """Test password reset functionality (AC #1, #2, #3)."""
+
+    @pytest.mark.asyncio
+    async def test_reset_password_success(
+        self, db_session: AsyncSession, async_client: AsyncClient
+    ):
+        """AC #1, #3: Valid username + bound invite_code + new password returns 200
+        and password is updated.
+        """
+        user = await create_user(db_session, username="reset_user")
+        # Create a used invite code bound to this user
+        code = InviteCode(
+            code="RESETCOD",
+            status="used",
+            bound_username="reset_user",
+            bound_qq="12345678901",
+        )
+        db_session.add(code)
+        # Create unused for first-commit balance
+        await create_unused_invite_code(db_session)
+        await db_session.flush()
+
+        response = await async_client.post(
+            "/api/v1/auth/reset-password",
+            json={
+                "username": "reset_user",
+                "invite_code": "RESETCOD",
+                "new_password": "newpassword456",
+            },
+        )
+        assert response.status_code == 200
+        data = response.json()["data"]
+        assert data["user"]["username"] == "reset_user"
+
+        # Verify old password no longer works
+        old_login = await async_client.post(
+            "/api/v1/auth/login",
+            json={"username": "reset_user", "password": "password123"},
+        )
+        assert old_login.status_code == 401
+
+        # Verify new password works
+        new_login = await async_client.post(
+            "/api/v1/auth/login",
+            json={"username": "reset_user", "password": "newpassword456"},
+        )
+        assert new_login.status_code == 200
+
+        # Verify password hash changed in DB
+        result = await db_session.execute(
+            select(User).where(User.username == "reset_user")
+        )
+        user_db = result.scalar_one()
+        from app.core.security import verify_password
+        assert verify_password("newpassword456", user_db.password_hash)
+        assert not verify_password("password123", user_db.password_hash)
+
+    @pytest.mark.asyncio
+    async def test_reset_password_wrong_invite_code(
+        self, db_session: AsyncSession, async_client: AsyncClient
+    ):
+        """AC #2: Wrong invite code returns 400 INVITE_CODE_MISMATCH."""
+        user = await create_user(db_session, username="wrong_code_user")
+        # Create invite code bound to a different user
+        code = InviteCode(
+            code="WRONGCOD",
+            status="used",
+            bound_username="other_user",
+            bound_qq="98765432109",
+        )
+        db_session.add(code)
+        await db_session.flush()
+
+        response = await async_client.post(
+            "/api/v1/auth/reset-password",
+            json={
+                "username": "wrong_code_user",
+                "invite_code": "WRONGCOD",
+                "new_password": "newpassword456",
+            },
+        )
+        assert response.status_code == 400
+        assert response.json()["detail"]["code"] == "INVITE_CODE_MISMATCH"
+        assert response.json()["detail"]["message"] == "邀请码与用户不匹配"
+
+    @pytest.mark.asyncio
+    async def test_reset_password_nonexistent_user(
+        self, async_client: AsyncClient
+    ):
+        """AC #2: Non-existent user returns 400 INVITE_CODE_MISMATCH."""
+        response = await async_client.post(
+            "/api/v1/auth/reset-password",
+            json={
+                "username": "ghost_user",
+                "invite_code": "GHOSTCOD",
+                "new_password": "newpassword456",
+            },
+        )
+        assert response.status_code == 400
+        assert response.json()["detail"]["code"] == "INVITE_CODE_MISMATCH"
+
+    @pytest.mark.asyncio
+    async def test_reset_password_nonexistent_invite_code(
+        self, db_session: AsyncSession, async_client: AsyncClient
+    ):
+        """Non-existent invite code returns 400 INVITE_CODE_MISMATCH."""
+        await create_user(db_session, username="real_user")
+        await db_session.flush()
+
+        response = await async_client.post(
+            "/api/v1/auth/reset-password",
+            json={
+                "username": "real_user",
+                "invite_code": "NONEXIST",
+                "new_password": "newpassword456",
+            },
+        )
+        assert response.status_code == 400
+        assert response.json()["detail"]["code"] == "INVITE_CODE_MISMATCH"
+
+    @pytest.mark.asyncio
+    async def test_reset_password_disabled_invite_code(
+        self, db_session: AsyncSession, async_client: AsyncClient
+    ):
+        """Disabled invite code returns 400 INVITE_CODE_MISMATCH."""
+        user = await create_user(db_session, username="disabled_code_user")
+        code = InviteCode(
+            code="DISABLE1",
+            status="disabled",
+            bound_username="disabled_code_user",
+            bound_qq="12345678901",
+        )
+        db_session.add(code)
+        await db_session.flush()
+
+        response = await async_client.post(
+            "/api/v1/auth/reset-password",
+            json={
+                "username": "disabled_code_user",
+                "invite_code": "DISABLE1",
+                "new_password": "newpassword456",
+            },
+        )
+        assert response.status_code == 400
+        assert response.json()["detail"]["code"] == "INVITE_CODE_MISMATCH"
+
+    @pytest.mark.asyncio
+    async def test_reset_password_short_password(self, async_client: AsyncClient):
+        """AC #4: Password shorter than 6 chars returns 422."""
+        response = await async_client.post(
+            "/api/v1/auth/reset-password",
+            json={
+                "username": "any_user",
+                "invite_code": "ANYCOD00",
+                "new_password": "12345",
+            },
+        )
+        assert response.status_code == 422

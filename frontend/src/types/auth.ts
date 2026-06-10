@@ -34,3 +34,13 @@ export interface LoginResponse {
 export interface TokenRefreshResponse {
   access_token: string
 }
+
+export interface ResetPasswordRequest {
+  username: string
+  invite_code: string
+  new_password: string
+}
+
+export interface ResetPasswordResponse {
+  user: UserInfo
+}

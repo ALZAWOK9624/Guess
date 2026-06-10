@@ -11,6 +11,9 @@ const username = ref('')
 const password = ref('')
 const loading = ref(false)
 const errorMessage = ref('')
+const successMessage = ref(
+  route.query.reset === 'success' ? '密码重置成功，请用新密码登录' : ''
+)
 
 function clearError() {
   errorMessage.value = ''
@@ -83,6 +86,11 @@ async function handleSubmit() {
       <h1 class="login-title">登录</h1>
 
       <form @submit.prevent="handleSubmit" novalidate>
+        <!-- Success banner (from password reset) -->
+        <div v-if="successMessage" class="success-banner" role="status" aria-live="polite">
+          {{ successMessage }}
+        </div>
+
         <!-- Global error -->
         <div v-if="errorMessage" class="error-banner" role="alert" aria-live="polite">
           {{ errorMessage }}
@@ -205,6 +213,16 @@ async function handleSubmit() {
 .error-banner {
   background: var(--color-destructive-light);
   color: var(--color-destructive);
+  padding: var(--spacing-12);
+  border-radius: var(--rounded-md);
+  font-size: 14px;
+  margin-bottom: var(--spacing-16);
+  text-align: center;
+}
+
+.success-banner {
+  background: var(--color-primary-light);
+  color: var(--color-primary);
   padding: var(--spacing-12);
   border-radius: var(--rounded-md);
   font-size: 14px;

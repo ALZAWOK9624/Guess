@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: 2026-06-09T17:36
-last_updated: 2026-06-10T14:12
+last_updated: 2026-06-10T14:26
 project: guess
 project_key: NOKEY
 tracking_system: file-system
@@ -50,7 +50,7 @@ development_status:
   1-4-user-registration: done
   1-5a-backend-auth-api: done
   1-5b-frontend-login-guest: done
-  1-6-password-recovery: backlog
+  1-6-password-recovery: done
   1-7-a11y-loading-microcopy: backlog
   epic-1-retrospective: optional
 

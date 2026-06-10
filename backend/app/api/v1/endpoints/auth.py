@@ -7,9 +7,10 @@ from app.api.deps import get_db
 from app.schemas.auth import (
     LoginRequest,
     RegisterRequest,
+    ResetPasswordRequest,
     TokenRefreshRequest,
 )
-from app.services.auth_service import login, refresh_token, register
+from app.services.auth_service import login, refresh_token, register, reset_password
 
 router = APIRouter(prefix="/api/v1/auth", tags=["auth"])
 
@@ -52,4 +53,20 @@ async def refresh_endpoint(
     Returns 401 for invalid/expired refresh tokens.
     """
     result = await refresh_token(db, request)
+    return {"data": result.model_dump()}
+
+
+@router.post("/reset-password", response_model=dict)
+async def reset_password_endpoint(
+    request: ResetPasswordRequest,
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """Reset password using username + invite code verification.
+
+    Requires: username + the invite_code that was bound to this user
+    during registration.
+    Returns 200 with user info on success.
+    Returns 400 for invite_code/user mismatch.
+    """
+    result = await reset_password(db, request)
     return {"data": result.model_dump()}
