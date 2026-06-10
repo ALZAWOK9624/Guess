@@ -4,7 +4,7 @@ baseline_commit: 9e8be222e01054f351cc8315f64d9ea70fa953aa
 
 # Story 1.1: 项目初始化与环境搭建
 
-Status: review
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
