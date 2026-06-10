@@ -5,7 +5,7 @@ date: '2026-06-10'
 sections_completed:
   ['technology_stack', 'language_rules', 'framework_rules', 'testing_rules', 'code_quality', 'workflow', 'critical_rules']
 status: 'complete'
-rule_count: 56
+rule_count: 60
 optimized_for_llm: true
 ---
 
@@ -72,7 +72,11 @@ _This file contains critical rules and patterns that AI agents must follow when 
 - Composable functions in `src/composables/` (`useAuth.ts`, `useVote.ts`, `useDragSort.ts`)
 - Admin routes prefixed `/admin/`, using `AdminLayout` with 240px sidebar
 - Auth guard placeholder in `router/index.ts` — full implementation in Story 1.5b
-- `@` path alias configured in `vite.config.ts` — use `@/pages/`, `@/components/`, etc.
+- `@` path alias configured in both `vite.config.ts` and `tsconfig.app.json` — use `@/pages/`, `@/components/`, etc.
+- Responsive navigation via `AppLayout` (global wrapper in `App.vue`): desktop top nav (≥768px, green bg) and mobile bottom nav (<768px, with SVG icons + text). Both hidden on admin routes via `v-if="!isAdminRoute"`
+- `safe-area-inset-bottom` applied via `viewport-fit=cover` meta + CSS `env(safe-area-inset-bottom)` — always add to mobile fixed elements
+- `prefers-reduced-motion: reduce` respected globally in `base.css` — overrides all animations/transitions
+- `AdminLayout` sidebar (`z-index: 200`): desktop fixed 240px, mobile hamburger-triggered overlay with body scroll lock
 
 **FastAPI:**
 - App entry: `app/main.py` with `lifespan` for DB engine lifecycle
@@ -159,6 +163,8 @@ _This file contains critical rules and patterns that AI agents must follow when 
 - Do NOT use WebSocket/SSE — poll or optimistic updates only
 - Do NOT implement OAuth/3rd-party login — username + password + invite code only
 - Do NOT implement dark mode — v1 is light mode only
+- Do NOT wrap admin routes with AppLayout nav — AppLayout already hides desktop header and mobile nav on `/admin` paths via `v-if="!isAdminRoute"`
+- Do NOT use `!important` globally except in utility classes (`.hidden`, `.mobile-only`, `.desktop-only`) and reduced-motion override
 
 **Security:**
 - JWT secrets (`SECRET_KEY`, `JWT_SECRET`) MUST be changed from defaults before production

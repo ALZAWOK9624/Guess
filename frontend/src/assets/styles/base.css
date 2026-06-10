@@ -1,5 +1,8 @@
-/* Base Resets & Global Styles */
-/* Placeholder: will be fully implemented in Story 1.2 */
+/* Base Resets & Global Styles — JRA Design System */
+
+/* =========================================
+   Reset
+   ========================================= */
 
 *,
 *::before,
@@ -13,33 +16,137 @@ html {
   font-size: 16px;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  scroll-behavior: smooth;
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-border-hairline) transparent;
 }
 
 body {
-  font-family: var(--font-family);
-  color: var(--color-text);
-  background-color: var(--color-bg);
-  line-height: 1.5;
+  font-family: var(--font-body);
+  color: var(--color-ink-primary);
+  background-color: var(--color-surface-base);
+  line-height: 1.6;
   min-width: 320px;
+  min-height: 100vh;
+  min-height: 100dvh;
 }
+
+/* =========================================
+   Links
+   ========================================= */
 
 a {
   color: inherit;
   text-decoration: none;
 }
 
+a:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+@media (forced-colors: active) {
+  a:focus-visible,
+  button:focus-visible,
+  input:focus-visible,
+  textarea:focus-visible,
+  select:focus-visible {
+    outline-color: Highlight;
+  }
+}
+
+/* =========================================
+   Buttons
+   ========================================= */
+
 button {
   cursor: pointer;
   border: none;
   background: none;
   font: inherit;
+  color: inherit;
 }
+
+button:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+/* =========================================
+   Lists
+   ========================================= */
 
 ul, ol {
   list-style: none;
 }
 
+/* =========================================
+   Media
+   ========================================= */
+
 img {
   max-width: 100%;
   height: auto;
+  display: block;
+}
+
+/* =========================================
+   Form Elements
+   ========================================= */
+
+input, textarea, select {
+  font: inherit;
+  color: inherit;
+}
+
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+/* =========================================
+   Tables
+   ========================================= */
+
+table {
+  border-collapse: collapse;
+  width: 100%;
+}
+
+/* =========================================
+   Scrollbar Styling (Webkit)
+   ========================================= */
+
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--color-border-hairline);
+  border-radius: var(--rounded-full);
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-border-strong);
+}
+
+/* =========================================
+   Reduced Motion
+   ========================================= */
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }
