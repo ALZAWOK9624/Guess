@@ -1,0 +1,347 @@
+"""Race management business logic service."""
+
+from datetime import date
+
+from fastapi import HTTPException, status
+from sqlalchemy import func, select
+from sqlalchemy.exc import IntegrityError, SQLAlchemyError
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
+
+from app.models.horse import Horse
+from app.models.race import GradeEnum, Race, RaceHorse, RaceStatus
+from app.schemas.race import CustomScoring, RaceCreate, RaceUpdate
+
+
+async def get_races(
+    db: AsyncSession, status_filter: str | None = None
+) -> list[Race]:
+    """Get all races, optionally filtered by status.
+
+    Returns races ordered by date descending with horse_count and vote_count.
+    """
+    stmt = (
+        select(Race)
+        .options(selectinload(Race.race_horses))
+        .order_by(Race.date.desc(), Race.created_at.desc())
+    )
+
+    if status_filter:
+        try:
+            valid_status = RaceStatus(status_filter)
+        except ValueError:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail={
+                    "code": "INVALID_STATUS",
+                    "message": f"无效的状态值: {status_filter}",
+                },
+            )
+        stmt = stmt.where(Race.status == valid_status)
+
+    result = await db.execute(stmt)
+    races = list(result.scalars().all())
+
+    return races
+
+
+async def get_race(db: AsyncSession, race_id: int) -> Race | None:
+    """Get a single race by ID with horses eagerly loaded."""
+    stmt = (
+        select(Race)
+        .options(selectinload(Race.race_horses))
+        .where(Race.id == race_id)
+    )
+    result = await db.execute(stmt)
+    return result.scalar_one_or_none()
+
+
+async def get_race_vote_count(db: AsyncSession, race_id: int) -> int:
+    """Get the number of votes for a race.
+
+    Currently returns 0; will be implemented properly when Vote model exists.
+    """
+    return 0
+
+
+def validate_custom_scoring(
+    custom_scoring: CustomScoring | None, horse_count: int | None = None
+) -> None:
+    """Validate custom scoring data for CUSTOM grade races."""
+    if custom_scoring is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "code": "INVALID_CUSTOM_SCORING",
+                "message": "自定义等级必须提供积分列表",
+            },
+        )
+    if not custom_scoring.positive_scores:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "code": "INVALID_CUSTOM_SCORING",
+                "message": "正序积分列表不能为空",
+            },
+        )
+    if any(s <= 0 for s in custom_scoring.positive_scores):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "code": "INVALID_CUSTOM_SCORING",
+                "message": "正序积分必须为正数",
+            },
+        )
+    if len(custom_scoring.positive_scores) > 50:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "code": "INVALID_CUSTOM_SCORING",
+                "message": "正序积分列表不能超过 50 项",
+            },
+        )
+    if horse_count is not None and len(custom_scoring.positive_scores) < horse_count:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "code": "INVALID_CUSTOM_SCORING",
+                "message": f"正序积分列表数量 ({len(custom_scoring.positive_scores)}) 少于参赛马匹数 ({horse_count})",
+            },
+        )
+
+
+def _build_snapshot(horse: Horse) -> dict:
+    """Build a snapshot dict from a Horse ORM object."""
+    return {
+        "name": horse.name,
+        "sex": horse.sex,
+        "age": horse.age,
+        "origin": horse.origin,
+        "sire": horse.sire,
+        "damsire": horse.damsire,
+        "weight": horse.weight,
+        "jockey": horse.jockey,
+        "previous_result": horse.previous_result,
+        "best_win": horse.best_win,
+    }
+
+
+async def create_race(
+    db: AsyncSession, data: RaceCreate, creator_id: int
+) -> Race:
+    """Create a new race with horse snapshots.
+
+    Validates:
+    - At least 2 horses
+    - All horse IDs exist
+    - Custom scoring valid for CUSTOM grade
+    """
+    # Validate at least 2 horses
+    if len(data.horse_ids) < 2:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "code": "INSUFFICIENT_HORSES",
+                "message": "至少需要 2 匹参赛马",
+            },
+        )
+
+    # Validate grade enum
+    try:
+        grade = GradeEnum(data.grade)
+    except ValueError:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "code": "INVALID_GRADE",
+                "message": f"无效的比赛等级: {data.grade}",
+            },
+        )
+
+    # Validate custom scoring if grade is CUSTOM
+    if grade == GradeEnum.CUSTOM:
+        validate_custom_scoring(data.custom_scoring, horse_count=len(data.horse_ids))
+    elif data.custom_scoring is not None:
+        # Custom scoring provided for non-CUSTOM grade → ignore
+        pass
+
+    # Create race record
+    custom_scoring_dict = (
+        data.custom_scoring.model_dump() if data.custom_scoring else None
+    )
+    race = Race(
+        name=data.name,
+        date=data.date,
+        grade=grade,
+        status=RaceStatus.VOTING,
+        custom_scoring=custom_scoring_dict,
+        creator_id=creator_id,
+    )
+    db.add(race)
+
+    try:
+        await db.flush()
+    except IntegrityError:
+        await db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={
+                "code": "RACE_CREATE_CONFLICT",
+                "message": "比赛创建失败，请重试",
+            },
+        )
+
+    # Fetch each horse and create snapshot
+    for horse_id in data.horse_ids:
+        horse = await db.get(Horse, horse_id)
+        if not horse:
+            await db.rollback()
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail={
+                    "code": "HORSE_NOT_FOUND",
+                    "message": f"马匹 {horse_id} 不存在",
+                },
+            )
+
+        race_horse = RaceHorse(
+            race_id=race.id,
+            horse_id=horse.id,
+            snapshot_data=_build_snapshot(horse),
+        )
+        db.add(race_horse)
+
+    await db.flush()
+    await db.refresh(race, ["race_horses"])
+    return race
+
+
+async def update_race(
+    db: AsyncSession, race_id: int, data: RaceUpdate, user_id: int
+) -> Race:
+    """Update an existing race. Only voting races can be edited.
+
+    Rules:
+    - Locked/settled races are rejected
+    - If race has votes, grade cannot be changed
+    - New horses get snapshots; removed horses' votes stay
+    """
+    race = await get_race(db, race_id)
+    if race is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={"code": "NOT_FOUND", "message": "比赛不存在"},
+        )
+
+    # Check race status — only voting races can be edited
+    if race.status != RaceStatus.VOTING:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "code": "RACE_NOT_EDITABLE",
+                "message": "比赛已锁定/已结算，不可编辑",
+            },
+        )
+
+    update_data = data.model_dump(exclude_unset=True)
+    # Filter out None values to prevent overwriting DB fields with null
+    update_data = {k: v for k, v in update_data.items() if v is not None}
+
+    # Check if race has votes (vote_count > 0 → grade is locked)
+    vote_count = await get_race_vote_count(db, race_id)
+    if vote_count > 0 and "grade" in update_data:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "code": "VOTES_EXIST",
+                "message": "比赛已有投票，等级不可修改",
+            },
+        )
+
+    # Update scalar fields
+    if "name" in update_data:
+        race.name = update_data["name"]
+    if "date" in update_data:
+        race.date = update_data["date"]
+    if "grade" in update_data:
+        try:
+            new_grade = GradeEnum(update_data["grade"])
+        except ValueError:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail={
+                    "code": "INVALID_GRADE",
+                    "message": f"无效的比赛等级: {update_data['grade']}",
+                },
+            )
+        race.grade = new_grade
+        if new_grade == GradeEnum.CUSTOM:
+            if "custom_scoring" in update_data:
+                scoring = update_data["custom_scoring"]
+                validate_custom_scoring(CustomScoring(**scoring), horse_count=len(race.race_horses))
+                race.custom_scoring = scoring
+            else:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail={
+                        "code": "MISSING_CUSTOM_SCORING",
+                        "message": "切换到自定义等级时必须提供积分列表",
+                    },
+                )
+        else:
+            race.custom_scoring = None
+
+    # Update horse list if provided
+    if "horse_ids" in update_data:
+        new_horse_ids = set(update_data["horse_ids"])
+        existing_ids = {rh.horse_id for rh in race.race_horses}
+
+        # Add new horses
+        for horse_id in new_horse_ids - existing_ids:
+            horse = await db.get(Horse, horse_id)
+            if not horse:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail={
+                        "code": "HORSE_NOT_FOUND",
+                        "message": f"马匹 {horse_id} 不存在",
+                    },
+                )
+            race_horse = RaceHorse(
+                race_id=race.id,
+                horse_id=horse.id,
+                snapshot_data=_build_snapshot(horse),
+            )
+            db.add(race_horse)
+
+        # Remove horses that are no longer in the list
+        for rh in list(race.race_horses):
+            if rh.horse_id not in new_horse_ids:
+                await db.delete(rh)
+
+    await db.flush()
+    # Re-query with eagerly loaded relationships
+    race = await get_race(db, race.id)
+    return race
+
+
+async def delete_race(db: AsyncSession, race_id: int) -> None:
+    """Delete a race. Only non-settled races can be deleted."""
+    race = await get_race(db, race_id)
+    if race is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={"code": "NOT_FOUND", "message": "比赛不存在"},
+        )
+
+    if race.status == RaceStatus.SETTLED:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "code": "RACE_SETTLED",
+                "message": "已结算比赛不可删除",
+            },
+        )
+
+    await db.delete(race)
+    await db.flush()

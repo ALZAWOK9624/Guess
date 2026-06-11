@@ -1,12 +1,19 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/authStore'
 import RaceCard from '@/components/RaceCard.vue'
+import GradeBadge from '@/components/GradeBadge.vue'
+import StatusBadge from '@/components/StatusBadge.vue'
+import { getRaces } from '@/api/races'
+import type { RaceListItem } from '@/types/race'
 
 type PageState = 'loading' | 'empty' | 'error' | 'success'
 
 const authStore = useAuthStore()
+const router = useRouter()
 const pageState = ref<PageState>('loading')
+const races = ref<RaceListItem[]>([])
 const errorMessage = ref('加载失败，请刷新重试')
 const refreshing = ref(false)
 
@@ -15,15 +22,13 @@ async function loadData() {
   errorMessage.value = '加载失败，请刷新重试'
 
   try {
-    // Placeholder for future story — replace with actual API call
-    // const races = await getRaces()
-    // if (races.length === 0) {
-    //   pageState.value = 'empty'
-    // } else {
-    //   pageState.value = 'success'
-    // }
-    // Temporary: simulate empty state for now
-    pageState.value = 'empty'
+    const data = await getRaces()
+    races.value = data
+    if (data.length === 0) {
+      pageState.value = 'empty'
+    } else {
+      pageState.value = 'success'
+    }
   } catch {
     pageState.value = 'error'
   }
@@ -33,6 +38,10 @@ async function handleRefresh() {
   refreshing.value = true
   await loadData()
   refreshing.value = false
+}
+
+function goToRaceDetail(raceId: number) {
+  router.push(`/races/${raceId}`)
 }
 
 onMounted(loadData)
@@ -73,10 +82,37 @@ onMounted(loadData)
       </div>
     </template>
 
-    <!-- Content (placeholder for future stories) -->
+    <!-- Race list -->
     <template v-else>
       <div class="race-list">
-        <p>比赛列表内容将在后续故事中展示</p>
+        <div
+          v-for="race in races"
+          :key="race.id"
+          class="race-card-wrapper"
+          @click="goToRaceDetail(race.id)"
+        >
+          <div class="race-card">
+            <div class="card-header">
+              <GradeBadge :grade="race.grade as any" />
+              <h2 class="race-name">{{ race.name }}</h2>
+              <StatusBadge :status="race.status as any" />
+              <span
+                v-if="race.status === 'voting'"
+                class="vote-entry"
+                @click.stop="goToRaceDetail(race.id)"
+                aria-label="前往投票"
+              >
+                投票
+              </span>
+            </div>
+            <div class="card-body">
+              <span class="race-date">{{ race.date }}</span>
+              <span class="race-meta">
+                {{ race.horse_count }} 匹参赛 · {{ race.vote_count }} 人已投
+              </span>
+            </div>
+          </div>
+        </div>
       </div>
     </template>
   </div>
@@ -84,7 +120,7 @@ onMounted(loadData)
 
 <style scoped>
 .home-page {
-  padding: var(--spacing-16);
+  padding: var(--spacing-4, 16px);
   max-width: 1280px;
   margin: 0 auto;
 }
@@ -92,7 +128,69 @@ onMounted(loadData)
 .race-list {
   display: flex;
   flex-direction: column;
-  gap: var(--spacing-12);
+  gap: var(--spacing-4, 16px);
+}
+
+.race-card-wrapper {
+  cursor: pointer;
+}
+
+.race-card {
+  background: var(--color-surface-raised, #FFFFFF);
+  border: 1px solid var(--color-border-hairline, #D4DCD0);
+  border-radius: var(--rounded-md, 10px);
+  padding: var(--spacing-5, 20px);
+  transition: box-shadow 0.15s;
+}
+
+.race-card:hover {
+  box-shadow: 0 2px 8px rgba(26, 86, 50, 0.08);
+}
+
+.card-header {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-3, 12px);
+  margin-bottom: var(--spacing-3, 12px);
+}
+
+.race-name {
+  font-size: var(--text-subheading, 18px);
+  font-weight: 600;
+  color: var(--color-ink-primary, #1A2E1A);
+  margin: 0;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.vote-entry {
+  background: var(--color-accent, #B8960C);
+  color: #FFFFFF;
+  padding: 4px 12px;
+  border-radius: var(--rounded-sm, 6px);
+  font-size: var(--text-caption, 12px);
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.card-body {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-4, 16px);
+}
+
+.race-date {
+  font-size: var(--text-caption, 12px);
+  color: var(--color-ink-secondary, #4A5A4A);
+  font-family: 'Barlow Condensed', system-ui, sans-serif;
+}
+
+.race-meta {
+  font-size: var(--text-caption, 12px);
+  color: var(--color-ink-secondary, #4A5A4A);
 }
 
 .state-container {
@@ -102,34 +200,33 @@ onMounted(loadData)
   justify-content: center;
   min-height: 50vh;
   text-align: center;
-  gap: var(--spacing-16);
+  gap: var(--spacing-4, 16px);
 }
 
 .empty-text {
   color: var(--color-ink-secondary);
-  font-size: var(--text-body);
+  font-size: var(--text-body, 16px);
 }
 
 .error-text {
-  color: var(--color-destructive);
-  font-size: var(--text-body);
+  color: var(--color-destructive, #C53030);
+  font-size: var(--text-body, 16px);
 }
 
 .refresh-btn {
   padding: 10px 24px;
-  font-size: var(--text-body);
+  font-size: var(--text-body, 16px);
   font-weight: 600;
   color: #ffffff;
-  background: var(--color-primary);
+  background: var(--color-primary, #1A5632);
   border: none;
-  border-radius: var(--rounded-md);
+  border-radius: var(--rounded-md, 10px);
   cursor: pointer;
   min-height: 44px;
-  transition: background 0.2s;
 }
 
 .refresh-btn:hover {
-  background: var(--color-primary-light);
+  background: var(--color-primary-light, #2D7A4F);
 }
 
 .refresh-btn:disabled {
@@ -138,6 +235,7 @@ onMounted(loadData)
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .race-card,
   .refresh-btn {
     transition: none;
   }

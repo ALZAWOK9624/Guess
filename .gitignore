@@ -27,3 +27,8 @@ Thumbs.db
 dist/
 build/
 *.db
+
+# Generated test/review output
+test_output*.txt
+review_diff.txt
+test_patch_result.txt

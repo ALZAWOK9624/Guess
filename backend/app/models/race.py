@@ -1,0 +1,75 @@
+"""Race and RaceHorse models — race management with horse snapshot."""
+
+import enum
+from datetime import date, datetime
+
+from sqlalchemy import Date, DateTime, Enum, ForeignKey, Integer, JSON, String, func
+from sqlalchemy.orm import Mapped, mapped_column, relationship
+
+from app.models import Base
+
+
+class GradeEnum(str, enum.Enum):
+    G1 = "G1"
+    G2_JPN1 = "G2_JPN1"
+    YOUNG_G1 = "YOUNG_G1"
+    CUSTOM = "CUSTOM"
+
+
+class RaceStatus(str, enum.Enum):
+    VOTING = "voting"
+    LOCKED = "locked"
+    SETTLED = "settled"
+
+
+class Race(Base):
+    __tablename__ = "races"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    name: Mapped[str] = mapped_column(String(200), nullable=False)
+    date: Mapped[date] = mapped_column(Date, nullable=False)
+    grade: Mapped[GradeEnum] = mapped_column(
+        Enum(GradeEnum, name="grade_enum"), nullable=False
+    )
+    status: Mapped[RaceStatus] = mapped_column(
+        Enum(RaceStatus, name="race_status_enum"),
+        nullable=False,
+        default=RaceStatus.VOTING,
+    )
+    custom_scoring: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    creator_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("users.id"), nullable=False
+    )
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
+    # Relationships
+    race_horses: Mapped[list["RaceHorse"]] = relationship(
+        back_populates="race", cascade="all, delete-orphan"
+    )
+
+
+class RaceHorse(Base):
+    __tablename__ = "race_horses"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    race_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("races.id", ondelete="CASCADE"), nullable=False
+    )
+    horse_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("horses.id", ondelete="CASCADE"), nullable=False
+    )
+    snapshot_data: Mapped[dict] = mapped_column(JSON, nullable=False)
+    position: Mapped[int | None] = mapped_column(Integer, nullable=True)
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+    # Relationships
+    race: Mapped["Race"] = relationship(back_populates="race_horses")
