@@ -206,6 +206,15 @@ _This file contains critical rules and patterns that AI agents must follow when 
 - Password reset uses **invite_code bound_username** as verification (no email/phone) — all failure cases (user not found, invite_code mismatch, disabled code) return the same `INVITE_CODE_MISMATCH` error to prevent user enumeration
 - ResetPasswordPage uses a **two-step form**: step 1 collects username + invite_code (frontend-only validation), step 2 collects new password (triggers API call). 400 errors fall back to step 1.
 
+**Service & DB patterns:**
+- `flush()` 后必须调用 `refresh()` 才能读取 `server_default`/`onupdate` 字段值（如 `created_at`、`updated_at`），否则 Pydantic `model_validate()` 会报 `MissingGreenlet` 错误。所有 CRUD 服务的 create/update 方法必须遵循 `flush()` → `refresh()` → return 模式。
+- Pydantic schemas：PATCH endpoint 使用的 Update schema（如 `HorseUpdate`）必须包含与 Create schema（如 `HorseCreate`）相同的 `@field_validator`，包括 `.strip()` 处理——因为用户可通过 API 直接调用 PATCH 绕过前端校验。
+
+**Frontend patterns:**
+- 管理后台 CRUD 页面使用 `<Teleport to="body">` 模态框进行创建/编辑操作，搜索框使用 300ms 防抖（`watch(search, debouncedSearch)` + `setTimeout`）。
+- **PATCH 编辑模式的关键模式**：`handleSave` 在编辑时必须按字段逐一比较当前值与原始值的差异，**仅发送变更的字段**，而非发送所有字段为 `null`。否则后端 `exclude_unset=True` 无法区分"用户未修改"和"用户将某字段清空为 null"——发送 `null` 会覆盖数据库中的已有值。参考实现：`frontend/src/pages/admin/HorsesPage.vue` 中的 `handleSave`。
+- 新建数据后不推荐 `unshift`，应 `push` 后按显示顺序 `sort()` 避免与后端排序不一致导致的视觉跳跃。
+
 ---
 
 ## Usage Guidelines
@@ -222,4 +231,4 @@ _This file contains critical rules and patterns that AI agents must follow when 
 - Review quarterly for outdated rules
 - Remove rules that become obvious over time
 
-Last Updated: 2026-06-10
+Last Updated: 2026-06-11
