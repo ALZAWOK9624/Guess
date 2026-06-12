@@ -86,6 +86,40 @@ async def update_horse(
     for field, value in update_data.items():
         setattr(horse, field, value)
 
+    # Track manually edited fields for auto-update protection
+    # Any field that gets updated via PATCH is added to the protection list
+    # so auto-updates will skip it (manual edit takes priority).
+    tracked_fields = [f for f in update_data.keys() if f not in ("name", "manually_updated_fields")]
+    if tracked_fields:
+        # Manually_updated_fields stores a list; handle None/empty list/falsy consistently
+        current_protected = horse.manually_updated_fields
+        protected_list = list(current_protected) if isinstance(current_protected, list) else []
+        for f in tracked_fields:
+            if f not in protected_list:
+                protected_list.append(f)
+        horse.manually_updated_fields = protected_list
+
+    await db.flush()
+    await db.refresh(horse)
+    return horse
+
+
+async def reset_auto_protection(
+    db: AsyncSession, horse_id: int
+) -> Horse:
+    """Clear the manually_updated_fields protection list for a horse.
+
+    After reset, all fields become eligible for auto-update overwrite.
+    Raises 404 if horse not found.
+    """
+    horse = await get_horse(db, horse_id)
+    if horse is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={"code": "NOT_FOUND", "message": "马匹不存在"},
+        )
+
+    horse.manually_updated_fields = None
     await db.flush()
     await db.refresh(horse)
     return horse

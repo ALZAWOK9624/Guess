@@ -345,3 +345,15 @@ async def delete_race(db: AsyncSession, race_id: int) -> None:
 
     await db.delete(race)
     await db.flush()
+
+
+# ===== Auto-Update Hook (Story 2.5) =====
+# TODO(Epic 3): Call auto_update_service.apply_auto_updates() after settlement.
+#   The caller MUST wrap this call in the same transaction as the settlement logic.
+#   apply_auto_updates() performs db.flush() internally; if an error occurs,
+#   the outer transaction rollback will undo all changes.
+# Usage:
+#   auto_update_service.apply_auto_updates(db, race_id, horse_updates)
+#   Where horse_updates = {horse_id: {field: value}} assembled by result settlement logic.
+# EXTENSION POINT: Register field-specific update rules here.
+# =========================================

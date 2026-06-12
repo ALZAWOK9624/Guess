@@ -69,3 +69,18 @@ async def delete_horse(
 ):
     """Delete a horse. Admin only."""
     await horse_service.delete_horse(db, horse_id)
+
+
+@router.post("/{horse_id}/reset-auto-protection", response_model=dict)
+async def reset_horse_auto_protection(
+    horse_id: int,
+    db: AsyncSession = Depends(get_db),
+    _admin=Depends(get_current_admin),
+):
+    """Clear manually_updated_fields protection list for a horse.
+
+    After reset, all fields become eligible for auto-update overwrite.
+    Admin only.
+    """
+    horse = await horse_service.reset_auto_protection(db, horse_id)
+    return {"data": HorseResponse.model_validate(horse)}

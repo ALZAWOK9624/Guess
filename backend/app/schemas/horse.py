@@ -59,6 +59,7 @@ class HorseResponse(BaseModel):
     jockey: str | None = None
     previous_result: str | None = None
     best_win: str | None = None
+    manually_updated_fields: list[str] | None = None
     created_at: datetime
     updated_at: datetime
 

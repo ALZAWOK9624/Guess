@@ -2,7 +2,7 @@
 
 from datetime import datetime
 
-from sqlalchemy import DateTime, Integer, String, func
+from sqlalchemy import DateTime, Integer, JSON, String, func
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.models import Base
@@ -24,6 +24,7 @@ class Horse(Base):
     jockey: Mapped[str | None] = mapped_column(String(50), nullable=True)
     previous_result: Mapped[str | None] = mapped_column(String(100), nullable=True)
     best_win: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    manually_updated_fields: Mapped[list | None] = mapped_column(JSON, nullable=True)
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
