@@ -3,12 +3,14 @@
 from datetime import date, datetime
 
 import pytest
+from fastapi import HTTPException
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_db, get_current_admin
 from app.main import app
 from app.models.horse import Horse
+from app.models.race import RaceStatus
 from app.schemas.horse import HorseCreate
 
 
@@ -201,6 +203,7 @@ class TestRaceService:
     async def test_delete_race(self, db_session: AsyncSession):
         from app.services.race_service import create_race, delete_race, get_race
         from app.schemas.race import RaceCreate
+        from sqlalchemy import select
 
         h1 = await _create_horse(db_session, SAMPLE_HORSE)
         h2 = await _create_horse(db_session, SAMPLE_HORSE_2)
@@ -214,6 +217,49 @@ class TestRaceService:
 
         found = await get_race(db_session, created.id)
         assert found is None
+
+        # Verify cascade delete of race_horses
+        from app.models.race import RaceHorse
+        result = await db_session.execute(
+            select(RaceHorse).where(RaceHorse.race_id == created.id)
+        )
+        remaining = result.scalars().all()
+        assert len(remaining) == 0, "race_horses should be cascade-deleted"
+
+        await db_session.rollback()
+
+    @pytest.mark.asyncio
+    async def test_delete_race_settled(self, db_session: AsyncSession):
+        from app.services.race_service import create_race, delete_race
+        from app.schemas.race import RaceCreate
+
+        h1 = await _create_horse(db_session, SAMPLE_HORSE)
+        h2 = await _create_horse(db_session, SAMPLE_HORSE_2)
+
+        created = await create_race(db_session, RaceCreate(
+            name="SettledRace", date=date(2026, 6, 15), grade="G1",
+            horse_ids=[h1.id, h2.id],
+        ), creator_id=1)
+
+        # Manually set status to SETTLED to simulate settled race
+        created.status = RaceStatus.SETTLED
+        await db_session.flush()
+
+        with pytest.raises(HTTPException) as exc_info:
+            await delete_race(db_session, created.id)
+        assert exc_info.value.status_code == 400
+        assert exc_info.value.detail["code"] == "RACE_SETTLED"
+
+        await db_session.rollback()
+
+    @pytest.mark.asyncio
+    async def test_delete_race_not_found(self, db_session: AsyncSession):
+        from app.services.race_service import delete_race
+
+        with pytest.raises(HTTPException) as exc_info:
+            await delete_race(db_session, 99999)
+        assert exc_info.value.status_code == 404
+        assert exc_info.value.detail["code"] == "NOT_FOUND"
 
         await db_session.rollback()
 
@@ -394,7 +440,101 @@ class TestRaceAPI:
         app.dependency_overrides.clear()
 
     @pytest.mark.asyncio
-    async def test_unauthenticated_create_race_api(self, db_session: AsyncSession):
+    async def test_delete_nonexistent_race_api(self, db_session: AsyncSession):
+        """DELETE non-existent race → 404."""
+        app.dependency_overrides[get_db] = lambda: db_session
+        app.dependency_overrides[get_current_admin] = override_get_admin
+
+        transport = ASGITransport(app=app)
+        async with AsyncClient(transport=transport, base_url="http://test") as client:
+            resp = await client.delete("/api/v1/races/99999")
+            assert resp.status_code == 404
+            data = resp.json()
+            assert data["detail"]["code"] == "NOT_FOUND"
+
+        app.dependency_overrides.clear()
+
+    @pytest.mark.asyncio
+    async def test_delete_settled_race_api(self, db_session: AsyncSession):
+        """DELETE settled race → 400."""
+        from app.services.race_service import create_race
+        from app.schemas.race import RaceCreate
+
+        h1 = await _create_horse(db_session, SAMPLE_HORSE)
+        h2 = await _create_horse(db_session, SAMPLE_HORSE_2)
+
+        created = await create_race(db_session, RaceCreate(
+            name="SettledDelete", date=date(2026, 6, 15), grade="G1",
+            horse_ids=[h1.id, h2.id],
+        ), creator_id=1)
+        created.status = RaceStatus.SETTLED
+        await db_session.flush()
+
+        app.dependency_overrides[get_db] = lambda: db_session
+        app.dependency_overrides[get_current_admin] = override_get_admin
+
+        transport = ASGITransport(app=app)
+        async with AsyncClient(transport=transport, base_url="http://test") as client:
+            resp = await client.delete(f"/api/v1/races/{created.id}")
+            assert resp.status_code == 400
+            data = resp.json()
+            assert data["detail"]["code"] == "RACE_SETTLED"
+
+        app.dependency_overrides.clear()
+
+    @pytest.mark.asyncio
+    async def test_delete_locked_race_api(self, db_session: AsyncSession):
+        """DELETE locked race → 204."""
+        from app.services.race_service import create_race
+        from app.schemas.race import RaceCreate
+
+        h1 = await _create_horse(db_session, SAMPLE_HORSE)
+        h2 = await _create_horse(db_session, SAMPLE_HORSE_2)
+
+        created = await create_race(db_session, RaceCreate(
+            name="LockedDelete", date=date(2026, 6, 15), grade="G1",
+            horse_ids=[h1.id, h2.id],
+        ), creator_id=1)
+        created.status = RaceStatus.LOCKED
+        await db_session.flush()
+
+        app.dependency_overrides[get_db] = lambda: db_session
+        app.dependency_overrides[get_current_admin] = override_get_admin
+
+        transport = ASGITransport(app=app)
+        async with AsyncClient(transport=transport, base_url="http://test") as client:
+            resp = await client.delete(f"/api/v1/races/{created.id}")
+            assert resp.status_code == 204
+
+            # Verify deleted
+            get_resp = await client.get(f"/api/v1/races/{created.id}")
+            assert get_resp.status_code == 404
+
+        app.dependency_overrides.clear()
+
+    @pytest.mark.asyncio
+    async def test_unauthenticated_delete_race_api(self, db_session: AsyncSession):
+        """DELETE without admin auth → 401."""
+        from app.services.race_service import create_race
+        from app.schemas.race import RaceCreate
+
+        h1 = await _create_horse(db_session, SAMPLE_HORSE)
+        h2 = await _create_horse(db_session, SAMPLE_HORSE_2)
+
+        created = await create_race(db_session, RaceCreate(
+            name="NoAuthDelete", date=date(2026, 6, 15), grade="G1",
+            horse_ids=[h1.id, h2.id],
+        ), creator_id=1)
+
+        app.dependency_overrides[get_db] = lambda: db_session
+        # No admin override → unauthenticated
+
+        transport = ASGITransport(app=app)
+        async with AsyncClient(transport=transport, base_url="http://test") as client:
+            resp = await client.delete(f"/api/v1/races/{created.id}")
+            assert resp.status_code == 401
+
+        app.dependency_overrides.clear()
         app.dependency_overrides[get_db] = lambda: db_session
         # No admin override → no auth token
 

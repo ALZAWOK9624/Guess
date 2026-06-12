@@ -1,11 +1,11 @@
 ---
 project_name: 'guess'
 user_name: 'tkd'
-date: '2026-06-11'
+date: '2026-06-12'
 sections_completed:
   ['technology_stack', 'language_rules', 'framework_rules', 'testing_rules', 'code_quality', 'workflow', 'critical_rules']
 status: 'complete'
-rule_count: 76
+rule_count: 80
 optimized_for_llm: true
 ---
 
@@ -56,6 +56,9 @@ _This file contains critical rules and patterns that AI agents must follow when 
 - `RaceCard.vue` 支持 `skeleton` prop，未来故事可直接使用 `<RaceCard skeleton />` 渲染骨架屏。
 - `HorseSearchSelect.vue` 使用 `defineModel<Horse[]>('selectedHorses')` 实现 v-model 双向绑定 — 新增组件应优先使用 `defineModel` 替代手动 `emit('update:...')` 模式。
 - `HorseDetailCard.vue` 用于展示马匹 10 属性快照数据，接收 `snapshotData` prop（可空，通过 `withDefaults` 提供默认值）。
+- `GradeBadge.vue` 用于展示比赛等级徽章：G1（金色底#B8960C）、G2_JPN1（灰色底#6B7280）、YOUNG_G1（亮绿底#2D7A4F）、CUSTOM（灰色底虚线边框）。接收 `grade: string` prop。
+- `StatusBadge.vue` 用于展示比赛状态胶囊：voting（绿底#2D7A4F）、locked（灰底#6B7280 + 🔒）、settled（深绿底#0D3A1F + ✓）。接收 `status: string` prop。
+- `ConfirmDeleteModal.vue` 可复用删除确认弹窗组件，接收 `title`, `itemName`, `message`, `loading` props，emit `confirm` / `cancel`。使用 `<Teleport to="body">` + `role="dialog"` + `aria-modal` + Esc 关闭 + 遮罩层点击关闭。不可点击遮罩层外部关闭（防误触）。
 - `CreateRacePage.vue` 使用 **grade radio selector** 模式（G1 / G2·JPN1 / 2岁G1 / 自定义），自定义等级时展开显示积分列表和扣分规则输入框。
 - 全局 `@keyframes skeleton-shimmer` 定义在 `base.css` 中，所有骨架屏复用此动画。
 
@@ -208,7 +211,8 @@ _This file contains critical rules and patterns that AI agents must follow when 
 - Race horse data uses **snapshot** mechanism — horse attributes at creation time are frozen in `RaceHorse.snapshot_data` JSON. Race detail pages read from snapshot_data, NOT the live Horse table. Editing a race does NOT update existing snapshots; new horses added via edit get fresh snapshots at add time.
 - Race status machine: `voting` → `locked` → `settled` (one direction). Only `voting` races are editable. `locked` races block voting. `settled` races are final (can only modify results).
 - Race grade enum: `G1`, `G2_JPN1`, `YOUNG_G1`, `CUSTOM`. Custom scoring uses JSON format: `{"positive_scores": [10,7,5,3,2,1], "penalty_rules": [{"position": -1, "points": -5}]}`.
-- Settled races cannot be deleted — only result modification with full rollback/recalculate
+- Settled races cannot be deleted — only result modification with full rollback/recalculate. `voting` 和 `locked` 状态的比赛可以删除（含级联删除投票记录）。删除操作需要管理员权限和二次确认弹窗，使用 `ConfirmDeleteModal` 组件。
+- `DashboardPage.vue`（`/admin` 路由）为管理后台比赛列表主页，显示所有比赛及其 GradeBadge/StatusBadge/日期/参赛数，提供「编辑」（跳转 `/admin/races/:id/edit`）和「删除」（仅非已结算比赛可见）操作按钮。使用 PageState 枚举模式管理 loading/empty/error/success 状态。
 - DNF/scratched horses score 0 points and are excluded from deduction calculation denominators
 - Custom scoring rules apply only to the current race — not saved as templates
 - Password reset uses **invite_code bound_username** as verification (no email/phone) — all failure cases (user not found, invite_code mismatch, disabled code) return the same `INVITE_CODE_MISMATCH` error to prevent user enumeration
@@ -240,4 +244,4 @@ _This file contains critical rules and patterns that AI agents must follow when 
 - Review quarterly for outdated rules
 - Remove rules that become obvious over time
 
-Last Updated: 2026-06-11
+Last Updated: 2026-06-12

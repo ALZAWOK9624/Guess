@@ -2,7 +2,8 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import HorseSearchSelect from '@/components/HorseSearchSelect.vue'
-import { getRace, updateRace } from '@/api/races'
+import ConfirmDeleteModal from '@/components/ConfirmDeleteModal.vue'
+import { getRace, updateRace, deleteRace } from '@/api/races'
 import type { Horse } from '@/types/horse'
 import type { RaceDetail, Grade } from '@/types/race'
 
@@ -22,6 +23,11 @@ const isLoading = ref(true)
 const formError = ref('')
 const notEditable = ref(false)
 const notEditableMessage = ref('')
+
+// Delete state
+const showDeleteModal = ref(false)
+const isDeleting = ref(false)
+const deleteError = ref('')
 
 const grades = [
   { value: 'G1', label: 'G1' },
@@ -184,6 +190,30 @@ async function handleSubmit() {
     isSubmitting.value = false
   }
 }
+
+function promptDelete() {
+  deleteError.value = ''
+  showDeleteModal.value = true
+}
+
+function cancelDelete() {
+  showDeleteModal.value = false
+  deleteError.value = ''
+}
+
+async function handleDelete() {
+  if (isDeleting.value) return
+  isDeleting.value = true
+  deleteError.value = ''
+  try {
+    await deleteRace(raceId)
+    router.push('/admin')
+  } catch (err: any) {
+    deleteError.value = err?.response?.data?.detail?.message || '删除失败，请重试'
+  } finally {
+    isDeleting.value = false
+  }
+}
 </script>
 
 <template>
@@ -311,8 +341,29 @@ async function handleSubmit() {
         >
           {{ isSubmitting ? '保存中…' : '保存修改' }}
         </button>
+        <button
+          type="button"
+          class="btn btn-destructive"
+          @click="promptDelete"
+        >
+          删除比赛
+        </button>
       </div>
+
+      <!-- Delete error -->
+      <p v-if="deleteError" class="form-error" role="alert">{{ deleteError }}</p>
     </form>
+
+    <!-- Delete confirmation modal -->
+    <ConfirmDeleteModal
+      v-if="showDeleteModal"
+      title="删除比赛"
+      :item-name="raceName"
+      message="确定删除「{name}」？所有投票记录将被清除。"
+      :loading="isDeleting"
+      @confirm="handleDelete"
+      @cancel="cancelDelete"
+    />
   </div>
 </template>
 
@@ -491,5 +542,15 @@ async function handleSubmit() {
   background: var(--color-surface-raised, #FFFFFF);
   color: var(--color-ink-primary, #1A2E1A);
   border: 1px solid var(--color-border-strong, #A8B8A4);
+}
+
+.btn-destructive {
+  background: var(--color-surface-raised, #FFFFFF);
+  color: var(--color-destructive, #C53030);
+  border: 1px solid var(--color-destructive, #C53030);
+}
+
+.btn-destructive:hover:not(:disabled) {
+  background: var(--color-destructive-light, #FED7D7);
 }
 </style>
