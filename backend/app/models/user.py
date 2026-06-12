@@ -3,7 +3,7 @@
 from datetime import datetime
 
 from sqlalchemy import Boolean, DateTime, String, func
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models import Base
 
@@ -19,6 +19,11 @@ class User(Base):
     qq: Mapped[str] = mapped_column(String(20), nullable=False)
     invite_code: Mapped[str] = mapped_column(String(8), nullable=False)
     is_admin: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+
+    # Relationships
+    votes: Mapped[list["Vote"]] = relationship(
+        back_populates="user", cascade="all, delete-orphan"
+    )
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()

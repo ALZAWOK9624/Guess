@@ -2,6 +2,7 @@
 project_name: 'guess'
 user_name: 'tkd'
 date: '2026-06-12'
+story: '3.2-voting-system-backend'
 sections_completed:
   ['technology_stack', 'language_rules', 'framework_rules', 'testing_rules', 'code_quality', 'workflow', 'critical_rules']
 status: 'complete'
@@ -218,6 +219,13 @@ _This file contains critical rules and patterns that AI agents must follow when 
 - Password reset uses **invite_code bound_username** as verification (no email/phone) — all failure cases (user not found, invite_code mismatch, disabled code) return the same `INVITE_CODE_MISMATCH` error to prevent user enumeration
 - ResetPasswordPage uses a **two-step form**: step 1 collects username + invite_code (frontend-only validation), step 2 collects new password (triggers API call). 400 errors fall back to step 1.
 
+**Voting System 模式（Story 3.2）：**
+- Vote 模型：`(user_id, race_id)` 唯一约束实现一用户一票一赛。`race_horse_id` FK 指向 `race_horses.id`（**无** CASCADE——防止编辑比赛移除马匹时静默删除投票）。`user_id` 和 `race_id` FK 有 CASCADE（用户删除或比赛删除时级联清理）。
+- **投票 Upsert 防竞态模式**：`vote_service.create_or_update_vote()` 使用 SELECT → check → INSERT/UPDATE 模式，外层包裹 `try/except IntegrityError`。当并发请求同时通过 SELECT（均未找到现有投票）时，第二个 INSERT 触发唯一约束冲突，`IntegrityError` 被捕获后回滚并重试 SELECT → UPDATE，返回 200。此模式替代 `ON CONFLICT DO UPDATE`（SQLAlchemy async + SQLite 测试兼容性考量）。
+- **Post-vote eager-load 模式**：`create_or_update_vote()` 在 `flush()` + `refresh()` 后，额外执行一次带 `selectinload(Vote.race_horse_rel)` 的查询以解析马名。端点层不再单独调用 `get_race_votes()`（避免 N+1 和冗余查询）。
+- **Lock 操作模式**：`POST /api/v1/races/{race_id}/lock` 为管理员专用端点（`Depends(get_current_admin)`）。使用否定检查 `if race.status != RaceStatus.VOTING`（而非列举非目标状态）以确保未来状态扩展的健壮性。仅 `voting` 状态可锁定。
+- **编辑比赛防删票保护**：`race_service.update_race()` 在移除马匹时，先查询 `Vote` 表检查被移除的 `race_horse_ids` 是否存在投票。若有投票存在，返回 400 `HORSE_HAS_VOTES` 拒绝操作。此保护覆盖 Story 3.2 中移除的 race_horse_id FK CASCADE 限制（无 DB 级 CASCADE，改由应用层保护）。
+
 **Service & DB patterns:**
 - `flush()` 后必须调用 `refresh()` 才能读取 `server_default`/`onupdate` 字段值（如 `created_at`、`updated_at`），否则 Pydantic `model_validate()` 会报 `MissingGreenlet` 错误。所有 CRUD 服务的 create/update 方法必须遵循 `flush()` → `refresh()` → return 模式。
 - Pydantic schemas：PATCH endpoint 使用的 Update schema（如 `HorseUpdate`）必须包含与 Create schema（如 `HorseCreate`）相同的 `@field_validator`，包括 `.strip()` 处理——因为用户可通过 API 直接调用 PATCH 绕过前端校验。
@@ -262,4 +270,4 @@ _This file contains critical rules and patterns that AI agents must follow when 
 - Review quarterly for outdated rules
 - Remove rules that become obvious over time
 
-Last Updated: 2026-06-12 (Story 3.1 scoring engine done + code review)
+Last Updated: 2026-06-12 (Story 3.2 voting system backend — upsert pattern, lock operation, edit-horse-vote guard)

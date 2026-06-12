@@ -52,6 +52,9 @@ class Race(Base):
     race_horses: Mapped[list["RaceHorse"]] = relationship(
         back_populates="race", cascade="all, delete-orphan"
     )
+    votes: Mapped[list["Vote"]] = relationship(
+        back_populates="race", cascade="all, delete-orphan"
+    )
 
 
 class RaceHorse(Base):
@@ -73,3 +76,6 @@ class RaceHorse(Base):
 
     # Relationships
     race: Mapped["Race"] = relationship(back_populates="race_horses")
+    votes: Mapped[list["Vote"]] = relationship(
+        back_populates="race_horse_rel", cascade="all, delete-orphan"
+    )

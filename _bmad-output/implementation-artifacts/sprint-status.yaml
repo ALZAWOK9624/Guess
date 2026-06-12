@@ -1,5 +1,5 @@
 # generated: 2026-06-09T17:36
-# last_updated: 2026-06-12T16:42
+# last_updated: 2026-06-12T17:48
 # project: guess
 # project_key: NOKEY
 # tracking_system: file-system
@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: 2026-06-09T17:36
-last_updated: 2026-06-12T17:28
+last_updated: 2026-06-12T17:48
 project: guess
 project_key: NOKEY
 tracking_system: file-system
@@ -66,7 +66,7 @@ development_status:
   # Epic 3: Voting, Scoring Engine & Leaderboard
   epic-3: in-progress
   3-1-scoring-engine: done
-  3-2-voting-system-backend: backlog
+  3-2-voting-system-backend: review
   3-3-voting-frontend-interaction: backlog
   3-4-result-entry-drag-sort: backlog
   3-5-point-settlement-leaderboard: backlog

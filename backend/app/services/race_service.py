@@ -57,11 +57,11 @@ async def get_race(db: AsyncSession, race_id: int) -> Race | None:
 
 
 async def get_race_vote_count(db: AsyncSession, race_id: int) -> int:
-    """Get the number of votes for a race.
-
-    Currently returns 0; will be implemented properly when Vote model exists.
-    """
-    return 0
+    """Get the number of votes for a race."""
+    from app.models.vote import Vote
+    stmt = select(func.count(Vote.id)).where(Vote.race_id == race_id)
+    result = await db.execute(stmt)
+    return result.scalar() or 0
 
 
 def validate_custom_scoring(
@@ -315,8 +315,26 @@ async def update_race(
             db.add(race_horse)
 
         # Remove horses that are no longer in the list
-        for rh in list(race.race_horses):
-            if rh.horse_id not in new_horse_ids:
+        removed_rhs = [rh for rh in race.race_horses if rh.horse_id not in new_horse_ids]
+        if removed_rhs:
+            # Check if any removed horse has existing votes
+            from app.models.vote import Vote
+            removed_rh_ids = [rh.id for rh in removed_rhs]
+            vote_stmt = select(func.count(Vote.id)).where(
+                Vote.race_id == race_id,
+                Vote.race_horse_id.in_(removed_rh_ids),
+            )
+            vote_result = await db.execute(vote_stmt)
+            vote_count_removed = vote_result.scalar() or 0
+            if vote_count_removed > 0:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail={
+                        "code": "HORSE_HAS_VOTES",
+                        "message": "无法移除已有投票的马匹",
+                    },
+                )
+            for rh in removed_rhs:
                 await db.delete(rh)
 
     await db.flush()
