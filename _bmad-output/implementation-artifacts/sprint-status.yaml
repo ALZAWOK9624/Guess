@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: 2026-06-09T17:36
-last_updated: 2026-06-12T17:00
+last_updated: 2026-06-12T17:25
 project: guess
 project_key: NOKEY
 tracking_system: file-system
@@ -55,13 +55,13 @@ development_status:
   epic-1-retrospective: done
 
   # Epic 2: Horse Library & Race Management
-  epic-2: in-progress
+  epic-2: done
   2-1-horse-data-model-management: done
   2-2-horse-search-selector: done
   2-3-race-creation-management: done
   2-4-race-deletion-horse-details: done
   2-5-horse-auto-update-framework: done
-  epic-2-retrospective: optional
+  epic-2-retrospective: done
 
   # Epic 3: Voting, Scoring Engine & Leaderboard
   epic-3: backlog

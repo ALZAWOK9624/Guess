@@ -7,6 +7,7 @@ Create Date: 2026-06-11
 
 from alembic import op
 import sqlalchemy as sa
+from sqlalchemy.dialects.postgresql import ENUM
 
 revision = "004"
 down_revision = "003"
@@ -15,13 +16,31 @@ depends_on = None
 
 
 def upgrade() -> None:
-    # Create grade_enum type
-    grade_enum = sa.Enum("G1", "G2_JPN1", "YOUNG_G1", "CUSTOM", name="grade_enum")
-    grade_enum.create(op.get_bind())
+    # Create grade_enum type if not exists (raw SQL to handle idempotency)
+    op.execute("""
+    DO $$
+    BEGIN
+        IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'grade_enum') THEN
+            CREATE TYPE grade_enum AS ENUM ('G1', 'G2_JPN1', 'YOUNG_G1', 'CUSTOM');
+        END IF;
+    END
+    $$;
+    """)
 
-    # Create race_status_enum type
-    status_enum = sa.Enum("voting", "locked", "settled", name="race_status_enum")
-    status_enum.create(op.get_bind())
+    # Create race_status_enum type if not exists (uppercase to match SQLAlchemy default behavior)
+    op.execute("""
+    DO $$
+    BEGIN
+        IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'race_status_enum') THEN
+            CREATE TYPE race_status_enum AS ENUM ('VOTING', 'LOCKED', 'SETTLED');
+        END IF;
+    END
+    $$;
+    """)
+
+    # Declare enums with create_type=False to prevent duplicate creation in create_table
+    grade_enum = ENUM("G1", "G2_JPN1", "YOUNG_G1", "CUSTOM", name="grade_enum", create_type=False)
+    status_enum = ENUM("VOTING", "LOCKED", "SETTLED", name="race_status_enum", create_type=False)
 
     # Create races table
     op.create_table(

@@ -226,6 +226,7 @@ _This file contains critical rules and patterns that AI agents must follow when 
 - **事务原子性模式**：`apply_auto_updates` 遵循"先全部验证再批量更新"模式——先验证所有 horse_id 存在，再逐个更新 + flush + refresh。调用方必须在同一事务中包裹此调用。
 - **字段名校验模式**：通过 `inspect(Horse).columns` 获取有效列名集合，在 `apply_auto_updates` 中验证 `field_name` 是否有效，无效字段返回 400 `INVALID_FIELD`。避免 `setattr` 动态创建属性导致静默丢失更新。
 - **变更日志模式**：`HorseAutoUpdateLog` 模型记录每次自动更新的字段级变更（old_value/new_value 为 Text 类型避免截断），`trigger_source` 标记触发来源（v1 固定 "settlement"）。外键：`horse_id` CASCADE, `race_id` SET NULL。
+- **Alembic 迁移枚举经验**：使用 `sa.Enum` 创建 PostgreSQL 枚举时，SQLAlchemy 默认使用 Python enum 的**成员名**（大写）作为数据库枚举值。手写迁移创建枚举时需保持大小写一致。推荐使用 `op.execute("CREATE TYPE ... AS ENUM (...)")` + `ENUM(..., create_type=False)` 模式以实现幂等迁移。
 
 **Frontend patterns:**
 - 管理后台 CRUD 页面使用 `<Teleport to="body">` 模态框进行创建/编辑操作，搜索框使用 300ms 防抖（`watch(search, debouncedSearch)` + `setTimeout`）。
@@ -248,4 +249,4 @@ _This file contains critical rules and patterns that AI agents must follow when 
 - Review quarterly for outdated rules
 - Remove rules that become obvious over time
 
-Last Updated: 2026-06-12 (Story 2.5: auto-update framework, manual edit tracking, change log)
+Last Updated: 2026-06-12 (Epic 2 done + retrospective, migration enum uppercase fix)

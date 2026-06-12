@@ -73,7 +73,7 @@ onMounted(async () => {
     raceGrade.value = race.grade
 
     // Convert horse snapshots back to Horse type for the selector
-    selectedHorses.value = race.horses.map(h => ({
+    const mapped: Horse[] = race.horses.map(h => ({
       id: h.horse_id,
       name: h.snapshot_data.name,
       sex: h.snapshot_data.sex,
@@ -87,7 +87,8 @@ onMounted(async () => {
       best_win: h.snapshot_data.best_win,
       created_at: '',
       updated_at: '',
-    } satisfies Horse) as Horse[]
+    }))
+    selectedHorses.value = mapped
 
     // Store initial values for change detection
     initialValues.value = {
