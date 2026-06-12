@@ -27,6 +27,7 @@ export interface RaceDetail {
 
 export interface RaceHorseSnapshot {
   horse_id: number
+  race_horse_id: number
   snapshot_data: HorseSnapshotData
   position: number | null
 }

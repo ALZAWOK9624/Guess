@@ -98,6 +98,7 @@ class RaceUpdate(BaseModel):
 
 
 class RaceHorseResponse(BaseModel):
+    race_horse_id: int
     horse_id: int
     snapshot_data: HorseSnapshot
     position: int | None = None

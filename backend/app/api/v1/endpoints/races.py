@@ -64,6 +64,7 @@ async def get_race(
         custom_scoring=CustomScoring(**race.custom_scoring) if race.custom_scoring else None,
         horses=[
             {
+                "race_horse_id": rh.id,
                 "horse_id": rh.horse_id,
                 "snapshot_data": rh.snapshot_data,
                 "position": rh.position,
@@ -96,6 +97,7 @@ async def create_race(
         custom_scoring=CustomScoring(**race.custom_scoring) if race.custom_scoring else None,
         horses=[
             {
+                "race_horse_id": rh.id,
                 "horse_id": rh.horse_id,
                 "snapshot_data": rh.snapshot_data,
                 "position": rh.position,
@@ -129,6 +131,7 @@ async def update_race(
         custom_scoring=CustomScoring(**race.custom_scoring) if race.custom_scoring else None,
         horses=[
             {
+                "race_horse_id": rh.id,
                 "horse_id": rh.horse_id,
                 "snapshot_data": rh.snapshot_data,
                 "position": rh.position,

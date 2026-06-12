@@ -2,7 +2,7 @@
 project_name: 'guess'
 user_name: 'tkd'
 date: '2026-06-12'
-story: '3.2-voting-system-backend'
+story: '3.3-voting-frontend-interaction'
 sections_completed:
   ['technology_stack', 'language_rules', 'framework_rules', 'testing_rules', 'code_quality', 'workflow', 'critical_rules']
 status: 'complete'
@@ -254,6 +254,25 @@ _This file contains critical rules and patterns that AI agents must follow when 
 - **PATCH 编辑模式的关键模式**：`handleSave` 在编辑时必须按字段逐一比较当前值与原始值的差异，**仅发送变更的字段**，而非发送所有字段为 `null`。否则后端 `exclude_unset=True` 无法区分"用户未修改"和"用户将某字段清空为 null"——发送 `null` 会覆盖数据库中的已有值。参考实现：`frontend/src/pages/admin/HorsesPage.vue` 中的 `handleSave`。
 - 新建数据后不推荐 `unshift`，应 `push` 后按显示顺序 `sort()` 避免与后端排序不一致导致的视觉跳跃。
 
+**VoteButton 状态机（Story 3.3）：**
+- `VoteButton.vue` 有 7 个状态：`voting-unvoted-loggedin`（金底"投票"）/ `voting-unvoted-guest`（金底"投票"）/ `voting-voted`（绿底"✓ 已投：{马名}"）/ `locked-voted`（灰底"投票已截止"）/ `locked-unvoted`（灰底"投票已截止。你未参与本场竞猜。"）/ `settled`（灰底"已结算"）。`voting-unvoted-loggedin` 和 `voting-voted` 是可交互的。
+- `buttonState` 使用 `computed` 根据 `raceStatus` + `votedHorseName` + `isLoggedIn` 派生，不使用中间 `voting-modify` 状态——修改流程由父组件 `RaceDetailPage.vue` 直接进入选择模式处理。
+- 移动端固定底部定位（`position: fixed; bottom: 0`），桌面端 768px 断点切换为 `position: static`（内联）。始终使用 `env(safe-area-inset-bottom)` 适配刘海屏。
+
+**useVote composable 模式（Story 3.3）：**
+- `selectHorse(horse, raceId)` 在选择模式下直接调用 `confirmVote(raceId)`，实现"选马即提交"——无确认按钮，核心投票 2 次点击 ✅。
+- 乐观更新模式：先设 `votedHorseName = optimisticName`，API 成功后用 `result.horse_name` 覆盖，失败时回滚为 `previousVotedName`。
+- `confirmVote` 成功后 `loadVotes(raceId)` 有独立 try/catch——不因投票分布刷新失败而影响投票状态。
+- `enterSelectionMode(raceHorses)` 接收当前比赛的马匹列表，根据 `votedHorseName` 查找并预选对应马匹（实现 AC-4 修改时预选）。
+- 组件卸载保护：`let unmounted = false` + `onUnmounted(() => { unmounted = true })`，所有 `await` 后的状态更新前检查 `if (unmounted) return`。
+
+**RaceDetailPage 投票集成模式（Story 3.3）：**
+- 选择模式 inline 展开（非弹窗）：`v-if="isInSelectionMode"` 切换 HorseDetailCard（普通视图）↔ HorseSelectCard（选择模式）。选择模式包含取消按钮（用于退出选择模式）和错误提示。
+- 锁定/已结算状态：通过 `.voted-horse` CSS 类（金色边框）在 HorseDetailCard 上高亮用户投中的马匹，满足 AC-5。
+- VotingDetail 组件在投票/锁定比赛时显示"用户名 → 马匹名"分布，刷新策略：仅在页面加载和投票成功后刷新，无轮询。
+- HorseSelectCard 使用 `role="radio"` + `:name="'vote-group-' + raceId"` 实现无障碍单选组。
+- VotingDetail 的 `v-for` key 使用 `index`（而非复合 key），避免同一用户修改投票后的 key 冲突。
+
 ---
 
 ## Usage Guidelines
@@ -270,4 +289,4 @@ _This file contains critical rules and patterns that AI agents must follow when 
 - Review quarterly for outdated rules
 - Remove rules that become obvious over time
 
-Last Updated: 2026-06-12 (Story 3.2 voting system backend — upsert pattern, lock operation, edit-horse-vote guard)
+Last Updated: 2026-06-12 (Story 3.3 voting frontend interaction — VoteButton state machine, useVote composable, direct-submit flow, pre-selection on modify)
