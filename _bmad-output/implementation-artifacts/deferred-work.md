@@ -5,3 +5,7 @@
 - parseCustomScoring 前端校验不足 — pre-existing from Story 2.3
 - Dashboard 401 认证过期未单独处理 — pre-existing 模式
 - StatusBadge Unicode 图标无障碍替代文本缺失 — pre-existing
+
+## Deferred from: code review of story 3.1-scoring-engine (2026-06-12)
+
+- AC-5 示例描述中数字笔误（"5 points for the 6th position" 应为 "1 point"） — 代码实现正确，仅故事文件示例数字需调整

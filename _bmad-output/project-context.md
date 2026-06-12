@@ -228,6 +228,19 @@ _This file contains critical rules and patterns that AI agents must follow when 
 - **变更日志模式**：`HorseAutoUpdateLog` 模型记录每次自动更新的字段级变更（old_value/new_value 为 Text 类型避免截断），`trigger_source` 标记触发来源（v1 固定 "settlement"）。外键：`horse_id` CASCADE, `race_id` SET NULL。
 - **Alembic 迁移枚举经验**：使用 `sa.Enum` 创建 PostgreSQL 枚举时，SQLAlchemy 默认使用 Python enum 的**成员名**（大写）作为数据库枚举值。手写迁移创建枚举时需保持大小写一致。推荐使用 `op.execute("CREATE TYPE ... AS ENUM (...)")` + `ENUM(..., create_type=False)` 模式以实现幂等迁移。
 
+**Scoring Engine 纯函数模式（Story 3.1）：**
+- `scoring_engine.py` 必须是纯函数模块，零外部依赖，仅允许 `from typing import Any`。禁止导入 FastAPI、SQLAlchemy 或任何 DB 相关模块。
+- 公共 API：`calculate_score(grade: str, total_horses: int, position: int, custom_scoring: dict | None = None) -> int`
+- G1 扣分使用**绝对位置转换公式**：`penalty_position = total_horses + offset + 1`，其中 `offset` 为负数（-1=最后一名，-2=倒数第二名，依此类推）。
+- G1 扣分分档：≥8匹扣末3名(-10/-5/-1)、7匹扣末2名(-5/-1)、6匹扣末1名(-1)、≤5匹无扣分。
+- G2_JPN1：正分 +5/+4/+3/+2/+1，不扣分。
+- YOUNG_G1：正分同 G1（+10/+5/+3/+2/+1），不扣分。
+- CUSTOM：从 `custom_scoring` 字典读取 `positive_scores`（list[int]，1-indexed）和可选的 `penalty_rules`（list[dict]，position 为负偏移，points 为扣分值）。
+- DNF/退赛：`position <= 0` 返回 0 分。
+- 调用方负责过滤 DNF 马匹（不将其计入 `total_horses`）——引擎不做 DB 查询。
+- `GradeEnum` 字符串值：`"G1"`, `"G2_JPN1"`, `"YOUNG_G1"`, `"CUSTOM"` ——直接在字符串参数中使用，不需要 import 枚举类。
+- 100% 分支覆盖要求：测试必须覆盖 4 种等级的所有边界组合，包括 G1 的 4 种匹数分档（≥8/7/6/≤5）。
+
 **Frontend patterns:**
 - 管理后台 CRUD 页面使用 `<Teleport to="body">` 模态框进行创建/编辑操作，搜索框使用 300ms 防抖（`watch(search, debouncedSearch)` + `setTimeout`）。
 - **PATCH 编辑模式的关键模式**：`handleSave` 在编辑时必须按字段逐一比较当前值与原始值的差异，**仅发送变更的字段**，而非发送所有字段为 `null`。否则后端 `exclude_unset=True` 无法区分"用户未修改"和"用户将某字段清空为 null"——发送 `null` 会覆盖数据库中的已有值。参考实现：`frontend/src/pages/admin/HorsesPage.vue` 中的 `handleSave`。
@@ -249,4 +262,4 @@ _This file contains critical rules and patterns that AI agents must follow when 
 - Review quarterly for outdated rules
 - Remove rules that become obvious over time
 
-Last Updated: 2026-06-12 (Epic 2 done + retrospective, migration enum uppercase fix)
+Last Updated: 2026-06-12 (Story 3.1 scoring engine done + code review)
