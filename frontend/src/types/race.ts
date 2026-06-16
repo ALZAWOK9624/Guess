@@ -20,6 +20,7 @@ export interface RaceDetail {
   status: RaceStatus
   custom_scoring: CustomScoring | null
   horses: RaceHorseSnapshot[]
+  horse_votes?: RaceDetailHorseVotes | null  // only for settled races
   vote_count: number
   created_at: string
   updated_at: string
@@ -30,6 +31,23 @@ export interface RaceHorseSnapshot {
   race_horse_id: number
   snapshot_data: HorseSnapshotData
   position: number | null
+}
+
+export interface PublicResultVote {
+  username: string
+  points: number | null
+}
+
+export interface RaceHorseResult {
+  race_horse_id: number
+  horse_id: number
+  snapshot_data: Record<string, any>
+  position: number | null
+  votes: PublicResultVote[]
+}
+
+export interface RaceDetailHorseVotes {
+  horses: RaceHorseResult[]
 }
 
 export interface HorseSnapshotData {

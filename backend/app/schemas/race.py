@@ -128,6 +128,7 @@ class RaceDetailResponse(BaseModel):
     status: str
     custom_scoring: CustomScoring | None = None
     horses: list[RaceHorseResponse]
+    horse_votes: dict | None = None  # populated for settled races
     vote_count: int
     created_at: datetime
     updated_at: datetime

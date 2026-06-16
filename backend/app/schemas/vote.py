@@ -26,6 +26,7 @@ class VoteListEntry(BaseModel):
     username: str
     race_horse_id: int
     horse_name: str
+    points: int | None = None
     created_at: datetime
 
     model_config = {"from_attributes": True}

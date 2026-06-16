@@ -8,6 +8,7 @@ import HorseDetailCard from '@/components/HorseDetailCard.vue'
 import VoteButton from '@/components/VoteButton.vue'
 import HorseSelectCard from '@/components/HorseSelectCard.vue'
 import VotingDetail from '@/components/VotingDetail.vue'
+import RaceResultView from '@/components/RaceResultView.vue'
 import { getRace } from '@/api/races'
 import { useVote } from '@/composables/useVote'
 import type { RaceDetail } from '@/types/race'
@@ -181,6 +182,25 @@ onMounted(async () => {
         :votes="votes"
         :loading="votesLoading"
       />
+
+      <!-- Settled Race Result View — show rankings, votes, and points -->
+      <RaceResultView
+        v-if="isRaceSettled && race.horse_votes"
+        :horses="race.horse_votes.horses"
+      />
+
+      <!-- Admin: Modify Result button for settled races -->
+      <div
+        v-if="isRaceSettled && authStore.isAdmin"
+        class="admin-actions"
+      >
+        <button
+          class="modify-result-btn"
+          @click="router.push(`/admin/races/${raceId}/results`)"
+        >
+          修改结果
+        </button>
+      </div>
 
       <!-- Vote error toast -->
       <p v-if="voteError && !isInSelectionMode" class="vote-error toast">
@@ -400,6 +420,32 @@ onMounted(async () => {
 
 .refresh-btn:hover {
   background: var(--color-primary-light, #2D7A4F);
+}
+
+/* Admin actions */
+.admin-actions {
+  display: flex;
+  justify-content: center;
+  margin-top: var(--spacing-6, 24px);
+  margin-bottom: var(--spacing-4, 16px);
+}
+
+.modify-result-btn {
+  padding: 12px 24px;
+  background: transparent;
+  color: var(--color-primary, #1A5632);
+  border: 1px solid var(--color-primary, #1A5632);
+  border-radius: var(--rounded-md, 10px);
+  font-size: var(--text-body, 16px);
+  font-weight: 600;
+  cursor: pointer;
+  min-height: 44px;
+  transition: background 0.2s, color 0.2s;
+}
+
+.modify-result-btn:hover {
+  background: var(--color-primary, #1A5632);
+  color: #FFFFFF;
 }
 
 /* Desktop: vote-bar inline instead of fixed */

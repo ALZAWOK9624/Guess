@@ -19,5 +19,6 @@ export interface VoteListEntry {
   username: string
   race_horse_id: number
   horse_name: string
+  points?: number | null
   created_at: string
 }

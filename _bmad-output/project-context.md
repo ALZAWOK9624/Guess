@@ -292,6 +292,14 @@ _This file contains critical rules and patterns that AI agents must follow when 
 - **review 通过后的 story 状态转换**：code-review 发现被全部修复后，story 状态从 `review` → `done`。同时 sprint-status.yaml 同步更新。此流程在 code-review 工作流的 Step 6 中自动执行。
 - **catch 规范**：所有 `catch` 块必须使用 `catch (err)`（非裸 `catch`），以便区分错误类型。即使在仅设置 error 状态的简单场景中也需遵守此规范。
 
+**已结算结果展示模式（Story 3.6）：**
+- **RaceResultView 组件模式**：`RaceResultView.vue` 用于在比赛详情页展示已结算比赛的完整排名、投票和积分。接收 `horses: RaceHorseResult[]` props（按 position 排序后的数组）。纯展示组件，无交互——与 VotingDetail（用于 voting/locked 状态）分离，不可混用。
+- **horse_votes 端点扩展模式**：`GET /api/v1/races/{race_id}` 在已结算状态下扩展返回 `horse_votes` 字段：`{"horses": [{"race_horse_id": id, "horse_id": id, "snapshot_data": {...}, "position": 1, "votes": [{"username": "user", "points": 10}]}]}`。条件判断使用 `race.status == RaceStatus.SETTLED`（枚举比较，非字符串比较）。空列表判断使用 `is not None` 而非布尔真假（避免空列表 `[]` 被当作 falsy）。
+- **get_race_results_grouped_by_horse 查询模式**：`vote_service.get_race_results_grouped_by_horse()` 使用 `select(RaceHorse).options(selectinload(RaceHorse.votes).selectinload(Vote.user))` 按马匹分组加载投票。排序：`case((position==0, 2), (is_(None), 3), else_=1)` 将正常马匹排前、DNF 排中、NULL 排后，再按 `position.asc().nulls_last()` 排序。
+- **积分颜色编码模式**：正分 `--color-primary`（绿色）、负分 `--color-destructive`（红色）、零分 `--color-ink-disabled`（灰色）。所有分值使用 Barlow Condensed 14px bold（`var(--font-display)` + `var(--text-body-sm)`）。DNF 马匹投票固定显示 `0`（灰色），忽略实际 `vote.points` 值。
+- **名次标签模式**：1st/2nd/3rd 金色底 `--color-accent` 白字、4th+ 灰底 `--color-ink-disabled` 白字、DNF 灰底斜体。aria-label 使用中文序数（"第一名"/"第二名"/"弃权"）。DNF 整个 wrapper 为 `opacity: 0.5`，但 `.no-votes` 文字覆盖为 `opacity: 1` 保持可读。
+- **已结算比赛管理员按钮模式**：比赛详情页中 `v-if="isRaceSettled && authStore.isAdmin"` 渲染 "修改结果" 按钮（透明背景 + 竞马绿 1px 边框 + 绿色文字），hover 时反转（绿底白字）。链接到 `/admin/races/${raceId}/results`。使用 `router.push()` SPA 跳转。
+
 ---
 
 ## Usage Guidelines
@@ -308,4 +316,4 @@ _This file contains critical rules and patterns that AI agents must follow when 
 - Review quarterly for outdated rules
 - Remove rules that become obvious over time
 
-Last Updated: 2026-06-16 (Story 3.5 leaderboard service/endpoint — LeaderboardRow, LeaderboardPage, aggregate query pattern)
+Last Updated: 2026-06-16 (Story 3.5 leaderboard + Story 3.6 RaceResultView settled results display)

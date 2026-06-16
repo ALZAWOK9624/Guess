@@ -67,6 +67,7 @@ async def list_votes(
             username=v.user.username if v.user else "unknown",
             race_horse_id=v.race_horse_id,
             horse_name=vote_service.resolve_horse_name(v),
+            points=v.points,
             created_at=v.created_at,
         )
         for v in votes

@@ -585,3 +585,295 @@ class TestRaceAPI:
             assert resp.status_code == 422
 
         app.dependency_overrides.clear()
+
+
+class TestRaceSettledResults:
+
+    @pytest.mark.asyncio
+    async def test_settled_race_horse_votes_grouped(self, db_session: AsyncSession):
+        """Settled race — horses sorted by position, votes grouped correctly."""
+        from app.services.race_service import create_race
+        from app.schemas.race import RaceCreate
+        from app.models.race import RaceHorse, RaceStatus
+        from app.models.vote import Vote
+        from app.models.user import User
+
+        h1 = await _create_horse(db_session, SAMPLE_HORSE)
+        h2 = await _create_horse(db_session, SAMPLE_HORSE_2)
+
+        race = await create_race(db_session, RaceCreate(
+            name="SettledTest", date=date(2026, 6, 15), grade="G1",
+            horse_ids=[h1.id, h2.id],
+        ), creator_id=1)
+        race_id = race.id
+
+        # Set positions
+        race_horses = race.race_horses
+        rh1 = race_horses[0]
+        rh2 = race_horses[1]
+        rh1.position = 1
+        rh2.position = 2
+        race.status = RaceStatus.SETTLED
+        await db_session.flush()
+
+        # Create users and votes with points
+        user1 = User(username="user_a", password_hash="x", qq="111", invite_code="aaaa")
+        user2 = User(username="user_b", password_hash="x", qq="222", invite_code="bbbb")
+        db_session.add_all([user1, user2])
+        await db_session.flush()
+
+        vote1 = Vote(user_id=user1.id, race_id=race_id, race_horse_id=rh1.id, points=10)
+        vote2 = Vote(user_id=user2.id, race_id=race_id, race_horse_id=rh2.id, points=5)
+        db_session.add_all([vote1, vote2])
+        await db_session.flush()
+
+        from app.services.vote_service import get_race_results_grouped_by_horse
+        result = await get_race_results_grouped_by_horse(db_session, race_id)
+
+        assert len(result) == 2
+        # First horse (position=1) should be first
+        assert result[0]["position"] == 1
+        assert result[1]["position"] == 2
+        # Check votes
+        assert len(result[0]["votes"]) == 1
+        assert result[0]["votes"][0]["username"] == "user_a"
+        assert result[0]["votes"][0]["points"] == 10
+        assert len(result[1]["votes"]) == 1
+        assert result[1]["votes"][0]["username"] == "user_b"
+        assert result[1]["votes"][0]["points"] == 5
+
+        await db_session.rollback()
+
+    @pytest.mark.asyncio
+    async def test_settled_race_dnf_horse_last(self, db_session: AsyncSession):
+        """Settled race — DNF horse listed last with 0-point votes."""
+        from app.services.race_service import create_race
+        from app.schemas.race import RaceCreate
+        from app.models.race import RaceHorse, RaceStatus
+        from app.models.vote import Vote
+        from app.models.user import User
+
+        h1 = await _create_horse(db_session, SAMPLE_HORSE)
+        h2 = await _create_horse(db_session, SAMPLE_HORSE_2)
+
+        race = await create_race(db_session, RaceCreate(
+            name="DNFTest", date=date(2026, 6, 20), grade="G1",
+            horse_ids=[h1.id, h2.id],
+        ), creator_id=1)
+        race_id = race.id
+
+        race_horses = race.race_horses
+        rh1 = race_horses[0]
+        rh2 = race_horses[1]
+        rh1.position = 1
+        rh2.position = 0  # DNF
+        race.status = RaceStatus.SETTLED
+        await db_session.flush()
+
+        user = User(username="voter", password_hash="x", qq="333", invite_code="cccc")
+        db_session.add(user)
+        await db_session.flush()
+
+        vote = Vote(user_id=user.id, race_id=race_id, race_horse_id=rh2.id, points=0)
+        db_session.add(vote)
+        await db_session.flush()
+
+        from app.services.vote_service import get_race_results_grouped_by_horse
+        result = await get_race_results_grouped_by_horse(db_session, race_id)
+
+        assert len(result) == 2
+        # DNF (position=0) should be last
+        assert result[0]["position"] == 1
+        assert result[1]["position"] == 0
+        assert result[1]["votes"][0]["points"] == 0
+
+        await db_session.rollback()
+
+    @pytest.mark.asyncio
+    async def test_settled_race_horse_with_no_votes(self, db_session: AsyncSession):
+        """Settled race — horse with zero votes shows empty votes list."""
+        from app.services.race_service import create_race
+        from app.schemas.race import RaceCreate
+        from app.models.race import RaceHorse, RaceStatus
+
+        h1 = await _create_horse(db_session, SAMPLE_HORSE)
+        h2 = await _create_horse(db_session, SAMPLE_HORSE_2)
+
+        race = await create_race(db_session, RaceCreate(
+            name="NoVotesHorse", date=date(2026, 6, 25), grade="G1",
+            horse_ids=[h1.id, h2.id],
+        ), creator_id=1)
+        race_id = race.id
+
+        race_horses = race.race_horses
+        rh1 = race_horses[0]
+        rh2 = race_horses[1]
+        rh1.position = 1
+        rh2.position = 2
+        race.status = RaceStatus.SETTLED
+        await db_session.flush()
+
+        from app.services.vote_service import get_race_results_grouped_by_horse
+        result = await get_race_results_grouped_by_horse(db_session, race_id)
+
+        assert len(result) == 2
+        assert result[0]["votes"] == []
+        assert result[1]["votes"] == []
+
+        await db_session.rollback()
+
+    @pytest.mark.asyncio
+    async def test_settled_race_multiple_users_same_horse(self, db_session: AsyncSession):
+        """Multiple users voted for same horse — all listed."""
+        from app.services.race_service import create_race
+        from app.schemas.race import RaceCreate
+        from app.models.race import RaceHorse, RaceStatus
+        from app.models.vote import Vote
+        from app.models.user import User
+
+        h1 = await _create_horse(db_session, SAMPLE_HORSE)
+        h2 = await _create_horse(db_session, SAMPLE_HORSE_2)
+
+        race = await create_race(db_session, RaceCreate(
+            name="MultiVote", date=date(2026, 7, 1), grade="G1",
+            horse_ids=[h1.id, h2.id],
+        ), creator_id=1)
+        race_id = race.id
+
+        race_horses = race.race_horses
+        rh1 = race_horses[0]
+        rh2 = race_horses[1]
+        rh1.position = 1
+        rh2.position = 2
+        race.status = RaceStatus.SETTLED
+        await db_session.flush()
+
+        users = []
+        for i in range(3):
+            u = User(username=f"user_{i}", password_hash="x", qq=f"qq{i}", invite_code=f"code{i}")
+            db_session.add(u)
+            users.append(u)
+        await db_session.flush()
+
+        for u in users:
+            v = Vote(user_id=u.id, race_id=race_id, race_horse_id=rh1.id, points=10)
+            db_session.add(v)
+        await db_session.flush()
+
+        from app.services.vote_service import get_race_results_grouped_by_horse
+        result = await get_race_results_grouped_by_horse(db_session, race_id)
+
+        assert len(result[0]["votes"]) == 3
+        usernames = [v["username"] for v in result[0]["votes"]]
+        assert "user_0" in usernames
+        assert "user_1" in usernames
+        assert "user_2" in usernames
+        assert all(v["points"] == 10 for v in result[0]["votes"])
+
+        await db_session.rollback()
+
+    @pytest.mark.asyncio
+    async def test_settled_race_api_horse_votes_field(self, db_session: AsyncSession):
+        """API — settled race detail includes horse_votes field."""
+        from app.services.race_service import create_race
+        from app.schemas.race import RaceCreate
+        from app.models.race import RaceStatus
+        from app.models.vote import Vote
+        from app.models.user import User
+
+        h1 = await _create_horse(db_session, SAMPLE_HORSE)
+        h2 = await _create_horse(db_session, SAMPLE_HORSE_2)
+
+        race = await create_race(db_session, RaceCreate(
+            name="APISettled", date=date(2026, 7, 5), grade="G1",
+            horse_ids=[h1.id, h2.id],
+        ), creator_id=1)
+        race_id = race.id
+
+        race.race_horses[0].position = 1
+        race.race_horses[1].position = 2
+        race.status = RaceStatus.SETTLED
+        await db_session.flush()
+
+        user = User(username="tester", password_hash="x", qq="555", invite_code="eeee")
+        db_session.add(user)
+        await db_session.flush()
+
+        vote = Vote(user_id=user.id, race_id=race_id, race_horse_id=race.race_horses[0].id, points=10)
+        db_session.add(vote)
+        await db_session.flush()
+
+        app.dependency_overrides[get_db] = lambda: db_session
+
+        transport = ASGITransport(app=app)
+        async with AsyncClient(transport=transport, base_url="http://test") as client:
+            resp = await client.get(f"/api/v1/races/{race_id}")
+            assert resp.status_code == 200
+            data = resp.json()["data"]
+            assert "horse_votes" in data
+            assert "horses" in data["horse_votes"]
+            assert len(data["horse_votes"]["horses"]) == 2
+            # First horse has a vote, second has none
+            assert len(data["horse_votes"]["horses"][0]["votes"]) == 1
+            assert data["horse_votes"]["horses"][0]["votes"][0]["username"] == "tester"
+            assert data["horse_votes"]["horses"][0]["votes"][0]["points"] == 10
+
+        app.dependency_overrides.clear()
+
+    @pytest.mark.asyncio
+    async def test_voting_race_api_no_horse_votes(self, db_session: AsyncSession):
+        """Voting race — horse_votes is null (not populated)."""
+        from app.services.race_service import create_race
+        from app.schemas.race import RaceCreate
+
+        h1 = await _create_horse(db_session, SAMPLE_HORSE)
+        h2 = await _create_horse(db_session, SAMPLE_HORSE_2)
+
+        race = await create_race(db_session, RaceCreate(
+            name="VotingNoVotes", date=date(2026, 7, 10), grade="G1",
+            horse_ids=[h1.id, h2.id],
+        ), creator_id=1)
+        race_id = race.id
+
+        app.dependency_overrides[get_db] = lambda: db_session
+
+        transport = ASGITransport(app=app)
+        async with AsyncClient(transport=transport, base_url="http://test") as client:
+            resp = await client.get(f"/api/v1/races/{race_id}")
+            assert resp.status_code == 200
+            data = resp.json()["data"]
+            assert data["horse_votes"] is None
+
+        app.dependency_overrides.clear()
+
+    @pytest.mark.asyncio
+    async def test_guest_access_settled_race_public(self, db_session: AsyncSession):
+        """Settled race detail — accessible without auth (public)."""
+        from app.services.race_service import create_race
+        from app.schemas.race import RaceCreate
+        from app.models.race import RaceStatus
+
+        h1 = await _create_horse(db_session, SAMPLE_HORSE)
+        h2 = await _create_horse(db_session, SAMPLE_HORSE_2)
+
+        race = await create_race(db_session, RaceCreate(
+            name="GuestTest", date=date(2026, 7, 15), grade="G1",
+            horse_ids=[h1.id, h2.id],
+        ), creator_id=1)
+        race_id = race.id
+        race.race_horses[0].position = 1
+        race.race_horses[1].position = 2
+        race.status = RaceStatus.SETTLED
+        await db_session.flush()
+
+        app.dependency_overrides[get_db] = lambda: db_session
+
+        transport = ASGITransport(app=app)
+        async with AsyncClient(transport=transport, base_url="http://test") as client:
+            resp = await client.get(f"/api/v1/races/{race_id}")
+            assert resp.status_code == 200
+            data = resp.json()["data"]
+            assert "horse_votes" in data
+            assert len(data["horse_votes"]["horses"]) == 2
+
+        app.dependency_overrides.clear()

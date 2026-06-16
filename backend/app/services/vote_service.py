@@ -1,7 +1,7 @@
 """Vote business logic service."""
 
 from fastapi import HTTPException, status
-from sqlalchemy import select
+from sqlalchemy import case, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -136,3 +136,48 @@ async def lock_race(db: AsyncSession, race_id: int) -> Race:
     await db.flush()
     await db.refresh(race)
     return race
+
+
+async def get_race_results_grouped_by_horse(
+    db: AsyncSession, race_id: int
+) -> list[dict]:
+    """For a settled race, load all votes grouped by race_horse_id.
+
+    Returns list of dicts with race_horse data and votes per horse,
+    sorted by position (1st, 2nd... DNF last).
+    Includes horses with zero votes (empty votes list).
+    """
+    stmt = (
+        select(RaceHorse)
+        .options(
+            selectinload(RaceHorse.votes).selectinload(Vote.user),
+        )
+        .where(RaceHorse.race_id == race_id)
+        .order_by(
+            case(
+                (RaceHorse.position == 0, 2),
+                (RaceHorse.position.is_(None), 3),
+                else_=1,
+            ),
+            RaceHorse.position.asc().nulls_last(),
+        )
+    )
+    result = await db.execute(stmt)
+    race_horses = list(result.scalars().all())
+
+    output = []
+    for rh in race_horses:
+        votes = []
+        for v in rh.votes:
+            votes.append({
+                "username": v.user.username if v.user else "unknown",
+                "points": v.points,
+            })
+        output.append({
+            "race_horse_id": rh.id,
+            "horse_id": rh.horse_id,
+            "snapshot_data": rh.snapshot_data,
+            "position": rh.position,
+            "votes": votes,
+        })
+    return output

@@ -5,6 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_admin
 from app.core.database import get_db
+from app.models.race import RaceStatus
 from app.schemas.race import (
     CustomScoring,
     RaceCreate,
@@ -12,7 +13,7 @@ from app.schemas.race import (
     RaceListResponse,
     RaceUpdate,
 )
-from app.services import race_service
+from app.services import race_service, vote_service
 
 router = APIRouter(prefix="/api/v1/races", tags=["races"])
 
@@ -55,6 +56,11 @@ async def get_race(
         )
     vc = await race_service.get_race_vote_count(db, race.id)
 
+    # Load grouped votes for settled races
+    horse_votes_data = None
+    if race.status == RaceStatus.SETTLED:
+        horse_votes_data = await vote_service.get_race_results_grouped_by_horse(db, race_id)
+
     detail = RaceDetailResponse(
         id=race.id,
         name=race.name,
@@ -71,6 +77,7 @@ async def get_race(
             }
             for rh in sorted(race.race_horses, key=lambda h: h.horse_id)
         ],
+        horse_votes={"horses": horse_votes_data} if horse_votes_data is not None else None,
         vote_count=vc,
         created_at=race.created_at,
         updated_at=race.updated_at,
