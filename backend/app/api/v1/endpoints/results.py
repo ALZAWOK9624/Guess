@@ -23,7 +23,7 @@ async def submit_results(
     Transitions race from locked to settled, calculating scores for all voters.
     If race is already settled, re-settles with new positions.
     """
-    result = await result_service.submit_results(db, race_id, data)
+    result = await result_service.submit_results(db, race_id, data, current_admin_id=admin.id)
     return {
         "data": ResultEntryResponse(
             race_id=result["race_id"],
@@ -31,3 +31,14 @@ async def submit_results(
             scores=result["scores"],
         ).model_dump()
     }
+
+
+@router.get("/{race_id}/results/history")
+async def get_race_result_history(
+    race_id: int,
+    db: AsyncSession = Depends(get_db),
+    admin=Depends(get_current_admin),
+):
+    """Get score modification history for a race. Admin-only."""
+    logs = await result_service.get_race_change_logs(db, race_id)
+    return {"data": logs}

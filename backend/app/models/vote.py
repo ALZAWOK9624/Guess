@@ -37,3 +37,6 @@ class Vote(Base):
     race: Mapped["Race"] = relationship(back_populates="votes")
     user: Mapped["User"] = relationship(back_populates="votes")
     race_horse_rel: Mapped["RaceHorse"] = relationship(back_populates="votes")
+    score_change_logs: Mapped[list["ScoreChangeLog"]] = relationship(
+        back_populates="vote_rel", cascade="all, delete-orphan"
+    )

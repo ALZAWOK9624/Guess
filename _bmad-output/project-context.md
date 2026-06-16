@@ -1,12 +1,12 @@
 ---
 project_name: 'guess'
 user_name: 'tkd'
-date: '2026-06-12'
-story: '3.3-voting-frontend-interaction'
+date: '2026-06-16'
+story: '3.7-result-modification-recalculation'
 sections_completed:
   ['technology_stack', 'language_rules', 'framework_rules', 'testing_rules', 'code_quality', 'workflow', 'critical_rules']
 status: 'complete'
-rule_count: 80
+rule_count: 86
 optimized_for_llm: true
 ---
 
@@ -300,6 +300,12 @@ _This file contains critical rules and patterns that AI agents must follow when 
 - **名次标签模式**：1st/2nd/3rd 金色底 `--color-accent` 白字、4th+ 灰底 `--color-ink-disabled` 白字、DNF 灰底斜体。aria-label 使用中文序数（"第一名"/"第二名"/"弃权"）。DNF 整个 wrapper 为 `opacity: 0.5`，但 `.no-votes` 文字覆盖为 `opacity: 1` 保持可读。
 - **已结算比赛管理员按钮模式**：比赛详情页中 `v-if="isRaceSettled && authStore.isAdmin"` 渲染 "修改结果" 按钮（透明背景 + 竞马绿 1px 边框 + 绿色文字），hover 时反转（绿底白字）。链接到 `/admin/races/${raceId}/results`。使用 `router.push()` SPA 跳转。
 
+**审计日志与重算模式（Story 3.7）：**
+- **ScoreChangeLog 审计模型模式**：`ScoreChangeLog` 模型（`models/change_log.py`）记录每次积分变更。字段包括 `race_id`（FK CASCADE）、`vote_id`（FK CASCADE）、`user_id`（FK CASCADE——投票者）、`admin_user_id`（FK CASCADE——操作管理员）、`old_points`（首次结算为 NULL）、`new_points`、`created_at`。`Vote` 和 `User` 模型各有反向关系指向此表。
+- **结果重算审计模式**：`result_service.submit_results()` 在重算时：先 `is_resettle = race.status == RaceStatus.SETTLED` 判断是否重算，然后 `old_points_map = {vote.id: vote.points for vote in race.votes}` 捕获旧值，再 `vote.points = None` 清除旧积分，重算后遍历 votes 创建 `ScoreChangeLog` 条目（仅 `old_val != new_val` 时记录）。同一 `flush()` 内完成所有操作确保事务原子性。
+- **Service 层延迟导入模式**：为避免循环导入，`ScoreChangeLog` 在 `result_service.py` 中使用函数内局部导入：`from app.models.change_log import ScoreChangeLog`。此模式适用于服务层需要引用新模型而模型层也引用服务层涉及的模型时的场景。
+- **审计查询端点模式**：`GET /api/v1/races/{race_id}/results/history` 管理员专用端点，返回 `{"race_id": ..., "race_name": ..., "changes": [{"vote_id": ..., "username": ..., "race_id": ..., "old_points": ..., "new_points": ..., "modified_at": ..., "admin_username": ...}]}`。使用 `selectinload(ScoreChangeLog.vote_rel).selectinload(Vote.user)` 链式加载避免 N+1。
+
 ---
 
 ## Usage Guidelines
@@ -316,4 +322,4 @@ _This file contains critical rules and patterns that AI agents must follow when 
 - Review quarterly for outdated rules
 - Remove rules that become obvious over time
 
-Last Updated: 2026-06-16 (Story 3.5 leaderboard + Story 3.6 RaceResultView settled results display)
+Last Updated: 2026-06-16 (Story 3.7 ScoreChangeLog audit trail + result modification patterns)

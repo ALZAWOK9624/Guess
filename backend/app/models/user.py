@@ -24,6 +24,14 @@ class User(Base):
     votes: Mapped[list["Vote"]] = relationship(
         back_populates="user", cascade="all, delete-orphan"
     )
+    score_change_logs_as_voter: Mapped[list["ScoreChangeLog"]] = relationship(
+        foreign_keys="ScoreChangeLog.user_id",
+        back_populates="user_rel",
+    )
+    score_change_logs_as_admin: Mapped[list["ScoreChangeLog"]] = relationship(
+        foreign_keys="ScoreChangeLog.admin_user_id",
+        back_populates="admin_user_rel",
+    )
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()

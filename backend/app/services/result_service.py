@@ -12,12 +12,13 @@ from app.services.scoring_engine import calculate_score
 
 
 async def submit_results(
-    db: AsyncSession, race_id: int, data: ResultEntry
+    db: AsyncSession, race_id: int, data: ResultEntry, current_admin_id: int | None = None
 ) -> dict:
     """Submit race results — transition from locked to settled.
 
     If race is already settled, this re-settles (rollback + recalculate).
     All operations happen in a single transaction.
+    When re-settling, ScoreChangeLog entries are created for audit trail.
     """
     # Load race with horses and votes eager-loaded
     stmt = (
@@ -71,8 +72,14 @@ async def submit_results(
             },
         )
 
+    # Track old points before any modification (for audit log)
+    is_resettle = race.status == RaceStatus.SETTLED
+    old_points_map: dict[int, int | None] | None = None
+    if is_resettle:
+        old_points_map = {vote.id: vote.points for vote in race.votes}
+
     # If already settled, rollback old points first
-    if race.status == RaceStatus.SETTLED:
+    if is_resettle:
         for vote in race.votes:
             vote.points = None
 
@@ -101,6 +108,24 @@ async def submit_results(
             vote.points = points
         else:
             vote.points = 0
+
+    # Create change log entries for every settlement (track value changes)
+    from app.models.change_log import ScoreChangeLog  # late import to avoid circular
+
+    for vote in race.votes:
+        old_val = old_points_map.get(vote.id) if old_points_map else None
+        new_val = vote.points
+        # Only log if value actually changed
+        if old_val != new_val:
+            log_entry = ScoreChangeLog(
+                race_id=race.id,
+                vote_id=vote.id,
+                user_id=vote.user_id,
+                admin_user_id=current_admin_id,
+                old_points=old_val,
+                new_points=new_val,
+            )
+            db.add(log_entry)
 
     # Update race status to settled
     race.status = RaceStatus.SETTLED
@@ -131,4 +156,53 @@ async def submit_results(
         "race_id": race.id,
         "status": race.status.value,
         "scores": user_scores,
+    }
+
+
+async def get_race_change_logs(
+    db: AsyncSession, race_id: int
+) -> dict:
+    """Get score change history for a race. Admin-only query."""
+    from app.models.change_log import ScoreChangeLog
+
+    stmt = (
+        select(ScoreChangeLog)
+        .options(
+            selectinload(ScoreChangeLog.vote_rel).selectinload(Vote.user),
+            selectinload(ScoreChangeLog.admin_user_rel),
+        )
+        .where(ScoreChangeLog.race_id == race_id)
+        .order_by(ScoreChangeLog.created_at.desc())
+    )
+    result = await db.execute(stmt)
+    logs = result.scalars().all()
+
+    # Load race name
+    race_stmt = select(Race).where(Race.id == race_id)
+    race_result = await db.execute(race_stmt)
+    race = race_result.scalar_one_or_none()
+    race_name = race.name if race else f"Race #{race_id}"
+
+    entries = []
+    for log in logs:
+        # Resolve username from vote's user relationship
+        vote = log.vote_rel
+        username = vote.user.username if vote and vote.user else "未知"
+        admin_username = log.admin_user_rel.username if log.admin_user_rel else "未知"
+        entries.append(
+            {
+                "vote_id": log.vote_id,
+                "username": username,
+                "race_id": log.race_id,
+                "old_points": log.old_points,
+                "new_points": log.new_points,
+                "modified_at": log.created_at.isoformat() if log.created_at else None,
+                "admin_username": admin_username,
+            }
+        )
+
+    return {
+        "race_id": race_id,
+        "race_name": race_name,
+        "changes": entries,
     }
