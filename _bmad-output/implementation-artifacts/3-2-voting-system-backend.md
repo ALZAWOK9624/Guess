@@ -4,7 +4,7 @@ baseline_commit: 1bd7ef85ac2e846f8e04de8fde7a96727d3902ed
 
 # Story 3.2: Voting System Backend
 
-Status: review
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
