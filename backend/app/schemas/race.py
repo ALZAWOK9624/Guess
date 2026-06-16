@@ -9,12 +9,11 @@ from sqlalchemy.orm import InstrumentedAttribute
 class HorseSnapshot(BaseModel):
     name: str
     sex: str | None = None
-    age: int | None = None
+    birth_year: int | None = None
     origin: str | None = None
+    hemisphere: str | None = None
     sire: str | None = None
     damsire: str | None = None
-    weight: str | None = None
-    jockey: str | None = None
     previous_result: str | None = None
     best_win: str | None = None
 
@@ -34,6 +33,8 @@ class RaceCreate(BaseModel):
     date: date_type
     grade: str  # "G1" | "G2_JPN1" | "YOUNG_G1" | "CUSTOM"
     horse_ids: list[int]
+    horse_weights: dict[int, str] | None = None  # horse_id → weight
+    horse_jockeys: dict[int, str] | None = None  # horse_id → jockey
     custom_scoring: CustomScoring | None = None
 
     @field_validator("name")
@@ -66,6 +67,8 @@ class RaceUpdate(BaseModel):
     date: date_type | None = None
     grade: str | None = None
     horse_ids: list[int] | None = None
+    horse_weights: dict[int, str] | None = None  # race_horse_id → weight
+    horse_jockeys: dict[int, str] | None = None  # race_horse_id → jockey
     custom_scoring: CustomScoring | None = None
 
     @field_validator("name")
@@ -102,6 +105,8 @@ class RaceHorseResponse(BaseModel):
     horse_id: int
     snapshot_data: HorseSnapshot
     position: int | None = None
+    weight: str | None = None
+    jockey: str | None = None
 
     model_config = {"from_attributes": True}
 

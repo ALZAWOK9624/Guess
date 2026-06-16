@@ -6,7 +6,7 @@ story: '3.7-result-modification-recalculation'
 sections_completed:
   ['technology_stack', 'language_rules', 'framework_rules', 'testing_rules', 'code_quality', 'workflow', 'critical_rules']
 status: 'complete'
-rule_count: 86
+rule_count: 95
 optimized_for_llm: true
 ---
 
@@ -322,6 +322,26 @@ _This file contains critical rules and patterns that AI agents must follow when 
 
 ---
 
+**马匹年龄动态计算模式（Story 4.x）：**
+- Horse 模型不存储整数 `age`，改为存储 `birth_year`（出生年，如 2022）+ `hemisphere`（"north"/"south"）。
+- 前端 `HorseDetailCard.vue` 提供 `computeAge(birthYear, hemisphere, onDate)` 函数动态计算年龄：
+  - 北半球：1月1日起 `今年-出生年` 岁
+  - 南半球：8月1日起 `今年-出生年` 岁
+- 卡片接收 `birthYear`/`hemisphere`/`referenceDate` props（可选，不传则用当天日期）。
+- 比赛页面向 `HorseDetailCard` 传入 `race.date` 作为 `referenceDate`，确保显示比赛中实际年龄。
+- `RaceHorse.snapshot_data` 中 `age` 字段被 `birth_year` 替代，但保留对旧数据 `age` 的向后兼容读取：`snapshot_data.birth_year ?? snapshot_data.age`。
+
+**出生国/所属地 新增选择模式（Story 4.x）：**
+- 出生国（`origin`）下拉使用原生 `<select>`，底部选项 "+ 新增国家"，选中后切换为文本输入模式。
+- 新增国家时必须选择南北半球（`north`/`south`），否则无法确认。
+- 选择已有国家时自动填充 `hemisphere`（来自 `countryHemispheres` 映射，由后端 `getOriginsStats()` 返回各国家最常见的半球）。
+- 所属地（`location`）与出生国完全独立的字段，逻辑相同但没有半球信息。
+- 新增确认后不立即修改 `sortedCountries`/`sortedLocations`（防止未保存时出现幽灵数据），而是通过 `<option v-if="formOrigin && !sortedCountries.includes(formOrigin)">` 显示临时选项。
+- 保存后通过 `refreshCountryList()` 从后端重新拉取统计数据。
+- `POST /api/v1/horses/origins/{origin}/toggle-hemisphere` 端点用于翻转所有同产地马匹的半球（north↔south），前端在半球标签旁显示"切换半球"按钮。
+
+---
+
 ## Usage Guidelines
 
 **For AI Agents:**
@@ -336,4 +356,4 @@ _This file contains critical rules and patterns that AI agents must follow when 
 - Review quarterly for outdated rules
 - Remove rules that become obvious over time
 
-Last Updated: 2026-06-16 (voting system overhaul: card-click vote toggle + delete vote endpoint + home page vote status)
+Last Updated: 2026-06-16 (horse info enhancement: weight/jockey per-race, sex/country dropdowns, birth_year+hemisphere age, location, auto-update previous_result)

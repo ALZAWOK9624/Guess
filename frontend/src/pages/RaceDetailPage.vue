@@ -8,6 +8,7 @@ import HorseDetailCard from '@/components/HorseDetailCard.vue'
 import VotingDetail from '@/components/VotingDetail.vue'
 import RaceResultView from '@/components/RaceResultView.vue'
 import { getRace } from '@/api/races'
+import { updateBestWin } from '@/api/horses'
 import { useVote } from '@/composables/useVote'
 import type { RaceDetail } from '@/types/race'
 
@@ -47,6 +48,40 @@ function checkUserVote() {
 const isRaceVoting = computed(() => race.value?.status === 'voting')
 const isRaceLocked = computed(() => race.value?.status === 'locked')
 const isRaceSettled = computed(() => race.value?.status === 'settled')
+
+// "更新主胜鞍" state
+const updatingBestWin = ref(false)
+const bestWinUpdateError = ref('')
+const bestWinUpdateSuccess = ref(false)
+
+// Find the winner horse (position=1) for best_win update
+const winnerHorse = computed(() => {
+  if (!race.value || !isRaceSettled.value) return null
+  return race.value.horses.find(h => h.position === 1) ?? null
+})
+
+// Check if winner's best_win needs updating
+const canUpdateBestWin = computed(() => {
+  if (!winnerHorse.value || !race.value) return false
+  // If the best_win is already this race, no need to update
+  if (winnerHorse.value.snapshot_data.best_win === race.value.name) return false
+  return true
+})
+
+async function handleUpdateBestWin() {
+  if (!winnerHorse.value || !race.value || updatingBestWin.value) return
+  updatingBestWin.value = true
+  bestWinUpdateError.value = ''
+  bestWinUpdateSuccess.value = false
+  try {
+    await updateBestWin(winnerHorse.value.horse_id, race.value.id)
+    bestWinUpdateSuccess.value = true
+  } catch (err: any) {
+    bestWinUpdateError.value = err?.response?.data?.detail?.message || '更新主胜鞍失败'
+  } finally {
+    updatingBestWin.value = false
+  }
+}
 
 // Whether regular users can vote (voting state, logged in, not admin)
 const canVote = computed(() =>
@@ -163,6 +198,11 @@ onMounted(async () => {
           :key="horse.horse_id"
           :snapshot-data="horse.snapshot_data"
           :horse-id="horse.horse_id"
+          :weight="horse.weight"
+          :jockey="horse.jockey"
+          :birth-year="horse.snapshot_data.birth_year ?? horse.snapshot_data.age"
+          :hemisphere="horse.snapshot_data.hemisphere"
+          :reference-date="race.date"
           :votable="cardsVotable"
           :voted="isHorseVoted(horse.race_horse_id)"
           :submitting="isSubmitting"
@@ -198,7 +238,21 @@ onMounted(async () => {
         >
           修改结果
         </button>
+        <button
+          v-if="canUpdateBestWin"
+          class="update-best-win-btn"
+          :disabled="updatingBestWin"
+          @click="handleUpdateBestWin"
+        >
+          {{ updatingBestWin ? '更新中…' : '更新主胜鞍' }}
+        </button>
       </div>
+
+      <!-- Best win update messages -->
+      <p v-if="bestWinUpdateSuccess" class="success-message">
+        主胜鞍已更新为「{{ race?.name }}」
+      </p>
+      <p v-if="bestWinUpdateError" class="vote-error">{{ bestWinUpdateError }}</p>
     </template>
   </div>
 </template>
@@ -353,11 +407,14 @@ onMounted(async () => {
 .admin-actions {
   display: flex;
   justify-content: center;
+  gap: var(--spacing-3, 12px);
   margin-top: var(--spacing-6, 24px);
   margin-bottom: var(--spacing-4, 16px);
+  flex-wrap: wrap;
 }
 
-.modify-result-btn {
+.modify-result-btn,
+.update-best-win-btn {
   padding: 12px 24px;
   background: transparent;
   color: var(--color-primary, #1A5632);
@@ -370,8 +427,23 @@ onMounted(async () => {
   transition: background 0.2s, color 0.2s;
 }
 
-.modify-result-btn:hover {
+.modify-result-btn:hover,
+.update-best-win-btn:hover:not(:disabled) {
   background: var(--color-primary, #1A5632);
   color: #FFFFFF;
+}
+
+.update-best-win-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.success-message {
+  text-align: center;
+  color: var(--color-primary, #1A5632);
+  font-size: var(--text-body-sm, 14px);
+  padding: 8px 12px;
+  background: #F0F7F2;
+  border-radius: var(--rounded-md, 10px);
 }
 </style>

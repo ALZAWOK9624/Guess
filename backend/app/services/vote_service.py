@@ -211,6 +211,8 @@ async def get_race_results_grouped_by_horse(
             "horse_id": rh.horse_id,
             "snapshot_data": rh.snapshot_data,
             "position": rh.position,
+            "weight": rh.weight,
+            "jockey": rh.jockey,
             "votes": votes,
         })
     return output

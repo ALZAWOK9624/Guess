@@ -1,10 +1,13 @@
 """Result entry business logic — drag-sort result submission and settlement."""
 
+from typing import Any
+
 from fastapi import HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from app.models.horse import Horse
 from app.models.race import Race, RaceHorse, RaceStatus
 from app.models.vote import Vote
 from app.schemas.result import ResultEntry, ResultPosition, UserScoreItem
@@ -144,13 +147,38 @@ async def submit_results(
             )
         )
 
-    # TODO(Story 2.5): Call auto_update_service.apply_auto_updates() after settlement.
-    # try:
-    #     from app.services import auto_update_service
-    #     await auto_update_service.apply_auto_updates(db, race_id, horse_updates)
-    # except Exception:
-    #     import logging
-    #     logging.warning("Auto-update failed after settlement (non-blocking)", exc_info=True)
+    # Auto-update previous_result for all horses in the race
+    try:
+        from app.services import auto_update_service
+
+        # Build horse_updates: for each horse that has a position in this race,
+        # if race.date is not earlier than the horse's current previous_result_date,
+        # update previous_result, previous_result_date, previous_result_position
+        horse_updates: dict[int, dict[str, Any]] = {}
+        for rh in race.race_horses:
+            # Load the Horse record to check current previous_result_date
+            horse_obj = await db.get(Horse, rh.horse_id)
+            if horse_obj is None:
+                continue
+
+            # Only update if race.date >= horse's previous_result_date (or no previous result yet)
+            prev_date = horse_obj.previous_result_date
+            if prev_date is None or race.date >= prev_date:
+                pos_text = (
+                    f"{rh.position}着" if rh.position and rh.position > 0
+                    else "除外/取消"
+                )
+                horse_updates[rh.horse_id] = {
+                    "previous_result": f"{race.name} {pos_text}",
+                    "previous_result_date": race.date,
+                    "previous_result_position": rh.position if rh.position else 0,
+                }
+
+        if horse_updates:
+            await auto_update_service.apply_auto_updates(db, race_id, horse_updates)
+    except Exception:
+        import logging
+        logging.warning("Auto-update failed after settlement (non-blocking)", exc_info=True)
 
     return {
         "race_id": race.id,

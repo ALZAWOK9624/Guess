@@ -56,6 +56,19 @@ async def list_races(
     return {"data": [item.model_dump() for item in items]}
 
 
+
+def _build_horse_dict(rh) -> dict:
+    """Build a horse dict from a RaceHorse ORM object."""
+    return {
+        "race_horse_id": rh.id,
+        "horse_id": rh.horse_id,
+        "snapshot_data": rh.snapshot_data,
+        "position": rh.position,
+        "weight": rh.weight,
+        "jockey": rh.jockey,
+    }
+
+
 @router.get("/{race_id}")
 async def get_race(
     race_id: int,
@@ -82,15 +95,7 @@ async def get_race(
         grade=race.grade.value,
         status=race.status.value,
         custom_scoring=CustomScoring(**race.custom_scoring) if race.custom_scoring else None,
-        horses=[
-            {
-                "race_horse_id": rh.id,
-                "horse_id": rh.horse_id,
-                "snapshot_data": rh.snapshot_data,
-                "position": rh.position,
-            }
-            for rh in sorted(race.race_horses, key=lambda h: h.horse_id)
-        ],
+        horses=[_build_horse_dict(rh) for rh in sorted(race.race_horses, key=lambda h: h.horse_id)],
         horse_votes={"horses": horse_votes_data} if horse_votes_data is not None else None,
         vote_count=vc,
         created_at=race.created_at,
@@ -116,15 +121,7 @@ async def create_race(
         grade=race.grade.value,
         status=race.status.value,
         custom_scoring=CustomScoring(**race.custom_scoring) if race.custom_scoring else None,
-        horses=[
-            {
-                "race_horse_id": rh.id,
-                "horse_id": rh.horse_id,
-                "snapshot_data": rh.snapshot_data,
-                "position": rh.position,
-            }
-            for rh in sorted(race.race_horses, key=lambda h: h.horse_id)
-        ],
+        horses=[_build_horse_dict(rh) for rh in sorted(race.race_horses, key=lambda h: h.horse_id)],
         vote_count=vc,
         created_at=race.created_at,
         updated_at=race.updated_at,
@@ -150,15 +147,7 @@ async def update_race(
         grade=race.grade.value,
         status=race.status.value,
         custom_scoring=CustomScoring(**race.custom_scoring) if race.custom_scoring else None,
-        horses=[
-            {
-                "race_horse_id": rh.id,
-                "horse_id": rh.horse_id,
-                "snapshot_data": rh.snapshot_data,
-                "position": rh.position,
-            }
-            for rh in sorted(race.race_horses, key=lambda h: h.horse_id)
-        ],
+        horses=[_build_horse_dict(rh) for rh in sorted(race.race_horses, key=lambda h: h.horse_id)],
         vote_count=vc,
         created_at=race.created_at,
         updated_at=race.updated_at,

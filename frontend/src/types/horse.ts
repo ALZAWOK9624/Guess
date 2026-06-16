@@ -4,14 +4,18 @@ export interface Horse {
   id: number
   name: string
   sex: string | null
-  age: number | null
+  birth_year: number | null
   origin: string | null
+  hemisphere: string | null
+  location: string | null
   sire: string | null
   damsire: string | null
-  weight: string | null
-  jockey: string | null
   previous_result: string | null
+  previous_result_date: string | null
+  previous_result_position: number | null
   best_win: string | null
+  best_win_date: string | null
+  manually_updated_fields: string[] | null
   created_at: string
   updated_at: string
 }
@@ -19,25 +23,42 @@ export interface Horse {
 export interface HorseCreatePayload {
   name: string
   sex?: string | null
-  age?: number | null
+  birth_year?: number | null
   origin?: string | null
+  hemisphere?: string | null
+  location?: string | null
   sire?: string | null
   damsire?: string | null
-  weight?: string | null
-  jockey?: string | null
   previous_result?: string | null
+  previous_result_date?: string | null
+  previous_result_position?: number | null
   best_win?: string | null
+  best_win_date?: string | null
 }
 
 export interface HorseUpdatePayload {
   name?: string | null
   sex?: string | null
-  age?: number | null
+  birth_year?: number | null
   origin?: string | null
+  hemisphere?: string | null
+  location?: string | null
   sire?: string | null
   damsire?: string | null
-  weight?: string | null
-  jockey?: string | null
   previous_result?: string | null
+  previous_result_date?: string | null
+  previous_result_position?: number | null
   best_win?: string | null
+  best_win_date?: string | null
+}
+
+export interface OriginStat {
+  origin: string
+  count: number
+  hemisphere?: string | null
+}
+
+export interface LocationStat {
+  location: string
+  count: number
 }

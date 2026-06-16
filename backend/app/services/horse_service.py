@@ -1,8 +1,9 @@
 """Horse data management business logic service."""
 
 from fastapi import HTTPException, status
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from app.models.horse import Horse
 from app.schemas.horse import HorseCreate, HorseUpdate
@@ -59,6 +60,7 @@ async def update_horse(
 
     Raises 404 if horse not found.
     Raises 409 if the new name conflicts with an existing horse.
+    Raises 400 if previous_result provided without date or position.
     """
     horse = await get_horse(db, horse_id)
     if horse is None:
@@ -83,15 +85,39 @@ async def update_horse(
                 },
             )
 
+    # Validate that if previous_result/previous_result_date/previous_result_position
+    # is provided, all must be present (partial not allowed)
+    has_prev_result = "previous_result" in update_data
+    has_prev_date = "previous_result_date" in update_data
+    has_prev_pos = "previous_result_position" in update_data
+    prev_fields_present = [has_prev_result, has_prev_date, has_prev_pos]
+    if any(prev_fields_present) and not all(prev_fields_present):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "code": "INCOMPLETE_PREVIOUS_RESULT",
+                "message": "前走成绩必须同时提供日期和名次",
+            },
+        )
+
+    # Validate that if best_win/best_win_date is provided, both must be present
+    has_best_win = "best_win" in update_data
+    has_best_date = "best_win_date" in update_data
+    if has_best_win != has_best_date:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "code": "INCOMPLETE_BEST_WIN",
+                "message": "主要胜鞍必须同时提供比赛名称和日期",
+            },
+        )
+
     for field, value in update_data.items():
         setattr(horse, field, value)
 
     # Track manually edited fields for auto-update protection
-    # Any field that gets updated via PATCH is added to the protection list
-    # so auto-updates will skip it (manual edit takes priority).
     tracked_fields = [f for f in update_data.keys() if f not in ("name", "manually_updated_fields")]
     if tracked_fields:
-        # Manually_updated_fields stores a list; handle None/empty list/falsy consistently
         current_protected = horse.manually_updated_fields
         protected_list = list(current_protected) if isinstance(current_protected, list) else []
         for f in tracked_fields:
@@ -129,7 +155,6 @@ async def delete_horse(db: AsyncSession, horse_id: int) -> None:
     """Delete a horse.
 
     Raises 404 if horse not found.
-    Raises 409 if the horse is referenced by any race (future check).
     """
     horse = await get_horse(db, horse_id)
     if horse is None:
@@ -138,8 +163,129 @@ async def delete_horse(db: AsyncSession, horse_id: int) -> None:
             detail={"code": "NOT_FOUND", "message": "马匹不存在"},
         )
 
-    # TODO: Check for race references when race model is implemented
-    # If race references exist, raise 409
-
     await db.delete(horse)
     await db.flush()
+
+
+async def get_origins_stats(db: AsyncSession) -> list[dict]:
+    """Get origin (country) usage frequency statistics with hemisphere info.
+
+    Returns list of {origin, count, hemisphere} sorted by count descending,
+    then by origin alphabetically. Hemisphere is the most common value for that origin.
+    """
+    stmt = (
+        select(Horse.origin, func.count(Horse.id).label("count"))
+        .where(Horse.origin.isnot(None))
+        .group_by(Horse.origin)
+        .order_by(func.count(Horse.id).desc(), Horse.origin.asc())
+    )
+    result = await db.execute(stmt)
+    rows = []
+    for row in result.all():
+        origin = row[0]
+        hs = await _get_common_hemisphere(db, origin)
+        rows.append({"origin": origin, "count": row[1], "hemisphere": hs})
+    return rows
+
+
+async def _get_common_hemisphere(db: AsyncSession, origin: str) -> str | None:
+    """Get the most common hemisphere for a given origin."""
+    stmt = (
+        select(Horse.hemisphere, func.count(Horse.id).label("cnt"))
+        .where(Horse.origin == origin, Horse.hemisphere.isnot(None))
+        .group_by(Horse.hemisphere)
+        .order_by(func.count(Horse.id).desc())
+    )
+    result = await db.execute(stmt)
+    row = result.first()
+    return row[0] if row else None
+
+
+async def get_locations_stats(db: AsyncSession) -> list[dict]:
+    """Get location (training stable) usage frequency statistics.
+
+    Returns list of {location, count} sorted by count descending,
+    then by location alphabetically.
+    """
+    stmt = (
+        select(Horse.location, func.count(Horse.id).label("count"))
+        .where(Horse.location.isnot(None))
+        .group_by(Horse.location)
+        .order_by(func.count(Horse.id).desc(), Horse.location.asc())
+    )
+    result = await db.execute(stmt)
+    return [{"location": row[0], "count": row[1]} for row in result.all()]
+
+
+async def toggle_hemisphere(db: AsyncSession, origin: str) -> dict:
+    """Toggle hemisphere for all horses with the given origin.
+
+    north → south, south → north.
+    Returns {origin, new_hemisphere, affected_count}.
+    """
+    stmt = select(Horse).where(Horse.origin == origin, Horse.hemisphere.isnot(None))
+    result = await db.execute(stmt)
+    horses = list(result.scalars().all())
+
+    new_hs = None
+    for h in horses:
+        new_hs = "south" if h.hemisphere == "north" else "north"
+        h.hemisphere = new_hs
+
+    await db.flush()
+
+    return {
+        "origin": origin,
+        "new_hemisphere": new_hs,
+        "affected_count": len(horses),
+    }
+
+
+async def update_best_win(
+    db: AsyncSession, horse_id: int, race_id: int
+) -> Horse:
+    """Update a horse's best_win to the specified race.
+
+    Validates the horse participated in the race and won (position=1).
+    Raises 404 if horse not found.
+    Raises 400 if horse didn't win the race.
+    """
+    horse = await get_horse(db, horse_id)
+    if horse is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={"code": "NOT_FOUND", "message": "马匹不存在"},
+        )
+
+    from app.models.race import Race, RaceHorse
+    stmt = (
+        select(RaceHorse)
+        .options(selectinload(RaceHorse.race))
+        .where(RaceHorse.horse_id == horse_id, RaceHorse.race_id == race_id)
+    )
+    result = await db.execute(stmt)
+    rh = result.scalar_one_or_none()
+
+    if rh is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "code": "HORSE_NOT_IN_RACE",
+                "message": "该马匹未参与此比赛",
+            },
+        )
+
+    if rh.position != 1:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "code": "HORSE_NOT_WINNER",
+                "message": "该马匹不是此比赛的胜马",
+            },
+        )
+
+    horse.best_win = rh.race.name
+    horse.best_win_date = rh.race.date
+    await db.flush()
+    await db.refresh(horse)
+    return horse

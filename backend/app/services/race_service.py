@@ -110,17 +110,16 @@ def validate_custom_scoring(
         )
 
 
-def _build_snapshot(horse: Horse) -> dict:
-    """Build a snapshot dict from a Horse ORM object."""
+def _build_snapshot(horse: Horse, weight: str | None = None, jockey: str | None = None) -> dict:
+    """Build a snapshot dict from a Horse ORM object and per-race weight/jockey."""
     return {
         "name": horse.name,
         "sex": horse.sex,
-        "age": horse.age,
+        "birth_year": horse.birth_year,
         "origin": horse.origin,
+        "hemisphere": horse.hemisphere,
         "sire": horse.sire,
         "damsire": horse.damsire,
-        "weight": horse.weight,
-        "jockey": horse.jockey,
         "previous_result": horse.previous_result,
         "best_win": horse.best_win,
     }
@@ -204,10 +203,16 @@ async def create_race(
                 },
             )
 
+        # Get per-horse weight/jockey from request, fallback to None
+        w = data.horse_weights.get(str(horse_id)) or data.horse_weights.get(horse_id) if data.horse_weights else None
+        j = data.horse_jockeys.get(str(horse_id)) or data.horse_jockeys.get(horse_id) if data.horse_jockeys else None
+
         race_horse = RaceHorse(
             race_id=race.id,
             horse_id=horse.id,
-            snapshot_data=_build_snapshot(horse),
+            snapshot_data=_build_snapshot(horse, weight=w, jockey=j),
+            weight=w,
+            jockey=j,
         )
         db.add(race_horse)
 
@@ -291,10 +296,37 @@ async def update_race(
         else:
             race.custom_scoring = None
 
+    # Update per-horse weight/jockey if provided (keyed by race_horse_id)
+    if "horse_weights" in update_data:
+        weights = update_data["horse_weights"]
+        for rh in race.race_horses:
+            w = weights.get(str(rh.id)) or weights.get(rh.id)
+            if w is not None:
+                rh.weight = w
+                # Also update snapshot_data for backward compat
+                snap = dict(rh.snapshot_data)
+                snap["weight"] = w
+                rh.snapshot_data = snap
+
+    if "horse_jockeys" in update_data:
+        jockeys = update_data["horse_jockeys"]
+        for rh in race.race_horses:
+            j = jockeys.get(str(rh.id)) or jockeys.get(rh.id)
+            if j is not None:
+                rh.jockey = j
+                # Also update snapshot_data for backward compat
+                snap = dict(rh.snapshot_data)
+                snap["jockey"] = j
+                rh.snapshot_data = snap
+
     # Update horse list if provided
     if "horse_ids" in update_data:
         new_horse_ids = set(update_data["horse_ids"])
         existing_ids = {rh.horse_id for rh in race.race_horses}
+
+        # Get weights/jockeys from update data for new horses
+        new_weights = update_data.get("horse_weights", {}) if "horse_weights" in update_data else {}
+        new_jockeys = update_data.get("horse_jockeys", {}) if "horse_jockeys" in update_data else {}
 
         # Add new horses
         for horse_id in new_horse_ids - existing_ids:
@@ -307,10 +339,14 @@ async def update_race(
                         "message": f"马匹 {horse_id} 不存在",
                     },
                 )
+            w = new_weights.get(str(horse_id)) or new_weights.get(horse_id) if isinstance(new_weights, dict) else None
+            j = new_jockeys.get(str(horse_id)) or new_jockeys.get(horse_id) if isinstance(new_jockeys, dict) else None
             race_horse = RaceHorse(
                 race_id=race.id,
                 horse_id=horse.id,
-                snapshot_data=_build_snapshot(horse),
+                snapshot_data=_build_snapshot(horse, weight=w, jockey=j),
+                weight=w,
+                jockey=j,
             )
             db.add(race_horse)
 

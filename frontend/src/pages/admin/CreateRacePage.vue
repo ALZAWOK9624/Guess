@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import HorseSearchSelect from '@/components/HorseSearchSelect.vue'
 import { createRace } from '@/api/races'
@@ -17,6 +17,29 @@ const customPenaltyRules = ref('')
 const isSubmitting = ref(false)
 const formError = ref('')
 const errors = ref<Record<string, string>>({})
+
+// Per-horse weight and jockey (keyed by horse id)
+const horseWeights = ref<Record<number, string>>({})
+const horseJockeys = ref<Record<number, string>>({})
+
+// Initialize weight/jockey when horses change
+watch(selectedHorses, (horses) => {
+  for (const h of horses) {
+    if (!(h.id in horseWeights.value)) {
+      horseWeights.value[h.id] = ''
+    }
+    if (!(h.id in horseJockeys.value)) {
+      horseJockeys.value[h.id] = ''
+    }
+  }
+  const currentIds = new Set(horses.map(h => h.id))
+  for (const id of Object.keys(horseWeights.value)) {
+    if (!currentIds.has(Number(id))) {
+      delete horseWeights.value[Number(id)]
+      delete horseJockeys.value[Number(id)]
+    }
+  }
+}, { deep: true })
 
 const grades = [
   { value: 'G1', label: 'G1' },
@@ -46,7 +69,6 @@ function validate(): boolean {
       errs.positive_scores = '请输入正序积分列表'
     } else {
       const parts = trimmedInput.split(',').map(s => s.trim())
-      // Check for empty parts (e.g. trailing comma)
       if (parts.some(p => p === '')) {
         errs.positive_scores = '积分格式无效，请使用逗号分隔数字'
       } else {
@@ -56,7 +78,6 @@ function validate(): boolean {
         }
       }
     }
-    // Validate penalty rules format if provided
     if (customPenaltyRules.value.trim()) {
       const ruleParts = customPenaltyRules.value.split(',').map(p => p.trim())
       for (const part of ruleParts) {
@@ -104,11 +125,25 @@ async function handleSubmit() {
   formError.value = ''
 
   try {
+    // Build horse_weights and horse_jockeys with non-empty values only
+    const hw: Record<string, string> = {}
+    const hj: Record<string, string> = {}
+    for (const h of selectedHorses.value) {
+      if (horseWeights.value[h.id]?.trim()) {
+        hw[String(h.id)] = horseWeights.value[h.id].trim()
+      }
+      if (horseJockeys.value[h.id]?.trim()) {
+        hj[String(h.id)] = horseJockeys.value[h.id].trim()
+      }
+    }
+
     const payload = {
       name: raceName.value.trim(),
       date: raceDate.value,
       grade: raceGrade.value as 'G1' | 'G2_JPN1' | 'YOUNG_G1' | 'CUSTOM',
       horse_ids: selectedHorses.value.map(h => h.id),
+      horse_weights: Object.keys(hw).length > 0 ? hw : undefined,
+      horse_jockeys: Object.keys(hj).length > 0 ? hj : undefined,
       custom_scoring: showCustomFields.value ? parseCustomScoring() : undefined,
     }
     await createRace(payload)
@@ -185,7 +220,7 @@ async function handleSubmit() {
           </div>
         </fieldset>
 
-        <!-- 自定义等级字段 -->
+        <!-- Custom scoring fields -->
         <div v-if="showCustomFields" class="custom-scoring-fields">
           <div class="form-group">
             <label class="form-label" for="positive-scores">
@@ -200,16 +235,12 @@ async function handleSubmit() {
               aria-required="true"
               :aria-invalid="!!errors.positive_scores"
             />
-            <p v-if="errors.positive_scores" class="field-error">
-              {{ errors.positive_scores }}
-            </p>
+            <p v-if="errors.positive_scores" class="field-error">{{ errors.positive_scores }}</p>
             <p class="field-hint">从第 1 名开始的积分，用逗号分隔</p>
           </div>
 
           <div class="form-group">
-            <label class="form-label" for="penalty-rules">
-              扣分规则（选填）
-            </label>
+            <label class="form-label" for="penalty-rules">扣分规则（选填）</label>
             <input
               id="penalty-rules"
               v-model="customPenaltyRules"
@@ -218,17 +249,11 @@ async function handleSubmit() {
               placeholder="例：-1:-5,-2:-2"
               :aria-invalid="!!errors.penalty_rules"
             />
-            <p v-if="errors.penalty_rules" class="field-error">
-              {{ errors.penalty_rules }}
-            </p>
-            <p v-else class="field-hint">
-              格式：倒数位置:扣分，用逗号分隔。如 -1:-5 表示倒数第一扣 5 分
-            </p>
+            <p v-if="errors.penalty_rules" class="field-error">{{ errors.penalty_rules }}</p>
+            <p v-else class="field-hint">格式：倒数位置:扣分，用逗号分隔。如 -1:-5 表示倒数第一扣 5 分</p>
           </div>
 
-          <p class="custom-note">
-            自定义规则仅作用于本场比赛，不会保存为模板。
-          </p>
+          <p class="custom-note">自定义规则仅作用于本场比赛，不会保存为模板。</p>
         </div>
       </div>
 
@@ -242,29 +267,149 @@ async function handleSubmit() {
         <p v-if="errors.horses" class="field-error">{{ errors.horses }}</p>
       </div>
 
-      <!-- 表单级错误 -->
+      <!-- Per-horse weight and jockey -->
+      <div v-if="selectedHorses.length > 0" class="form-group">
+        <label class="form-label">鞍上信息（每匹马的体重和骑手）</label>
+        <div class="horse-weight-jockey-list">
+          <div
+            v-for="horse in selectedHorses"
+            :key="horse.id"
+            class="horse-weight-jockey-row"
+          >
+            <span class="horse-label">{{ horse.name }}</span>
+            <input
+              v-model="horseWeights[horse.id]"
+              type="text"
+              class="form-input weight-input"
+              placeholder="体重（如 520kg）"
+              maxlength="20"
+            />
+            <input
+              v-model="horseJockeys[horse.id]"
+              type="text"
+              class="form-input jockey-input"
+              placeholder="骑手名"
+              maxlength="50"
+            />
+          </div>
+        </div>
+      </div>
+
+      <!-- Form-level error -->
       <p v-if="formError" class="form-error" role="alert">{{ formError }}</p>
 
-      <!-- 提交按钮 -->
+      <!-- Submit button -->
       <div class="form-actions">
-        <button
-          type="button"
-          class="btn btn-cancel"
-          @click="router.push('/admin')"
-        >
-          取消
-        </button>
-        <button
-          type="submit"
-          class="btn btn-primary"
-          :disabled="!canSubmit || isSubmitting"
-        >
+        <button type="button" class="btn btn-cancel" @click="router.push('/admin')">取消</button>
+        <button type="submit" class="btn btn-primary" :disabled="!canSubmit || isSubmitting">
           {{ isSubmitting ? '创建中…' : '确认创建' }}
         </button>
       </div>
     </form>
   </div>
 </template>
+
+<style scoped>
+.create-race-page {
+  padding: var(--spacing-4, 16px);
+  max-width: 720px;
+  margin: 0 auto;
+}
+.page-title {
+  font-family: var(--font-display, 'Barlow Condensed', system-ui, sans-serif);
+  font-size: var(--text-heading, 24px);
+  font-weight: 600;
+  color: var(--color-primary, #1A5632);
+  margin-bottom: var(--spacing-6, 24px);
+}
+.race-form { display: flex; flex-direction: column; gap: var(--spacing-5, 20px); }
+.form-group { display: flex; flex-direction: column; gap: var(--spacing-2, 8px); }
+.form-label { font-size: var(--text-body-sm, 14px); font-weight: 600; color: var(--color-ink-primary, #1A2E1A); }
+.label-hint { font-weight: 400; color: var(--color-ink-secondary, #4A5A4A); }
+.required { color: var(--color-destructive, #C53030); }
+.form-input {
+  padding: 10px 12px;
+  border: 1px solid var(--color-border-strong, #A8B8A4);
+  border-radius: var(--rounded-md, 10px);
+  font-size: var(--text-body, 16px);
+  color: var(--color-ink-primary, #1A2E1A);
+  background: var(--color-surface-raised, #FFFFFF);
+  min-height: 44px;
+}
+.form-input:focus { outline: 2px solid var(--color-primary, #1A5632); outline-offset: 2px; border-color: var(--color-primary, #1A5632); }
+.form-input::placeholder { color: var(--color-ink-disabled, #9CAA9C); }
+.grade-fieldset { border: none; padding: 0; margin: 0; }
+.grade-options { display: flex; flex-wrap: wrap; gap: var(--spacing-3, 12px); }
+.grade-option {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-2, 8px);
+  padding: 8px 16px;
+  border: 1px solid var(--color-border-strong, #A8B8A4);
+  border-radius: var(--rounded-md, 10px);
+  cursor: pointer;
+  min-height: 44px;
+}
+.grade-option.active { border-color: var(--color-primary, #1A5632); background: var(--color-primary, #1A5632); color: #fff; }
+.grade-option input { position: absolute; opacity: 0; width: 0; height: 0; }
+.custom-scoring-fields {
+  margin-top: var(--spacing-4, 16px);
+  padding: var(--spacing-4, 16px);
+  background: var(--color-surface-base, #F8FAF7);
+  border-radius: var(--rounded-md, 10px);
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-4, 16px);
+}
+.field-hint { font-size: var(--text-caption, 12px); color: var(--color-ink-secondary, #4A5A4A); }
+.custom-note { font-size: var(--text-caption, 12px); color: var(--color-ink-disabled, #9CAA9C); padding: 8px; border: 1px dashed var(--color-border-hairline, #D4DCD0); border-radius: var(--rounded-sm, 6px); }
+.field-error { font-size: var(--text-caption, 12px); color: var(--color-destructive, #C53030); }
+.form-error { font-size: var(--text-body-sm, 14px); color: var(--color-destructive, #C53030); padding: 10px 12px; background: var(--color-destructive-light, #FED7D7); border-radius: var(--rounded-md, 10px); }
+.form-actions { display: flex; gap: var(--spacing-3, 12px); justify-content: flex-end; padding-top: var(--spacing-4, 16px); border-top: 1px solid var(--color-border-hairline, #D4DCD0); }
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 10px 24px;
+  border: none;
+  border-radius: var(--rounded-md, 10px);
+  font-size: var(--text-body, 16px);
+  font-weight: 600;
+  cursor: pointer;
+  min-height: 44px;
+}
+.btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.btn-primary { background: var(--color-primary, #1A5632); color: #FFFFFF; }
+.btn-primary:hover:not(:disabled) { background: var(--color-primary-light, #2D7A4F); }
+.btn-cancel { background: var(--color-surface-raised, #FFFFFF); color: var(--color-ink-primary, #1A2E1A); border: 1px solid var(--color-border-strong, #A8B8A4); }
+
+/* Per-horse weight/jockey */
+.horse-weight-jockey-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-2, 8px);
+}
+.horse-weight-jockey-row {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-3, 12px);
+  padding: 8px 12px;
+  background: var(--color-surface-base, #F8FAF7);
+  border-radius: var(--rounded-md, 8px);
+}
+.horse-label {
+  min-width: 100px;
+  font-weight: 600;
+  font-size: var(--text-body-sm, 14px);
+  color: var(--color-ink-primary, #1A2E1A);
+}
+.weight-input { flex: 1; min-width: 0; }
+.jockey-input { flex: 1; min-width: 0; }
+
+@media (prefers-reduced-motion: reduce) {
+  .grade-option, .btn, .form-input { transition: none; }
+}
+</style>
 
 <style scoped>
 .create-race-page {

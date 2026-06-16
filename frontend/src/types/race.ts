@@ -32,6 +32,8 @@ export interface RaceHorseSnapshot {
   race_horse_id: number
   snapshot_data: HorseSnapshotData
   position: number | null
+  weight: string | null
+  jockey: string | null
 }
 
 export interface PublicResultVote {
@@ -44,6 +46,8 @@ export interface RaceHorseResult {
   horse_id: number
   snapshot_data: Record<string, any>
   position: number | null
+  weight: string | null
+  jockey: string | null
   votes: PublicResultVote[]
 }
 
@@ -54,12 +58,12 @@ export interface RaceDetailHorseVotes {
 export interface HorseSnapshotData {
   name: string
   sex: string | null
-  age: number | null
+  birth_year: number | null
+  age?: number | null  // legacy: old snapshots used age
   origin: string | null
+  hemisphere: string | null
   sire: string | null
   damsire: string | null
-  weight: string | null
-  jockey: string | null
   previous_result: string | null
   best_win: string | null
 }
@@ -82,6 +86,8 @@ export interface RaceCreatePayload {
   date: string
   grade: Grade
   horse_ids: number[]
+  horse_weights?: Record<string, string> | null
+  horse_jockeys?: Record<string, string> | null
   custom_scoring?: CustomScoring | null
 }
 
@@ -90,6 +96,8 @@ export interface RaceUpdatePayload {
   date?: string
   grade?: Grade
   horse_ids?: number[]
+  horse_weights?: Record<string, string> | null
+  horse_jockeys?: Record<string, string> | null
   custom_scoring?: CustomScoring | null
 }
 

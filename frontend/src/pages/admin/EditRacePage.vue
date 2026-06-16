@@ -1,11 +1,11 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import HorseSearchSelect from '@/components/HorseSearchSelect.vue'
 import ConfirmDeleteModal from '@/components/ConfirmDeleteModal.vue'
 import { getRace, updateRace, deleteRace } from '@/api/races'
 import type { Horse } from '@/types/horse'
-import type { RaceDetail, Grade } from '@/types/race'
+import type { RaceDetail, RaceHorseSnapshot, Grade } from '@/types/race'
 
 const route = useRoute()
 const router = useRouter()
@@ -23,6 +23,12 @@ const isLoading = ref(true)
 const formError = ref('')
 const notEditable = ref(false)
 const notEditableMessage = ref('')
+
+// Per-horse weight/jockey (keyed by race_horse_id for PATCH updates)
+const horseWeights = ref<Record<number, string>>({})
+const horseJockeys = ref<Record<number, string>>({})
+// Map race_horse_id → horse_id for weight/jockey submission
+const raceHorseIdMap = ref<Record<number, number>>({})
 
 // Delete state
 const showDeleteModal = ref(false)
@@ -44,7 +50,12 @@ const initialValues = ref<{
   date: string
   grade: string
   horses: Horse[]
-}>({ name: '', date: '', grade: 'G1', horses: [] })
+  weights: Record<number, string>
+  jockeys: Record<number, string>
+}>({
+  name: '', date: '', grade: 'G1', horses: [],
+  weights: {}, jockeys: {},
+})
 
 const canSubmit = computed(() => {
   if (notEditable.value) return false
@@ -55,56 +66,79 @@ const canSubmit = computed(() => {
   return true
 })
 
+function loadRaceHorseWeights(race: RaceDetail) {
+  const w: Record<number, string> = {}
+  const j: Record<number, string> = {}
+  const idMap: Record<number, number> = {}
+  for (const rh of race.horses) {
+    // Use weight/jockey from RaceHorse (new) or fallback to snapshot_data (old)
+    const weight = (rh as any).weight || rh.snapshot_data.weight || ''
+    const jockey = (rh as any).jockey || rh.snapshot_data.jockey || ''
+    w[rh.race_horse_id] = weight
+    j[rh.race_horse_id] = jockey
+    idMap[rh.race_horse_id] = rh.horse_id
+  }
+  horseWeights.value = w
+  horseJockeys.value = j
+  raceHorseIdMap.value = idMap
+}
+
 onMounted(async () => {
   try {
     const race = await getRace(raceId)
 
-    // Check if race is editable
     if (race.status !== 'voting') {
       notEditable.value = true
       notEditableMessage.value =
-        race.status === 'locked'
-          ? '比赛已锁定，不可编辑'
-          : '比赛已结算，不可编辑'
+        race.status === 'locked' ? '比赛已锁定，不可编辑' : '比赛已结算，不可编辑'
     }
 
     raceName.value = race.name
     raceDate.value = race.date
     raceGrade.value = race.grade
 
-    // Convert horse snapshots back to Horse type for the selector
+    // Convert horse snapshots back to Horse type
+    // The weight/jockey are now per-race, so we don't put them in the Horse objects
     const mapped: Horse[] = race.horses.map(h => ({
       id: h.horse_id,
       name: h.snapshot_data.name,
       sex: h.snapshot_data.sex,
-      age: h.snapshot_data.age,
+      birth_year: h.snapshot_data.birth_year ?? h.snapshot_data.age ?? null,
       origin: h.snapshot_data.origin,
+      hemisphere: h.snapshot_data.hemisphere ?? null,
+      location: null,
       sire: h.snapshot_data.sire,
       damsire: h.snapshot_data.damsire,
-      weight: h.snapshot_data.weight,
-      jockey: h.snapshot_data.jockey,
       previous_result: h.snapshot_data.previous_result,
       best_win: h.snapshot_data.best_win,
+      previous_result_date: null,
+      previous_result_position: null,
+      best_win_date: null,
+      manually_updated_fields: null,
       created_at: '',
       updated_at: '',
     }))
     selectedHorses.value = mapped
 
-    // Store initial values for change detection
+    // Load per-horse weight and jockey
+    loadRaceHorseWeights(race)
+
+    // Store initial values
     initialValues.value = {
       name: race.name,
       date: race.date,
       grade: race.grade,
       horses: [...selectedHorses.value],
+      weights: { ...horseWeights.value },
+      jockeys: { ...horseJockeys.value },
     }
 
-    // Pre-fill custom scoring if present
+    // Pre-fill custom scoring
     if (race.custom_scoring) {
       customPositiveScores.value = race.custom_scoring.positive_scores.join(',')
-      if (race.custom_scoring.penalty_rules && race.custom_scoring.penalty_rules.length > 0) {
+      if (race.custom_scoring.penalty_rules?.length) {
         customPenaltyRules.value = race.custom_scoring.penalty_rules
-          .map(r => `${r.position}:${r.points}`)
-          .join(',')
+          .map(r => `${r.position}:${r.points}`).join(',')
       }
     }
   } catch (err: any) {
@@ -121,23 +155,19 @@ function getChangedHorseIds(): number[] | undefined {
   for (let i = 0; i < currentIds.length; i++) {
     if (currentIds[i] !== initialIds[i]) return selectedHorses.value.map(h => h.id)
   }
-  return undefined  // No change
+  return undefined
 }
 
 function parseCustomScoring() {
   const scores = customPositiveScores.value
-    .split(',')
-    .map(s => parseInt(s.trim()))
-    .filter(n => !isNaN(n))
+    .split(',').map(s => parseInt(s.trim())).filter(n => !isNaN(n))
 
   const penalties = customPenaltyRules.value
     ? customPenaltyRules.value
-        .split(',')
-        .map(p => {
+        .split(',').map(p => {
           const [pos, pts] = p.split(':')
           return { position: parseInt(pos.trim()), points: parseInt(pts.trim()) }
-        })
-        .filter(r => !isNaN(r.position) && !isNaN(r.points))
+        }).filter(r => !isNaN(r.position) && !isNaN(r.points))
     : []
 
   return { positive_scores: scores, penalty_rules: penalties.length > 0 ? penalties : undefined }
@@ -151,7 +181,6 @@ async function handleSubmit() {
   try {
     const payload: Record<string, any> = {}
 
-    // Only send changed fields
     if (raceName.value.trim() !== initialValues.value.name) {
       payload.name = raceName.value.trim()
     }
@@ -160,7 +189,6 @@ async function handleSubmit() {
     }
     if (raceGrade.value !== initialValues.value.grade) {
       payload.grade = raceGrade.value as Grade
-      // When changing to CUSTOM, always send custom_scoring
       if (raceGrade.value === 'CUSTOM') {
         payload.custom_scoring = parseCustomScoring()
       }
@@ -171,12 +199,25 @@ async function handleSubmit() {
       payload.horse_ids = changedHorses
     }
 
-    // Only send custom_scoring if grade is CUSTOM (change detected above)
+    // Check weight/jockey changes (keyed by race_horse_id)
+    const weightChanges: Record<string, string> = {}
+    const jockeyChanges: Record<string, string> = {}
+    for (const rhId of Object.keys(horseWeights.value)) {
+      const numRhId = Number(rhId)
+      const currentW = horseWeights.value[numRhId]
+      const currentJ = horseJockeys.value[numRhId]
+      const initialW = initialValues.value.weights[numRhId] || ''
+      const initialJ = initialValues.value.jockeys[numRhId] || ''
+      if (currentW !== initialW) weightChanges[rhId] = currentW || ''
+      if (currentJ !== initialJ) jockeyChanges[rhId] = currentJ || ''
+    }
+    if (Object.keys(weightChanges).length > 0) payload.horse_weights = weightChanges
+    if (Object.keys(jockeyChanges).length > 0) payload.horse_jockeys = jockeyChanges
+
     if (raceGrade.value !== 'CUSTOM' && 'custom_scoring' in payload) {
       delete payload.custom_scoring
     }
 
-    // Skip if nothing changed
     if (Object.keys(payload).length === 0) {
       router.push('/admin')
       return
@@ -185,8 +226,7 @@ async function handleSubmit() {
     await updateRace(raceId, payload)
     router.push('/admin')
   } catch (err: any) {
-    formError.value =
-      err?.response?.data?.detail?.message || '保存失败，请重试'
+    formError.value = err?.response?.data?.detail?.message || '保存失败，请重试'
   } finally {
     isSubmitting.value = false
   }
@@ -221,101 +261,50 @@ async function handleDelete() {
   <div class="edit-race-page">
     <h1 class="page-title">编辑比赛</h1>
 
-    <!-- Loading -->
-    <div v-if="isLoading" class="loading-state">
-      <p>加载中…</p>
-    </div>
+    <div v-if="isLoading" class="loading-state"><p>加载中…</p></div>
 
-    <!-- Not editable -->
     <div v-else-if="notEditable" class="not-editable-state">
       <p class="not-editable-message">{{ notEditableMessage }}</p>
-      <button class="btn btn-cancel" @click="router.push('/admin')">
-        返回管理后台
-      </button>
+      <button class="btn btn-cancel" @click="router.push('/admin')">返回管理后台</button>
     </div>
 
-    <!-- Edit form -->
     <form v-else class="race-form" @submit.prevent="handleSubmit">
-      <!-- 比赛名称 -->
+
       <div class="form-group">
         <label class="form-label" for="race-name">比赛名称</label>
-        <input
-          id="race-name"
-          v-model="raceName"
-          type="text"
-          class="form-input"
-          placeholder="输入比赛名称"
-          maxlength="200"
-        />
+        <input id="race-name" v-model="raceName" type="text" class="form-input" placeholder="输入比赛名称" maxlength="200" />
       </div>
 
-      <!-- 日期 -->
       <div class="form-group">
         <label class="form-label" for="race-date">日期</label>
-        <input
-          id="race-date"
-          v-model="raceDate"
-          type="date"
-          class="form-input"
-        />
+        <input id="race-date" v-model="raceDate" type="date" class="form-input" />
       </div>
 
-      <!-- 等级 -->
       <div class="form-group">
         <fieldset class="grade-fieldset">
           <legend class="form-label">等级</legend>
           <div class="grade-options" role="radiogroup">
-            <label
-              v-for="g in grades"
-              :key="g.value"
-              class="grade-option"
-              :class="{ active: raceGrade === g.value }"
-            >
-              <input
-                v-model="raceGrade"
-                type="radio"
-                name="grade"
-                :value="g.value"
-              />
+            <label v-for="g in grades" :key="g.value" class="grade-option" :class="{ active: raceGrade === g.value }">
+              <input v-model="raceGrade" type="radio" name="grade" :value="g.value" />
               <span class="grade-label">{{ g.label }}</span>
             </label>
           </div>
         </fieldset>
 
-        <!-- 自定义等级字段 -->
         <div v-if="showCustomFields" class="custom-scoring-fields">
           <div class="form-group">
-            <label class="form-label" for="positive-scores">
-              正序积分列表
-            </label>
-            <input
-              id="positive-scores"
-              v-model="customPositiveScores"
-              type="text"
-              class="form-input"
-              placeholder="例：10,7,5,3,2,1"
-            />
+            <label class="form-label" for="positive-scores">正序积分列表</label>
+            <input id="positive-scores" v-model="customPositiveScores" type="text" class="form-input" placeholder="例：10,7,5,3,2,1" />
             <p class="field-hint">从第 1 名开始的积分，用逗号分隔</p>
           </div>
-
           <div class="form-group">
             <label class="form-label" for="penalty-rules">扣分规则（选填）</label>
-            <input
-              id="penalty-rules"
-              v-model="customPenaltyRules"
-              type="text"
-              class="form-input"
-              placeholder="例：-1:-5,-2:-2"
-            />
+            <input id="penalty-rules" v-model="customPenaltyRules" type="text" class="form-input" placeholder="例：-1:-5,-2:-2" />
           </div>
-
-          <p class="custom-note">
-            自定义规则仅作用于本场比赛，不会保存为模板。
-          </p>
+          <p class="custom-note">自定义规则仅作用于本场比赛，不会保存为模板。</p>
         </div>
       </div>
 
-      <!-- 参赛马匹 -->
       <div class="form-group">
         <label class="form-label">
           参赛马匹 <span class="label-hint">（至少 2 匹）</span>
@@ -323,39 +312,45 @@ async function handleDelete() {
         <HorseSearchSelect v-model:selectedHorses="selectedHorses" />
       </div>
 
-      <!-- 表单级错误 -->
-      <p v-if="formError" class="form-error" role="alert">{{ formError }}</p>
-
-      <!-- 提交按钮 -->
-      <div class="form-actions">
-        <button
-          type="button"
-          class="btn btn-cancel"
-          @click="router.push('/admin')"
-        >
-          取消
-        </button>
-        <button
-          type="submit"
-          class="btn btn-primary"
-          :disabled="!canSubmit || isSubmitting"
-        >
-          {{ isSubmitting ? '保存中…' : '保存修改' }}
-        </button>
-        <button
-          type="button"
-          class="btn btn-destructive"
-          @click="promptDelete"
-        >
-          删除比赛
-        </button>
+      <!-- Per-horse weight and jockey -->
+      <div v-if="Object.keys(raceHorseIdMap).length > 0" class="form-group">
+        <label class="form-label">鞍上信息（每匹马的体重和骑手）</label>
+        <div class="horse-weight-jockey-list">
+          <div v-for="(horseId, rhId) in raceHorseIdMap" :key="rhId" class="horse-weight-jockey-row">
+            <span class="horse-label">
+              {{ selectedHorses.find(h => h.id === horseId)?.name || `马匹#${horseId}` }}
+            </span>
+            <input
+              v-model="horseWeights[Number(rhId)]"
+              type="text"
+              class="form-input weight-input"
+              placeholder="体重（如 520kg）"
+              maxlength="20"
+            />
+            <input
+              v-model="horseJockeys[Number(rhId)]"
+              type="text"
+              class="form-input jockey-input"
+              placeholder="骑手名"
+              maxlength="50"
+            />
+          </div>
+        </div>
       </div>
 
-      <!-- Delete error -->
+      <p v-if="formError" class="form-error" role="alert">{{ formError }}</p>
+
+      <div class="form-actions">
+        <button type="button" class="btn btn-cancel" @click="router.push('/admin')">取消</button>
+        <button type="submit" class="btn btn-primary" :disabled="!canSubmit || isSubmitting">
+          {{ isSubmitting ? '保存中…' : '保存修改' }}
+        </button>
+        <button type="button" class="btn btn-destructive" @click="promptDelete">删除比赛</button>
+      </div>
+
       <p v-if="deleteError" class="form-error" role="alert">{{ deleteError }}</p>
     </form>
 
-    <!-- Delete confirmation modal -->
     <ConfirmDeleteModal
       v-if="showDeleteModal"
       title="删除比赛"
@@ -367,6 +362,43 @@ async function handleDelete() {
     />
   </div>
 </template>
+
+<style scoped>
+.edit-race-page { padding: var(--spacing-4, 16px); max-width: 720px; margin: 0 auto; }
+.page-title { font-family: var(--font-display, 'Barlow Condensed', system-ui, sans-serif); font-size: var(--text-heading, 24px); font-weight: 600; color: var(--color-primary, #1A5632); margin-bottom: var(--spacing-6, 24px); }
+.loading-state, .not-editable-state { display: flex; flex-direction: column; align-items: center; gap: var(--spacing-4, 16px); padding: var(--spacing-8, 32px); text-align: center; }
+.not-editable-message { font-size: var(--text-body, 16px); color: var(--color-ink-secondary, #4A5A4A); }
+.race-form { display: flex; flex-direction: column; gap: var(--spacing-5, 20px); }
+.form-group { display: flex; flex-direction: column; gap: var(--spacing-2, 8px); }
+.form-label { font-size: var(--text-body-sm, 14px); font-weight: 600; color: var(--color-ink-primary, #1A2E1A); }
+.label-hint { font-weight: 400; color: var(--color-ink-secondary, #4A5A4A); }
+.form-input { padding: 10px 12px; border: 1px solid var(--color-border-strong, #A8B8A4); border-radius: var(--rounded-md, 10px); font-size: var(--text-body, 16px); color: var(--color-ink-primary, #1A2E1A); background: var(--color-surface-raised, #FFFFFF); min-height: 44px; }
+.form-input:focus { outline: 2px solid var(--color-primary, #1A5632); outline-offset: 2px; border-color: var(--color-primary, #1A5632); }
+.grade-fieldset { border: none; padding: 0; margin: 0; }
+.grade-options { display: flex; flex-wrap: wrap; gap: var(--spacing-3, 12px); }
+.grade-option { display: flex; align-items: center; gap: var(--spacing-2, 8px); padding: 8px 16px; border: 1px solid var(--color-border-strong, #A8B8A4); border-radius: var(--rounded-md, 10px); cursor: pointer; min-height: 44px; }
+.grade-option.active { border-color: var(--color-primary, #1A5632); background: var(--color-primary, #1A5632); color: #fff; }
+.grade-option input { position: absolute; opacity: 0; width: 0; height: 0; }
+.custom-scoring-fields { margin-top: var(--spacing-4, 16px); padding: var(--spacing-4, 16px); background: var(--color-surface-base, #F8FAF7); border-radius: var(--rounded-md, 10px); display: flex; flex-direction: column; gap: var(--spacing-4, 16px); }
+.field-hint { font-size: var(--text-caption, 12px); color: var(--color-ink-secondary, #4A5A4A); }
+.custom-note { font-size: var(--text-caption, 12px); color: var(--color-ink-disabled, #9CAA9C); padding: 8px; border: 1px dashed var(--color-border-hairline, #D4DCD0); border-radius: var(--rounded-sm, 6px); }
+.form-error { font-size: var(--text-body-sm, 14px); color: var(--color-destructive, #C53030); padding: 10px 12px; background: var(--color-destructive-light, #FED7D7); border-radius: var(--rounded-md, 10px); }
+.form-actions { display: flex; gap: var(--spacing-3, 12px); justify-content: flex-end; padding-top: var(--spacing-4, 16px); border-top: 1px solid var(--color-border-hairline, #D4DCD0); }
+.btn { display: inline-flex; align-items: center; justify-content: center; padding: 10px 24px; border: none; border-radius: var(--rounded-md, 10px); font-size: var(--text-body, 16px); font-weight: 600; cursor: pointer; min-height: 44px; }
+.btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.btn-primary { background: var(--color-primary, #1A5632); color: #FFFFFF; }
+.btn-primary:hover:not(:disabled) { background: var(--color-primary-light, #2D7A4F); }
+.btn-cancel { background: var(--color-surface-raised, #FFFFFF); color: var(--color-ink-primary, #1A2E1A); border: 1px solid var(--color-border-strong, #A8B8A4); }
+.btn-destructive { background: var(--color-surface-raised, #FFFFFF); color: var(--color-destructive, #C53030); border: 1px solid var(--color-destructive, #C53030); }
+.btn-destructive:hover:not(:disabled) { background: var(--color-destructive-light, #FED7D7); }
+
+/* Per-horse weight/jockey */
+.horse-weight-jockey-list { display: flex; flex-direction: column; gap: var(--spacing-2, 8px); }
+.horse-weight-jockey-row { display: flex; align-items: center; gap: var(--spacing-3, 12px); padding: 8px 12px; background: var(--color-surface-base, #F8FAF7); border-radius: var(--rounded-md, 8px); }
+.horse-label { min-width: 100px; font-weight: 600; font-size: var(--text-body-sm, 14px); color: var(--color-ink-primary, #1A2E1A); }
+.weight-input { flex: 1; min-width: 0; }
+.jockey-input { flex: 1; min-width: 0; }
+</style>
 
 <style scoped>
 .edit-race-page {

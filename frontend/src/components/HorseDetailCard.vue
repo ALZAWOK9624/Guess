@@ -2,9 +2,22 @@
 import { computed } from 'vue'
 import type { HorseSnapshotData } from '@/types/race'
 
+function computeAge(birthYear: number, hemisphere: string, onDate: Date): number {
+  const cutoffMonth = hemisphere === 'south' ? 8 : 1
+  const thisYear = onDate.getFullYear()
+  const cutoff = new Date(thisYear, cutoffMonth - 1, 1)
+  const effectiveYear = onDate >= cutoff ? thisYear : thisYear - 1
+  return effectiveYear - birthYear
+}
+
 const props = withDefaults(defineProps<{
   snapshotData?: HorseSnapshotData | null
   horseId: number
+  weight?: string | null
+  jockey?: string | null
+  birthYear?: number | null
+  hemisphere?: string | null
+  referenceDate?: string | null  // race date for age calculation; uses today if null
   votable?: boolean
   voted?: boolean
   submitting?: boolean
@@ -12,15 +25,17 @@ const props = withDefaults(defineProps<{
   snapshotData: () => ({
     name: '',
     sex: null,
-    age: null,
     origin: null,
     sire: null,
     damsire: null,
-    weight: null,
-    jockey: null,
     previous_result: null,
     best_win: null,
   }),
+  weight: null,
+  jockey: null,
+  birthYear: null,
+  hemisphere: null,
+  referenceDate: null,
   votable: false,
   voted: false,
   submitting: false,
@@ -33,14 +48,25 @@ const emit = defineEmits<{
 const safeData = computed(() => props.snapshotData ?? {
   name: '',
   sex: null,
-  age: null,
   origin: null,
   sire: null,
   damsire: null,
-  weight: null,
-  jockey: null,
   previous_result: null,
   best_win: null,
+})
+
+const displayWeight = computed(() => props.weight ?? props.snapshotData?.weight ?? null)
+const displayJockey = computed(() => props.jockey ?? props.snapshotData?.jockey ?? null)
+
+// Compute age: from props (new) → snapshotData.birth_year (new snap) → snapshotData.age (legacy snap)
+const rawBirthYear = computed(() => props.birthYear ?? props.snapshotData?.birth_year ?? props.snapshotData?.age ?? null)
+const rawHemisphere = computed(() => props.hemisphere ?? props.snapshotData?.hemisphere ?? null)
+
+const displayAge = computed(() => {
+  if (rawBirthYear.value === null || rawBirthYear.value === undefined) return null
+  const refDate = props.referenceDate ? new Date(props.referenceDate) : new Date()
+  const hs = rawHemisphere.value || 'north'
+  return computeAge(rawBirthYear.value, hs, refDate)
 })
 
 function handleClick() {
@@ -75,7 +101,7 @@ function handleClick() {
       </div>
       <div class="attr-row">
         <span class="attr-label">年龄</span>
-        <span class="attr-value">{{ safeData.age ?? '-' }}</span>
+        <span class="attr-value">{{ displayAge !== null ? `${displayAge}岁` : '-' }}</span>
       </div>
       <div class="attr-row">
         <span class="attr-label">产地</span>
@@ -91,11 +117,11 @@ function handleClick() {
       </div>
       <div class="attr-row">
         <span class="attr-label">负重</span>
-        <span class="attr-value">{{ safeData.weight || '-' }}</span>
+        <span class="attr-value">{{ displayWeight || '-' }}</span>
       </div>
       <div class="attr-row">
         <span class="attr-label">骑手</span>
-        <span class="attr-value">{{ safeData.jockey || '-' }}</span>
+        <span class="attr-value">{{ displayJockey || '-' }}</span>
       </div>
       <div class="attr-row">
         <span class="attr-label">前走成绩</span>

@@ -36,7 +36,7 @@ const snapshot = () => props.horse.snapshot_data
     <div class="card-content">
       <span class="horse-name">{{ snapshot().name }}</span>
       <span class="horse-meta">
-        {{ snapshot().jockey ? snapshot().jockey + ' · ' : '' }}{{ snapshot().weight ?? '' }}
+        {{ props.horse.jockey || snapshot().jockey || '' }}{{ (props.horse.jockey || snapshot().jockey) ? ' · ' : '' }}{{ props.horse.weight || snapshot().weight || '' }}
       </span>
     </div>
     <div v-if="isDnf" class="dnf-badge">DNF</div>
