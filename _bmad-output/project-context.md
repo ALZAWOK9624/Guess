@@ -284,6 +284,14 @@ _This file contains critical rules and patterns that AI agents must follow when 
 - **移动端触控拖拽模式**（AC-3）：`ResultsPage.vue` 使用 `@touchstart`（300ms setTimeout 延迟激活，`document.body.style.overflow = 'hidden'` 禁止滚动）→ `@touchmove`（e.preventDefault() + 通过 getBoundingClientRect 计算当前位置）→ `@touchend`（检测 DNF 区域 + 清除 body overflow）。`touch-action: none` 设置在拖拽手柄 CSS 上，避免触控与滚动冲突。拖拽结束后恢复 `document.body.style.overflow = ''`。
 - **位置连续校验模式**：`ResultEntry.validate_positions()` 在 schema 层校验 `sorted(positive_positions) == list(range(1, len(positive_positions) + 1))`，确保名次无间隔。此校验防止管理员提交 1,3,4,5 等不连续位置导致评分引擎计算错误。
 
+**排行榜模式（Story 3.5）：**
+- **Leaderboard 聚合查询模式**：`leaderboard_service.get_leaderboard()` 使用 `OUTER JOIN votes ON (user.id = vote.user_id AND vote.points IS NOT NULL)` 确保所有用户（含 0 参与用户）出现。聚合列：`COALESCE(SUM(vote.points), 0)` 为 total_points、`COUNT(DISTINCT vote.race_id)` 为 races_participated、`ROUND(COALESCE(SUM(vote.points), 0.0) / NULLIF(COUNT(DISTINCT vote.race_id), 0), 1)` 为 avg_points。排序：`total_points DESC, avg_points DESC`。Python 层对 NULL avg 做 `float(row.avg_points or 0.0)` 处理。
+- **Leaderboard 公开端点模式**：`GET /api/v1/leaderboard` 无认证依赖（FR-23 要求公开访问），路由前缀 `/api/v1`。前端 `apiClient.get('/leaderboard')` 因 baseURL 为 `/api/v1` 正确匹配。
+- **LeaderboardRow 组件模式**：`LeaderboardRow.vue` 接收 `entry: LeaderboardEntry`, `rank: number`, `isCurrentUser: boolean` props。rank 使用 Barlow Condensed 18px bold，前三名使用 `--color-accent` 金色（`color: var(--color-accent, #B8960C)`），其余用 `--color-ink-primary`。积分使用 Barlow Condensed 20px bold `--color-primary`。当前用户行使用 `background: #F0F7F2`。场次/场均使用 body-sm 14px `--color-ink-secondary`。row 使用 `role="row"` + `aria-label="{rank}名 {username} {points}分"`，`min-height: 44px` 确保触摸目标。
+- **LeaderboardPage 模式**：`LeaderboardPage.vue` 使用 PageState 枚举（loading/empty/error/success）。success 态渲染 `.leaderboard-table` 容器（`role="table"`）包含 sticky header（`position: sticky; top: 0; z-index: 1`）和 LeaderboardRow 列表。empty 态条件：`data.length === 0 || data.every(e => e.races_participated === 0)`。
+- **review 通过后的 story 状态转换**：code-review 发现被全部修复后，story 状态从 `review` → `done`。同时 sprint-status.yaml 同步更新。此流程在 code-review 工作流的 Step 6 中自动执行。
+- **catch 规范**：所有 `catch` 块必须使用 `catch (err)`（非裸 `catch`），以便区分错误类型。即使在仅设置 error 状态的简单场景中也需遵守此规范。
+
 ---
 
 ## Usage Guidelines
@@ -300,4 +308,4 @@ _This file contains critical rules and patterns that AI agents must follow when 
 - Review quarterly for outdated rules
 - Remove rules that become obvious over time
 
-Last Updated: 2026-06-16 (Story 3.4 result entry drag-sort — settlement service, DragCard, useDragSort composable, touch drag, position validation)
+Last Updated: 2026-06-16 (Story 3.5 leaderboard service/endpoint — LeaderboardRow, LeaderboardPage, aggregate query pattern)

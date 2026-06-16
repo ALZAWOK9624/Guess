@@ -1,11 +1,15 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
-import { useRouter } from 'vue-router'
+import { useAuthStore } from '@/stores/authStore'
+import { getLeaderboard } from '@/api/leaderboard'
+import type { LeaderboardEntry } from '@/types/leaderboard'
+import LeaderboardRow from '@/components/LeaderboardRow.vue'
 
 type PageState = 'loading' | 'empty' | 'error' | 'success'
 
-const router = useRouter()
+const authStore = useAuthStore()
 const pageState = ref<PageState>('loading')
+const leaderboard = ref<LeaderboardEntry[]>([])
 const errorMessage = ref('加载失败，请刷新重试')
 const refreshing = ref(false)
 
@@ -14,16 +18,17 @@ async function loadData() {
   errorMessage.value = '加载失败，请刷新重试'
 
   try {
-    // Placeholder for future story — replace with actual API call
-    // const data = await getLeaderboard()
-    // if (data.length === 0) {
-    //   pageState.value = 'empty'
-    // } else {
-    //   pageState.value = 'success'
-    // }
-    // Temporary: simulate empty state for now
-    pageState.value = 'empty'
-  } catch {
+    const data = await getLeaderboard()
+    leaderboard.value = data
+    // Check if any user has points — empty means no settled races with votes
+    const hasActivity = data.length > 0 && data.some(e => e.races_participated > 0)
+    if (hasActivity) {
+      pageState.value = 'success'
+    } else {
+      pageState.value = 'empty'
+    }
+  } catch (err) {
+    console.error('Leaderboard load failed:', err)
     pageState.value = 'error'
   }
 }
@@ -39,7 +44,7 @@ onMounted(loadData)
 
 <template>
   <div class="leaderboard-page">
-    <!-- Skeleton loading -->
+    <!-- Loading skeleton -->
     <template v-if="pageState === 'loading'">
       <div class="leaderboard-container" role="status" aria-live="polite" aria-label="加载中">
         <div class="skeleton-table">
@@ -83,18 +88,34 @@ onMounted(loadData)
       </div>
     </template>
 
-    <!-- Content (placeholder for future stories) -->
+    <!-- Leaderboard data -->
     <template v-else>
       <div class="leaderboard-container">
-        <p>排行榜内容将在 Story 3.5 中实现</p>
+        <div class="leaderboard-table" role="table" aria-label="排行榜">
+          <div class="leaderboard-header" role="row">
+            <span class="col-rank" role="columnheader">排名</span>
+            <span class="col-name" role="columnheader">用户名</span>
+            <span class="col-points" role="columnheader">积分</span>
+            <span class="col-races" role="columnheader">场数</span>
+            <span class="col-avg" role="columnheader">场均</span>
+          </div>
+          <LeaderboardRow
+            v-for="(entry, index) in leaderboard"
+            :key="entry.username"
+            :entry="entry"
+            :rank="index + 1"
+            :is-current-user="entry.username === authStore.user?.username"
+          />
+        </div>
       </div>
+      <p class="updated-hint">积分在每次比赛结算后自动更新</p>
     </template>
   </div>
 </template>
 
 <style scoped>
 .leaderboard-page {
-  padding: var(--spacing-16);
+  padding: var(--spacing-16, 16px);
   max-width: 1280px;
   margin: 0 auto;
 }
@@ -109,59 +130,40 @@ onMounted(loadData)
 .skeleton-table {
   display: flex;
   flex-direction: column;
-  gap: var(--spacing-8);
+  gap: var(--spacing-8, 8px);
   min-width: 320px;
 }
 
 .skeleton-header-row,
 .skeleton-row {
   display: flex;
-  gap: var(--spacing-12);
-  padding: var(--spacing-12) var(--spacing-8);
-  border-bottom: 1px solid var(--color-border-hairline);
+  gap: var(--spacing-12, 12px);
+  padding: var(--spacing-12, 12px) var(--spacing-8, 8px);
+  border-bottom: 1px solid var(--color-border-hairline, #D4DCD0);
 }
 
 .skeleton-header-row {
-  border-bottom: 2px solid var(--color-border-hairline);
+  border-bottom: 2px solid var(--color-border-hairline, #D4DCD0);
 }
 
 .skeleton-block {
   background: linear-gradient(
     90deg,
-    var(--color-surface-base) 25%,
-    var(--color-border-hairline) 50%,
-    var(--color-surface-base) 75%
+    var(--color-surface-base, #F8FAF7) 25%,
+    var(--color-border-hairline, #D4DCD0) 50%,
+    var(--color-surface-base, #F8FAF7) 75%
   );
   background-size: 200% 100%;
   animation: skeleton-shimmer 1.5s ease-in-out infinite;
-  border-radius: var(--rounded-sm);
+  border-radius: var(--rounded-sm, 6px);
   height: 16px;
 }
 
-.col-rank {
-  width: 40px;
-  flex-shrink: 0;
-}
-
-.col-name {
-  flex: 1;
-  max-width: 120px;
-}
-
-.col-points {
-  width: 60px;
-  flex-shrink: 0;
-}
-
-.col-races {
-  width: 50px;
-  flex-shrink: 0;
-}
-
-.col-avg {
-  width: 50px;
-  flex-shrink: 0;
-}
+.col-rank { width: 40px; flex-shrink: 0; }
+.col-name { flex: 1; max-width: 120px; }
+.col-points { width: 60px; flex-shrink: 0; }
+.col-races { width: 50px; flex-shrink: 0; }
+.col-avg { width: 50px; flex-shrink: 0; }
 
 /* State patterns */
 .state-container {
@@ -171,23 +173,23 @@ onMounted(loadData)
   justify-content: center;
   min-height: 50vh;
   text-align: center;
-  gap: var(--spacing-16);
+  gap: var(--spacing-16, 16px);
 }
 
 .empty-text {
-  color: var(--color-ink-secondary);
-  font-size: var(--text-body);
+  color: var(--color-ink-secondary, #4A5A4A);
+  font-size: var(--text-body, 16px);
 }
 
 .error-text {
-  color: var(--color-destructive);
-  font-size: var(--text-body);
+  color: var(--color-destructive, #C53030);
+  font-size: var(--text-body, 16px);
 }
 
 .home-link {
-  color: var(--color-primary);
+  color: var(--color-primary, #1A5632);
   font-weight: 600;
-  font-size: var(--text-body);
+  font-size: var(--text-body, 16px);
   text-decoration: underline;
   min-height: 44px;
   display: inline-flex;
@@ -196,19 +198,19 @@ onMounted(loadData)
 
 .refresh-btn {
   padding: 10px 24px;
-  font-size: var(--text-body);
+  font-size: var(--text-body, 16px);
   font-weight: 600;
   color: #ffffff;
-  background: var(--color-primary);
+  background: var(--color-primary, #1A5632);
   border: none;
-  border-radius: var(--rounded-md);
+  border-radius: var(--rounded-md, 10px);
   cursor: pointer;
   min-height: 44px;
   transition: background 0.2s;
 }
 
 .refresh-btn:hover {
-  background: var(--color-primary-light);
+  background: var(--color-primary-light, #2D7A4F);
 }
 
 .refresh-btn:disabled {
@@ -216,10 +218,39 @@ onMounted(loadData)
   cursor: not-allowed;
 }
 
+/* Leaderboard table */
+.leaderboard-table {
+  min-width: 320px;
+  background: var(--color-surface-raised, #FFFFFF);
+  border-radius: var(--rounded-md, 10px);
+  overflow: hidden;
+}
+
+.leaderboard-header {
+  display: flex;
+  gap: var(--spacing-12, 12px);
+  padding: var(--spacing-3, 12px) var(--spacing-4, 16px);
+  border-bottom: 2px solid var(--color-border-hairline, #D4DCD0);
+  font-size: var(--text-body-sm, 14px);
+  font-weight: 600;
+  color: var(--color-ink-secondary, #4A5A4A);
+  position: sticky;
+  top: 0;
+  background: var(--color-surface-raised, #FFFFFF);
+  z-index: 1;
+}
+
+.updated-hint {
+  text-align: center;
+  font-size: var(--text-caption, 12px);
+  color: var(--color-ink-secondary, #4A5A4A);
+  margin-top: var(--spacing-8, 8px);
+}
+
 @media (prefers-reduced-motion: reduce) {
   .skeleton-block {
     animation: none;
-    background: var(--color-surface-base);
+    background: var(--color-surface-base, #F8FAF7);
   }
   .refresh-btn {
     transition: none;

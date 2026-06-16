@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: 2026-06-09T17:36
-last_updated: 2026-06-16T09:42
+last_updated: 2026-06-16T09:59
 project: guess
 project_key: NOKEY
 tracking_system: file-system
@@ -69,7 +69,7 @@ development_status:
   3-2-voting-system-backend: done
   3-3-voting-frontend-interaction: done
   3-4-result-entry-drag-sort: done
-  3-5-point-settlement-leaderboard: backlog
+  3-5-point-settlement-leaderboard: done
   3-6-race-details-public: backlog
   3-7-result-modification-recalculation: backlog
   epic-3-retrospective: optional
