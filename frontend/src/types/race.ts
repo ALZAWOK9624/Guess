@@ -73,3 +73,21 @@ export interface RaceUpdatePayload {
   horse_ids?: number[]
   custom_scoring?: CustomScoring | null
 }
+
+/** Result entry types */
+export interface ResultPosition {
+  race_horse_id: number
+  position: number  // 0 = DNF, 1+ = finishing order
+}
+
+export interface UserScore {
+  user_id: number
+  username: string
+  points: number
+}
+
+export interface ResultEntryResponse {
+  race_id: number
+  status: string
+  scores: UserScore[]
+}

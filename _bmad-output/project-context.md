@@ -273,6 +273,17 @@ _This file contains critical rules and patterns that AI agents must follow when 
 - HorseSelectCard 使用 `role="radio"` + `:name="'vote-group-' + raceId"` 实现无障碍单选组。
 - VotingDetail 的 `v-for` key 使用 `index`（而非复合 key），避免同一用户修改投票后的 key 冲突。
 
+**结果录入与结算模式（Story 3.4）：**
+- **Result settlement 模式**：`result_service.submit_results()` 同时处理两种流程：`locked → settled`（首次结算）和 `settled → settled`（重新结算）。重新结算时先清空所有 `vote.points = NULL`，再重新计算。整个操作在同一事务中，`db.flush()` 确保原子性。
+- **Vote.points 字段**：积分直接存储在 `Vote.points`（nullable int）。结算前为 NULL，结算后为实际积分值。排行榜查询使用 `SELECT user_id, SUM(points) FROM votes WHERE points IS NOT NULL GROUP BY user_id`。此设计避免创建独立积分表。
+- **RaceHorse.position 语义**：`NULL` = 未排位（比赛未结算）、`0` = DNF/退赛、`>0` = 实际名次（1=冠军）。此三方语义在结算是更新，在比赛编辑时保持不变。
+- **DNF 处理模式**：position=0 的马匹不参与 active_horses 计数，投票给 DNF 马匹的用户得 0 分。active_count 仅统计 `position > 0` 的马匹数量，传递给 scoring_engine 作为 `total_horses` 参数。
+- **结果结算 API 模式**：`PUT /api/v1/races/{race_id}/results` 管理员专用端点，接收 `ResultEntry { positions: ResultPosition[] }`。位置校验由 schema 层执行：无重复正数位置、无负数位置、位置从 1 开始连续（无间隔）、所有 race_horse_id 均被覆盖。服务层额外校验比赛状态（拒绝 VOTING 状态的比赛）。
+- **DragCard 组件模式**：`DragCard.vue` 使用原生 HTML5 `draggable="true"` 属性 + @dragstart/@dragend 事件。六点网格手柄（⠿，`touch-action: none`）区分拖拽区域。dragging 态应用 opacity 0.7 + box-shadow lift + scale(1.02)。DNF 态应用 opacity 0.5 + grey bg。骨架屏复用全局 `skeleton-shimmer` 动画。
+- **useDragSort composable 模式**：`useDragSort.ts` 管理两个响应式列表（activeList + dnfList）。初始化时根据 existingPositions Map 进行预排序（重录入模式）。提供 startDrag/onDragOver/endDrag 接口，通过 splice 数组操作实现重排。DNF 区域检测通过 event.target.closest('.dnf-zone') 实现。
+- **移动端触控拖拽模式**（AC-3）：`ResultsPage.vue` 使用 `@touchstart`（300ms setTimeout 延迟激活，`document.body.style.overflow = 'hidden'` 禁止滚动）→ `@touchmove`（e.preventDefault() + 通过 getBoundingClientRect 计算当前位置）→ `@touchend`（检测 DNF 区域 + 清除 body overflow）。`touch-action: none` 设置在拖拽手柄 CSS 上，避免触控与滚动冲突。拖拽结束后恢复 `document.body.style.overflow = ''`。
+- **位置连续校验模式**：`ResultEntry.validate_positions()` 在 schema 层校验 `sorted(positive_positions) == list(range(1, len(positive_positions) + 1))`，确保名次无间隔。此校验防止管理员提交 1,3,4,5 等不连续位置导致评分引擎计算错误。
+
 ---
 
 ## Usage Guidelines
@@ -289,4 +300,4 @@ _This file contains critical rules and patterns that AI agents must follow when 
 - Review quarterly for outdated rules
 - Remove rules that become obvious over time
 
-Last Updated: 2026-06-12 (Story 3.3 voting frontend interaction — VoteButton state machine, useVote composable, direct-submit flow, pre-selection on modify)
+Last Updated: 2026-06-16 (Story 3.4 result entry drag-sort — settlement service, DragCard, useDragSort composable, touch drag, position validation)
