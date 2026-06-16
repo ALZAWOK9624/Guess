@@ -81,7 +81,7 @@ _This file contains critical rules and patterns that AI agents must follow when 
 - Styles: **scoped CSS** + CSS custom properties (no UI library)
 - Layout components in `src/layouts/`, page components in `src/pages/`, reusable components in `src/components/`
 - Composable functions in `src/composables/` (`useAuth.ts`, `useVote.ts`, `useDragSort.ts`)
-- Admin routes prefixed `/admin/`, using `AdminLayout` with 240px sidebar
+- Admin routes prefixed `/admin/`, using `AdminLayout` with a top navigation bar and dropdown menu
 - Auth guard implementation in `router/index.ts`: `beforeEach` with `useAuthStore()` for three guard layers:
   1. `isAdmin` → redirect to home for non-admin users
   2. `requiresAuth` → redirect to `/login?redirect={path}` for unauthenticated users
@@ -94,7 +94,7 @@ _This file contains critical rules and patterns that AI agents must follow when 
 - `prefers-reduced-motion: reduce` respected globally in `base.css` — overrides all animations/transitions. 全局 `scroll-behavior: smooth` 也被覆盖为 `auto`。
 - `*:focus-visible` 全局统一样式在 `base.css` 中定义（2px 竞马绿 outline + 2px offset），所有可聚焦元素自动继承。组件内如需自定义 focus 样式，使用 scoped CSS 覆盖。
 - **ARIA combobox 模式**：搜索下拉组件（如 `HorseSearchSelect.vue`）必须遵循 combobox 无障碍模式：`role="combobox"` + `:aria-expanded="showDropdown"`（动态绑定，不能硬编码 `"false"`）+ `aria-controls` 指向 listbox + `role="listbox"` + `role="option"` + `aria-selected`。`aria-expanded` 必须响应式绑定到下拉展开状态。
-- `AdminLayout` sidebar (`z-index: 200`): desktop fixed 240px, mobile hamburger-triggered overlay with body scroll lock
+- `AdminLayout` top nav bar (`z-index: 200`): fixed green header with brand + title on left, dropdown trigger on right. Dropdown shows admin items (仪表盘/创建比赛/马匹管理/邀请码) on white background. Closes on click-outside and route change.
 
 **FastAPI:**
 - App entry: `app/main.py` with `lifespan` for DB engine lifecycle
