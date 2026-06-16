@@ -5,8 +5,6 @@ import { useAuthStore } from '@/stores/authStore'
 import GradeBadge from '@/components/GradeBadge.vue'
 import StatusBadge from '@/components/StatusBadge.vue'
 import HorseDetailCard from '@/components/HorseDetailCard.vue'
-import VoteButton from '@/components/VoteButton.vue'
-import HorseSelectCard from '@/components/HorseSelectCard.vue'
 import VotingDetail from '@/components/VotingDetail.vue'
 import RaceResultView from '@/components/RaceResultView.vue'
 import { getRace } from '@/api/races'
@@ -25,26 +23,24 @@ const race = ref<RaceDetail | null>(null)
 const errorMessage = ref('加载失败，请刷新重试')
 
 const {
-  selectedHorse,
   votedHorseName,
+  votedRaceHorseId,
   isSubmitting,
-  isInSelectionMode,
   votes,
   votesLoading,
   votesError,
   errorMessage: voteError,
-  selectHorse,
-  enterSelectionMode,
-  exitSelectionMode,
+  toggleVote,
   loadVotes,
 } = useVote(null)
 
-// After votes load, check if current user has a vote and set votedHorseName
+// After votes load, check if current user has a vote and set votedHorseName and votedRaceHorseId
 function checkUserVote() {
   if (!authStore.isLoggedIn || !authStore.user) return
   const myVote = votes.value.find(v => v.user_id === authStore.user!.id)
   if (myVote) {
     votedHorseName.value = myVote.horse_name
+    votedRaceHorseId.value = myVote.race_horse_id
   }
 }
 
@@ -52,28 +48,33 @@ const isRaceVoting = computed(() => race.value?.status === 'voting')
 const isRaceLocked = computed(() => race.value?.status === 'locked')
 const isRaceSettled = computed(() => race.value?.status === 'settled')
 
+// Whether regular users can vote (voting state, logged in, not admin)
+const canVote = computed(() =>
+  isRaceVoting.value && authStore.isLoggedIn && !authStore.isAdmin
+)
 
-function handleVoteClick() {
-  // Guest redirect
+// Whether horse cards should be clickable (voting state, logged in or guest for redirect)
+const cardsVotable = computed(() =>
+  isRaceVoting.value && !authStore.isAdmin
+)
+
+function handleCardClick(horse: RaceDetail['horses'][0]) {
+  // Guest redirect to login
   if (!authStore.isLoggedIn) {
     router.push({ path: '/login', query: { redirect: `/races/${raceId}` } })
     return
   }
   // Admin cannot vote
   if (authStore.isAdmin) return
-  // Logged-in: enter selection mode with pre-selected current vote
-  if (race.value) {
-    enterSelectionMode(race.value.horses)
-  }
+  // Non-voting race
+  if (!isRaceVoting.value) return
+
+  // Toggle vote
+  toggleVote(horse, raceId)
 }
 
-function handleVotedClick() {
-  // Admin cannot vote
-  if (authStore.isAdmin) return
-  // Already voted — enter selection mode to modify
-  if (race.value) {
-    enterSelectionMode(race.value.horses)
-  }
+function isHorseVoted(raceHorseId: number): boolean {
+  return votedRaceHorseId.value === raceHorseId
 }
 
 onMounted(async () => {
@@ -93,7 +94,7 @@ onMounted(async () => {
 </script>
 
 <template>
-  <div class="race-detail-page" :class="{ 'has-vote-bar': isRaceVoting || isRaceLocked }">
+  <div class="race-detail-page">
     <!-- Loading -->
     <div v-if="pageState === 'loading'" class="state-container">
       <p>加载中…</p>
@@ -141,44 +142,37 @@ onMounted(async () => {
         </p>
       </div>
 
-      <!-- Horse list — normal view (non-selection mode) -->
-      <div v-if="!isInSelectionMode" class="horse-list">
+      <!-- Vote hint for logged-in users in voting state -->
+      <div v-if="canVote && !votedHorseName" class="vote-hint">
+        点击马匹卡片进行投票，再次点击取消投票
+      </div>
+      <div v-if="canVote && votedHorseName" class="vote-hint voted">
+        已投 <strong>{{ votedHorseName }}</strong>，点击该马匹可取消投票，点击其他马匹可更换选择
+      </div>
+
+      <!-- Vote hint for guests in voting state -->
+      <div v-if="isRaceVoting && !authStore.isLoggedIn" class="vote-hint">
+        点击马匹卡片，登录后即可投票
+      </div>
+
+      <!-- Horse list — always show HorseDetailCard, clickable if in voting state -->
+      <div class="horse-list">
         <h2 class="section-title">参赛马匹</h2>
         <HorseDetailCard
           v-for="horse in race.horses"
           :key="horse.horse_id"
           :snapshot-data="horse.snapshot_data"
           :horse-id="horse.horse_id"
-          :class="{ 'voted-horse': isRaceLocked && votedHorseName && horse.snapshot_data.name === votedHorseName }"
+          :votable="cardsVotable"
+          :voted="isHorseVoted(horse.race_horse_id)"
+          :submitting="isSubmitting"
+          :class="{ 'voted-horse-locked': (isRaceLocked || isRaceSettled) && votedHorseName && horse.snapshot_data.name === votedHorseName }"
+          @vote-toggle="handleCardClick(horse)"
         />
       </div>
 
-      <!-- Horse list — selection mode (voting) -->
-      <div v-else class="selection-section">
-        <h2 class="section-title">
-          {{ votedHorseName ? '修改投票 — 点击其他马匹更换选择' : '选择你要投注的马匹' }}
-        </h2>
-        <div class="select-card-list">
-          <HorseSelectCard
-            v-for="horse in race.horses"
-            :key="horse.race_horse_id"
-            :horse="horse"
-            :selected="selectedHorse?.race_horse_id === horse.race_horse_id"
-            :name="'vote-group-' + raceId"
-            @select="selectHorse(horse, race.id)"
-          />
-        </div>
-
-        <!-- Vote error message -->
-        <p v-if="voteError" class="vote-error">{{ voteError }}</p>
-
-        <!-- Cancel button (only cancel, no confirm needed — tap horse = submit) -->
-        <div class="selection-actions">
-          <button class="cancel-btn" :disabled="isSubmitting" @click="exitSelectionMode">
-            {{ isSubmitting ? '提交中…' : '取消' }}
-          </button>
-        </div>
-      </div>
+      <!-- Vote error message -->
+      <p v-if="voteError" class="vote-error">{{ voteError }}</p>
 
       <!-- Voting Detail — show vote distribution for voting/locked races -->
       <VotingDetail
@@ -205,33 +199,6 @@ onMounted(async () => {
           修改结果
         </button>
       </div>
-
-      <!-- Vote error toast -->
-      <p v-if="voteError && !isInSelectionMode" class="vote-error toast">
-        {{ voteError }}
-      </p>
-
-      <!-- VoteButton — fixed bottom bar on mobile, inline on desktop -->
-      <div
-        v-if="!authStore.isAdmin && (isRaceVoting || isRaceLocked || isRaceSettled)"
-        class="vote-bar"
-      >
-        <!-- Locked/unvoted message -->
-        <p v-if="isRaceLocked && !votedHorseName" class="locked-message">
-          投票已截止。你未参与本场竞猜。
-        </p>
-
-        <!-- VoteButton -->
-        <VoteButton
-          v-if="!isInSelectionMode"
-          :race-status="race.status"
-          :voted-horse-name="votedHorseName"
-          :is-logged-in="authStore.isLoggedIn"
-          :is-submitting="isSubmitting"
-          @vote-click="handleVoteClick"
-          @modify-click="handleVotedClick"
-        />
-      </div>
     </template>
   </div>
 </template>
@@ -241,10 +208,6 @@ onMounted(async () => {
   padding: var(--spacing-4, 16px);
   max-width: 960px;
   margin: 0 auto;
-}
-
-.race-detail-page.has-vote-bar {
-  padding-bottom: calc(80px + env(safe-area-inset-bottom, 0px));
 }
 
 .race-header {
@@ -312,6 +275,23 @@ onMounted(async () => {
   margin: 0;
 }
 
+/* Vote hint */
+.vote-hint {
+  font-size: var(--text-body-sm, 14px);
+  color: var(--color-ink-secondary, #4A5A4A);
+  margin-bottom: var(--spacing-4, 16px);
+  padding: var(--spacing-3, 12px);
+  background: var(--color-surface-base, #F8FAF7);
+  border-radius: var(--rounded-md, 10px);
+  text-align: center;
+}
+
+.vote-hint.voted {
+  border: 1px solid var(--color-accent, #B8960C);
+  background: #FFFDF0;
+  color: var(--color-ink-primary, #1A2E1A);
+}
+
 .section-title {
   font-size: var(--text-subheading, 18px);
   font-weight: 600;
@@ -326,73 +306,16 @@ onMounted(async () => {
   margin-top: var(--spacing-4, 16px);
 }
 
-/* Locked/ settled state: highlight user's voted horse */
-.voted-horse {
-  border: 2px solid var(--color-accent, #B8960C) !important;
-}
-
-/* Selection mode */
-.selection-section {
-  margin-top: var(--spacing-4, 16px);
-}
-
-.select-card-list {
-  display: flex;
-  flex-direction: column;
-  gap: var(--spacing-3, 12px);
-  margin-bottom: var(--spacing-4, 16px);
-}
-
-.selection-actions {
-  display: flex;
-  justify-content: center;
-  margin-bottom: var(--spacing-4, 16px);
-}
-
-.cancel-btn {
-  padding: 12px 24px;
-  background: transparent;
-  color: var(--color-ink-secondary, #4A5A4A);
-  border: 1px solid var(--border-strong, #A8B8A4);
-  border-radius: var(--rounded-md, 10px);
-  font-size: var(--text-body, 16px);
-  font-weight: 500;
-  cursor: pointer;
-  min-height: 44px;
-}
-
-.cancel-btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
+/* Locked/ settled state: highlight user's voted horse via CSS class */
+.voted-horse-locked {
+  border-color: var(--color-accent, #B8960C) !important;
 }
 
 .vote-error {
   color: var(--color-destructive, #C53030);
   font-size: var(--text-body-sm, 14px);
   margin: var(--spacing-2, 8px) 0;
-}
-
-.vote-error.toast {
   text-align: center;
-}
-
-/* Vote bar */
-.vote-bar {
-  position: fixed;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  padding: var(--spacing-3, 12px) var(--spacing-4, 16px);
-  padding-bottom: calc(var(--spacing-3, 12px) + env(safe-area-inset-bottom, 0px));
-  background: linear-gradient(to top, rgba(248, 250, 247, 1) 80%, rgba(248, 250, 247, 0));
-  z-index: 100;
-}
-
-.locked-message {
-  font-size: var(--text-body-sm, 14px);
-  color: var(--color-ink-secondary, #4A5A4A);
-  text-align: center;
-  margin: 0;
 }
 
 .state-container {
@@ -450,19 +373,5 @@ onMounted(async () => {
 .modify-result-btn:hover {
   background: var(--color-primary, #1A5632);
   color: #FFFFFF;
-}
-
-/* Desktop: vote-bar inline instead of fixed */
-@media (min-width: 768px) {
-  .vote-bar {
-    position: static;
-    background: none;
-    padding: var(--spacing-4, 16px) 0;
-    padding-bottom: 0;
-  }
-
-  .race-detail-page.has-vote-bar {
-    padding-bottom: var(--spacing-4, 16px);
-  }
 }
 </style>

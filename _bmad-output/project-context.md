@@ -56,7 +56,7 @@ _This file contains critical rules and patterns that AI agents must follow when 
 - **PageState 枚举模式**：列表页面使用 `type PageState = 'loading' | 'empty' | 'error' | 'success'`，搜索/下拉组件可使用扩展版 `'idle' | 'loading' | 'empty' | 'error' | 'success'`（`idle` 表示初始未搜索状态，下拉隐藏）。骨架屏显示 loading 态，精确微文案显示 empty 态，"加载失败，请刷新重试"+刷新按钮显示 error 态。
 - `RaceCard.vue` 支持 `skeleton` prop，未来故事可直接使用 `<RaceCard skeleton />` 渲染骨架屏。
 - `HorseSearchSelect.vue` 使用 `defineModel<Horse[]>('selectedHorses')` 实现 v-model 双向绑定 — 新增组件应优先使用 `defineModel` 替代手动 `emit('update:...')` 模式。
-- `HorseDetailCard.vue` 用于展示马匹 10 属性快照数据，接收 `snapshotData` prop（可空，通过 `withDefaults` 提供默认值）。
+- `HorseDetailCard.vue` 用于展示马匹 10 属性快照数据，接收 `snapshotData` prop（可空，通过 `withDefaults` 提供默认值）。新增 `votable`、`voted`、`submitting` 三个 props 支持点击投票交互：`votable` 时显示 `cursor: pointer` + hover 高亮，`voted` 时显示金色边框 + "✓ 已投"徽章。emit `voteToggle` 事件供父组件处理投票逻辑。
 - `GradeBadge.vue` 用于展示比赛等级徽章：G1（金色底#B8960C）、G2_JPN1（灰色底#6B7280）、YOUNG_G1（亮绿底#2D7A4F）、CUSTOM（灰色底虚线边框）。接收 `grade: string` prop。
 - `StatusBadge.vue` 用于展示比赛状态胶囊：voting（绿底#2D7A4F）、locked（灰底#6B7280 + 🔒）、settled（深绿底#0D3A1F + ✓）。接收 `status: string` prop。
 - `ConfirmDeleteModal.vue` 可复用删除确认弹窗组件，接收 `title`, `itemName`, `message`, `loading` props，emit `confirm` / `cancel`。使用 `<Teleport to="body">` + `role="dialog"` + `aria-modal` + Esc 关闭 + 遮罩层点击关闭。不可点击遮罩层外部关闭（防误触）。
@@ -226,6 +226,8 @@ _This file contains critical rules and patterns that AI agents must follow when 
 - **投票 Upsert 防竞态模式**：`vote_service.create_or_update_vote()` 使用 SELECT → check → INSERT/UPDATE 模式，外层包裹 `try/except IntegrityError`。当并发请求同时通过 SELECT（均未找到现有投票）时，第二个 INSERT 触发唯一约束冲突，`IntegrityError` 被捕获后回滚并重试 SELECT → UPDATE，返回 200。此模式替代 `ON CONFLICT DO UPDATE`（SQLAlchemy async + SQLite 测试兼容性考量）。
 - **Post-vote eager-load 模式**：`create_or_update_vote()` 在 `flush()` + `refresh()` 后，额外执行一次带 `selectinload(Vote.race_horse_rel)` 的查询以解析马名。端点层不再单独调用 `get_race_votes()`（避免 N+1 和冗余查询）。
 - **Lock 操作模式**：`POST /api/v1/races/{race_id}/lock` 为管理员专用端点（`Depends(get_current_admin)`）。使用否定检查 `if race.status != RaceStatus.VOTING`（而非列举非目标状态）以确保未来状态扩展的健壮性。仅 `voting` 状态可锁定。
+**取消投票端点模式**：`DELETE /api/v1/races/{race_id}/votes` 为已登录用户专用端点。校验比赛处于 `voting` 状态后才能取消，通过 `await db.delete(vote)` + `flush()` 删除投票记录。服务层 `delete_vote()` 封装所有校验逻辑（比赛存在性、比赛状态、投票是否存在）。
+**可选用户依赖模式**：`get_optional_user()` 用于公开端点中可选地展示用户特定数据。与 `get_current_user` 逻辑相同但捕获所有认证错误并返回 `None`（无 token/token 过期/token 无效 → 均返回 `None`）。用于 `list_races` 端点返回当前用户各比赛的 `has_voted` 状态。
 - **编辑比赛防删票保护**：`race_service.update_race()` 在移除马匹时，先查询 `Vote` 表检查被移除的 `race_horse_ids` 是否存在投票。若有投票存在，返回 400 `HORSE_HAS_VOTES` 拒绝操作。此保护覆盖 Story 3.2 中移除的 race_horse_id FK CASCADE 限制（无 DB 级 CASCADE，改由应用层保护）。
 
 **Service & DB patterns:**
@@ -256,24 +258,34 @@ _This file contains critical rules and patterns that AI agents must follow when 
 - **PATCH 编辑模式的关键模式**：`handleSave` 在编辑时必须按字段逐一比较当前值与原始值的差异，**仅发送变更的字段**，而非发送所有字段为 `null`。否则后端 `exclude_unset=True` 无法区分"用户未修改"和"用户将某字段清空为 null"——发送 `null` 会覆盖数据库中的已有值。参考实现：`frontend/src/pages/admin/HorsesPage.vue` 中的 `handleSave`。
 - 新建数据后不推荐 `unshift`，应 `push` 后按显示顺序 `sort()` 避免与后端排序不一致导致的视觉跳跃。
 
-**VoteButton 状态机（Story 3.3）：**
-- `VoteButton.vue` 有 7 个状态：`voting-unvoted-loggedin`（金底"投票"）/ `voting-unvoted-guest`（金底"投票"）/ `voting-voted`（绿底"✓ 已投：{马名}"）/ `locked-voted`（灰底"投票已截止"）/ `locked-unvoted`（灰底"投票已截止。你未参与本场竞猜。"）/ `settled`（灰底"已结算"）。`voting-unvoted-loggedin` 和 `voting-voted` 是可交互的。
-- `buttonState` 使用 `computed` 根据 `raceStatus` + `votedHorseName` + `isLoggedIn` 派生，不使用中间 `voting-modify` 状态——修改流程由父组件 `RaceDetailPage.vue` 直接进入选择模式处理。
-- 移动端固定底部定位（`position: fixed; bottom: 0`），桌面端 768px 断点切换为 `position: static`（内联）。始终使用 `env(safe-area-inset-bottom)` 适配刘海屏。
+**VoteButton 状态机（Story 3.3）已迁移为卡片点击投票模式：**
+- `VoteButton.vue` 已被移除，改为 `HorseDetailCard.vue` 直接支持点击投票
+- `HorseDetailCard.vue` 新增 `votable`、`voted`、`submitting` props：`votable` 时显示 `cursor: pointer` + hover 高亮效果；`voted` 时显示金色边框 + "✓ 已投"徽章；`submitting` 时禁用点击
+- 移动端不再有固定底部投票栏（`position: fixed; bottom: 0`）——投票交互直接在卡片上进行
+- 锁定/已结算状态：通过 `.voted-horse-locked` CSS 类（金色边框）在 HorseDetailCard 上高亮用户投中的马匹
 
 **useVote composable 模式（Story 3.3）：**
-- `selectHorse(horse, raceId)` 在选择模式下直接调用 `confirmVote(raceId)`，实现"选马即提交"——无确认按钮，核心投票 2 次点击 ✅。
-- 乐观更新模式：先设 `votedHorseName = optimisticName`，API 成功后用 `result.horse_name` 覆盖，失败时回滚为 `previousVotedName`。
-- `confirmVote` 成功后 `loadVotes(raceId)` 有独立 try/catch——不因投票分布刷新失败而影响投票状态。
-- `enterSelectionMode(raceHorses)` 接收当前比赛的马匹列表，根据 `votedHorseName` 查找并预选对应马匹（实现 AC-4 修改时预选）。
-- 组件卸载保护：`let unmounted = false` + `onUnmounted(() => { unmounted = true })`，所有 `await` 后的状态更新前检查 `if (unmounted) return`。
+- `toggleVote(horse, raceId)` 替代旧的 `selectHorse` + `enterSelectionMode` 模式，实现三段逻辑：
+  - **未投票** → 提交投票（`POST /races/{id}/votes`）
+  - **已投该马再次点击** → 取消投票（`DELETE /races/{id}/votes`）
+  - **已投他马点击新马** → 切换投票（`POST` 更新）
+- 移除 `isInSelectionMode`、`enterSelectionMode`、`exitSelectionMode` 状态
+- 新增 `votedRaceHorseId` 响应式字段追踪已投票马匹 ID，用于判断"是否同一匹马"
+- 乐观更新模式：投票/取消均先乐观更新状态，API 失败时回滚
+- 组件卸载保护：`let unmounted = false` + `onUnmounted(() => { unmounted = true })`，所有 `await` 后的状态更新前检查 `if (unmounted) return`
 
 **RaceDetailPage 投票集成模式（Story 3.3）：**
-- 选择模式 inline 展开（非弹窗）：`v-if="isInSelectionMode"` 切换 HorseDetailCard（普通视图）↔ HorseSelectCard（选择模式）。选择模式包含取消按钮（用于退出选择模式）和错误提示。
-- 锁定/已结算状态：通过 `.voted-horse` CSS 类（金色边框）在 HorseDetailCard 上高亮用户投中的马匹，满足 AC-5。
-- VotingDetail 组件在投票/锁定比赛时显示"用户名 → 马匹名"分布，刷新策略：仅在页面加载和投票成功后刷新，无轮询。
-- HorseSelectCard 使用 `role="radio"` + `:name="'vote-group-' + raceId"` 实现无障碍单选组。
-- VotingDetail 的 `v-for` key 使用 `index`（而非复合 key），避免同一用户修改投票后的 key 冲突。
+- **移除** VoteButton、HorseSelectCard 引用；**移除** 选择模式（`selection-section`）、**移除** 底部投票栏（`vote-bar`）
+- 比赛详情页中的赛马卡片（HorseDetailCard）直接可点击投票——点击卡片 = 投票/取消/切换
+- 游客点击卡片 → 跳转登录页；管理员不可投票
+- 新增投票提示条（`vote-hint`）：引导用户操作
+- VotingDetail 组件在投票/锁定比赛时显示"用户名 → 马匹名"分布，刷新策略：仅在页面加载和投票成功后刷新，无轮询
+- HorseSelectCard 已被删除，无单选组需求——每张卡片独立可点击
+
+**HomePage 首场比赛列表投票状态模式：**
+- **移除**"投票"按钮（原金色 `vote-entry` CSS 类）
+- **新增** `vote-status` 徽章，仅在 voting 状态 + 已登录时显示用户的投票状态："未投票"（灰底灰框）/"已投票"（绿底绿框）
+- 未登录用户不显示任何投票标记
 
 **结果录入与结算模式（Story 3.4）：**
 - **Result settlement 模式**：`result_service.submit_results()` 同时处理两种流程：`locked → settled`（首次结算）和 `settled → settled`（重新结算）。重新结算时先清空所有 `vote.points = NULL`，再重新计算。整个操作在同一事务中，`db.flush()` 确保原子性。
@@ -324,4 +336,4 @@ _This file contains critical rules and patterns that AI agents must follow when 
 - Review quarterly for outdated rules
 - Remove rules that become obvious over time
 
-Last Updated: 2026-06-16 (invite code QQ binding + three login modes + delete cascade + removed disabled status)
+Last Updated: 2026-06-16 (voting system overhaul: card-click vote toggle + delete vote endpoint + home page vote status)

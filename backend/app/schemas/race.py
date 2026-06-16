@@ -115,6 +115,7 @@ class RaceListResponse(BaseModel):
     custom_scoring: CustomScoring | None = None
     horse_count: int
     vote_count: int
+    has_voted: bool = False
     created_at: datetime
 
     model_config = {"from_attributes": True}

@@ -83,6 +83,33 @@ async def list_votes(
     return {"data": [e.model_dump() for e in entries]}
 
 
+@router.delete("/{race_id}/votes")
+async def cancel_vote(
+    race_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Cancel a user's vote on a race. Requires authentication."""
+    if current_user is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail={"code": "NOT_AUTHENTICATED", "message": "请先登录"},
+        )
+    if current_user.is_admin:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail={"code": "ADMIN_CANNOT_VOTE", "message": "管理员无法参与投票"},
+        )
+
+    await vote_service.delete_vote(
+        db=db,
+        race_id=race_id,
+        user_id=current_user.id,
+    )
+
+    return {"data": {"message": "投票已取消"}}
+
+
 @router.post("/{race_id}/lock")
 async def lock_race(
     race_id: int,

@@ -113,6 +113,39 @@ def resolve_horse_name(vote: Vote) -> str:
     return "未知"
 
 
+async def delete_vote(
+    db: AsyncSession, race_id: int, user_id: int
+) -> None:
+    """Delete a user's vote for a race if the race is still in VOTING status."""
+    # Validate race exists and is in VOTING status
+    stmt = select(Race).where(Race.id == race_id)
+    result = await db.execute(stmt)
+    race = result.scalar_one_or_none()
+    if race is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={"code": "NOT_FOUND", "message": "比赛不存在"},
+        )
+    if race.status != RaceStatus.VOTING:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={"code": "VOTE_LOCKED", "message": "投票已截止，无法取消"},
+        )
+
+    # Find and delete the user's vote
+    stmt = select(Vote).where(Vote.user_id == user_id, Vote.race_id == race_id)
+    result = await db.execute(stmt)
+    vote = result.scalar_one_or_none()
+    if vote is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={"code": "VOTE_NOT_FOUND", "message": "你尚未投票"},
+        )
+
+    await db.delete(vote)
+    await db.flush()
+
+
 async def lock_race(db: AsyncSession, race_id: int) -> Race:
     """Lock voting for a race — transition from VOTING to LOCKED."""
     stmt = select(Race).where(Race.id == race_id)

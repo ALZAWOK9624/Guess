@@ -97,12 +97,11 @@ onMounted(loadData)
               <h2 class="race-name">{{ race.name }}</h2>
               <StatusBadge :status="race.status as any" />
               <span
-                v-if="race.status === 'voting'"
-                class="vote-entry"
-                @click.stop="goToRaceDetail(race.id)"
-                aria-label="前往投票"
+                v-if="race.status === 'voting' && authStore.isLoggedIn"
+                class="vote-status"
+                :class="{ voted: race.has_voted }"
               >
-                投票
+                {{ race.has_voted ? '已投票' : '未投票' }}
               </span>
             </div>
             <div class="card-body">
@@ -166,14 +165,21 @@ onMounted(loadData)
   white-space: nowrap;
 }
 
-.vote-entry {
-  background: var(--color-accent, #B8960C);
-  color: #FFFFFF;
+.vote-status {
+  font-size: var(--text-caption, 12px);
+  font-weight: 600;
   padding: 4px 12px;
   border-radius: var(--rounded-sm, 6px);
-  font-size: var(--text-caption, 12px);
-  font-weight: 700;
   white-space: nowrap;
+  color: var(--color-ink-secondary, #4A5A4A);
+  background: var(--color-surface-base, #F8FAF7);
+  border: 1px solid var(--color-border-hairline, #D4DCD0);
+}
+
+.vote-status.voted {
+  color: var(--color-primary, #1A5632);
+  background: #EDF5EF;
+  border-color: var(--color-primary, #1A5632);
 }
 
 .card-body {

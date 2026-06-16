@@ -1,11 +1,13 @@
 """Race API endpoints — CRUD for race management."""
 
 from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.deps import get_current_admin
+from app.api.deps import get_current_admin, get_optional_user
 from app.core.database import get_db
 from app.models.race import RaceStatus
+from app.models.user import User
 from app.schemas.race import (
     CustomScoring,
     RaceCreate,
@@ -22,10 +24,21 @@ router = APIRouter(prefix="/api/v1/races", tags=["races"])
 async def list_races(
     status: str | None = None,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_optional_user),
 ):
     """Get all races. Supports optional ?status=xxx filter. Public endpoint."""
+    from app.models.vote import Vote
     races = await race_service.get_races(db, status)
     items = []
+    race_ids = [race.id for race in races] if current_user else None
+    voted_race_ids: set[int] = set()
+    if current_user and race_ids:
+        vote_stmt = select(Vote.race_id).where(
+            Vote.user_id == current_user.id,
+            Vote.race_id.in_(race_ids),
+        )
+        vote_result = await db.execute(vote_stmt)
+        voted_race_ids = {row[0] for row in vote_result.all()}
     for race in races:
         vc = await race_service.get_race_vote_count(db, race.id)
         items.append(RaceListResponse(
@@ -37,6 +50,7 @@ async def list_races(
             custom_scoring=CustomScoring(**race.custom_scoring) if race.custom_scoring else None,
             horse_count=len(race.race_horses),
             vote_count=vc,
+            has_voted=race.id in voted_race_ids,
             created_at=race.created_at,
         ))
     return {"data": [item.model_dump() for item in items]}

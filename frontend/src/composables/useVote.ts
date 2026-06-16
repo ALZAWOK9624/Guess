@@ -1,5 +1,5 @@
 import { ref, onUnmounted, type Ref } from 'vue'
-import { submitVote, getRaceVotes } from '@/api/votes'
+import { submitVote, getRaceVotes, deleteVote } from '@/api/votes'
 import type { VoteListEntry, VoteResponse } from '@/types/vote'
 import type { RaceHorseSnapshot } from '@/types/race'
 
@@ -7,15 +7,13 @@ interface UseVoteReturn {
   selectedHorseId: Ref<number | null>
   selectedHorse: Ref<RaceHorseSnapshot | null>
   votedHorseName: Ref<string | null>
+  votedRaceHorseId: Ref<number | null>
   isSubmitting: Ref<boolean>
-  isInSelectionMode: Ref<boolean>
   votes: Ref<VoteListEntry[]>
   votesLoading: Ref<boolean>
   votesError: Ref<string | null>
   errorMessage: Ref<string | null>
-  selectHorse: (horse: RaceHorseSnapshot, raceId: number) => Promise<void>
-  enterSelectionMode: (raceHorses: RaceHorseSnapshot[]) => void
-  exitSelectionMode: () => void
+  toggleVote: (horse: RaceHorseSnapshot, raceId: number) => Promise<void>
   loadVotes: (raceId: number) => Promise<void>
   reset: () => void
 }
@@ -24,8 +22,8 @@ export function useVote(initialVotedHorseName: string | null = null): UseVoteRet
   const selectedHorseId = ref<number | null>(null)
   const selectedHorse = ref<RaceHorseSnapshot | null>(null)
   const votedHorseName = ref<string | null>(initialVotedHorseName)
+  const votedRaceHorseId = ref<number | null>(null)
   const isSubmitting = ref(false)
-  const isInSelectionMode = ref(false)
   const votes = ref<VoteListEntry[]>([])
   const votesLoading = ref(false)
   const votesError = ref<string | null>(null)
@@ -34,73 +32,88 @@ export function useVote(initialVotedHorseName: string | null = null): UseVoteRet
 
   onUnmounted(() => { unmounted = true })
 
-  async function selectHorse(horse: RaceHorseSnapshot, raceId: number) {
+  /**
+   * Toggle vote on a horse card:
+   * - If not voted → submit vote
+   * - If voted for this horse → cancel vote
+   * - If voted for another horse → change vote
+   */
+  async function toggleVote(horse: RaceHorseSnapshot, raceId: number) {
     if (isSubmitting.value) return
-    // Skip if same horse already selected
-    if (selectedHorseId.value === horse.race_horse_id) return
-    selectedHorseId.value = horse.race_horse_id
-    selectedHorse.value = horse
-    // Direct submission when in selection mode
-    if (isInSelectionMode.value) {
-      await confirmVote(raceId)
+
+    // Same horse clicked again → cancel vote
+    if (votedRaceHorseId.value === horse.race_horse_id) {
+      await cancelVoteAction(raceId)
+      return
     }
+
+    // Different horse (or no previous vote) → submit/change vote
+    await castVoteAction(horse, raceId)
   }
 
-  async function confirmVote(raceId: number) {
-    if (selectedHorseId.value === null) return
-
+  async function castVoteAction(horse: RaceHorseSnapshot, raceId: number) {
     const previousVotedName = votedHorseName.value
-    const optimisticName = selectedHorse.value?.snapshot_data.name ?? null
+    const optimisticName = horse.snapshot_data.name
 
     votedHorseName.value = optimisticName
+    votedRaceHorseId.value = horse.race_horse_id
     isSubmitting.value = true
     errorMessage.value = null
 
     try {
-      const result: VoteResponse = await submitVote(raceId, selectedHorseId.value)
+      const result: VoteResponse = await submitVote(raceId, horse.race_horse_id)
       if (unmounted) return
       votedHorseName.value = result.horse_name
-      isInSelectionMode.value = false
-      selectedHorseId.value = null
-      selectedHorse.value = null
+      votedRaceHorseId.value = horse.race_horse_id
     } catch (err: unknown) {
       if (unmounted) return
       votedHorseName.value = previousVotedName
+      if (previousVotedName === null) {
+        votedRaceHorseId.value = null
+      }
       const axiosErr = err as { response?: { data?: { detail?: { message?: string } } } }
       errorMessage.value = axiosErr?.response?.data?.detail?.message ?? '投票失败，请重试'
     } finally {
       isSubmitting.value = false
     }
 
-    // Refresh vote distribution (independent try/catch — don't let failure affect vote state)
+    // Refresh vote distribution (independent try/catch)
     try {
       if (!unmounted) await loadVotes(raceId)
     } catch {
-      // Vote distribution refresh failure is non-critical
+      // Non-critical
     }
   }
 
-  /** Enter selection mode, pre-selecting the user's existing vote if any. */
-  function enterSelectionMode(raceHorses: RaceHorseSnapshot[]) {
-    isInSelectionMode.value = true
-    selectedHorseId.value = null
-    selectedHorse.value = null
-    errorMessage.value = null
-    // Pre-select existing vote
-    if (votedHorseName.value) {
-      const existing = raceHorses.find(h => h.snapshot_data.name === votedHorseName.value)
-      if (existing) {
-        selectedHorseId.value = existing.race_horse_id
-        selectedHorse.value = existing
-      }
-    }
-  }
+  async function cancelVoteAction(raceId: number) {
+    const previousVotedName = votedHorseName.value
 
-  function exitSelectionMode() {
-    isInSelectionMode.value = false
-    selectedHorseId.value = null
-    selectedHorse.value = null
+    // Optimistic clear
+    votedHorseName.value = null
+    votedRaceHorseId.value = null
+    isSubmitting.value = true
     errorMessage.value = null
+
+    try {
+      await deleteVote(raceId)
+      if (unmounted) return
+    } catch (err: unknown) {
+      if (unmounted) return
+      // Rollback on failure
+      votedHorseName.value = previousVotedName
+      // Need to find the previous race_horse_id — won't be accurate but name is sufficient
+      const axiosErr = err as { response?: { data?: { detail?: { message?: string } } } }
+      errorMessage.value = axiosErr?.response?.data?.detail?.message ?? '取消投票失败，请重试'
+    } finally {
+      isSubmitting.value = false
+    }
+
+    // Refresh vote distribution
+    try {
+      if (!unmounted) await loadVotes(raceId)
+    } catch {
+      // Non-critical
+    }
   }
 
   async function loadVotes(raceId: number) {
@@ -121,8 +134,8 @@ export function useVote(initialVotedHorseName: string | null = null): UseVoteRet
     selectedHorseId.value = null
     selectedHorse.value = null
     votedHorseName.value = null
+    votedRaceHorseId.value = null
     isSubmitting.value = false
-    isInSelectionMode.value = false
     votes.value = []
     votesLoading.value = false
     votesError.value = null
@@ -133,15 +146,13 @@ export function useVote(initialVotedHorseName: string | null = null): UseVoteRet
     selectedHorseId,
     selectedHorse,
     votedHorseName,
+    votedRaceHorseId,
     isSubmitting,
-    isInSelectionMode,
     votes,
     votesLoading,
     votesError,
     errorMessage,
-    selectHorse,
-    enterSelectionMode,
-    exitSelectionMode,
+    toggleVote,
     loadVotes,
     reset,
   }

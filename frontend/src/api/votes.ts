@@ -14,3 +14,7 @@ export async function getRaceVotes(raceId: number): Promise<VoteListEntry[]> {
   const res = await apiClient.get<{ data: VoteListEntry[] }>(`/races/${raceId}/votes`)
   return res.data.data
 }
+
+export async function deleteVote(raceId: number): Promise<void> {
+  await apiClient.delete(`/races/${raceId}/votes`)
+}

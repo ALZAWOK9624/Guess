@@ -89,3 +89,32 @@ async def get_current_admin(
             detail={"code": "FORBIDDEN", "message": "需要管理员权限"},
         )
     return current_user
+
+
+async def get_optional_user(
+    credentials: Optional[HTTPAuthorizationCredentials] = Depends(security_scheme),
+    db: AsyncSession = Depends(get_db),
+) -> Optional[User]:
+    """Resolve the current user from JWT token without raising errors.
+
+    Returns None for any auth error (no token, expired, invalid).
+    Use for public endpoints that optionally show user-specific data.
+    """
+    if credentials is None:
+        return None
+
+    try:
+        payload = jwt.decode(
+            credentials.credentials,
+            settings.jwt_secret,
+            algorithms=[settings.jwt_algorithm],
+        )
+        username: str = payload.get("sub")
+        if username is None:
+            return None
+    except (ExpiredSignatureError, JWTError):
+        return None
+
+    result = await db.execute(select(User).where(User.username == username))
+    user = result.scalar_one_or_none()
+    return user  # None if user not found

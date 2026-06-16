@@ -8,6 +8,7 @@ export interface RaceListItem {
   status: RaceStatus
   horse_count: number
   vote_count: number
+  has_voted: boolean
   created_at: string
   custom_scoring?: CustomScoring | null
 }
