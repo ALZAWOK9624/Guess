@@ -4,7 +4,8 @@ Queries Vote.points (directly on the Vote model) to compute
 cumulative scores, race counts, and per-race averages.
 """
 
-from sqlalchemy import select, func
+import sqlalchemy as sa
+from sqlalchemy import Numeric, select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.user import User
@@ -22,9 +23,11 @@ async def get_leaderboard(db: AsyncSession) -> list[LeaderboardEntry]:
     """
     total_points_col = func.coalesce(func.sum(Vote.points), 0)
     races_col = func.count(func.distinct(Vote.race_id))
+    # Cast to NUMERIC so round(numeric, integer) works in PostgreSQL
+    sum_points = func.coalesce(func.sum(Vote.points), 0.0)
+    divisor = func.nullif(func.count(func.distinct(Vote.race_id)), 0)
     avg_points_col = func.round(
-        func.coalesce(func.sum(Vote.points), 0.0)
-        / func.nullif(func.count(func.distinct(Vote.race_id)), 0),
+        sa.cast(sum_points / divisor, Numeric),
         1,
     )
 

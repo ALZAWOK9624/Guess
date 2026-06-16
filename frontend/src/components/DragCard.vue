@@ -16,7 +16,7 @@ const props = withDefaults(
 
 const emit = defineEmits<{
   dragStart: [index: number]
-  dragEnd: []
+  dragEnd: [event: DragEvent]
 }>()
 
 const snapshot = () => props.horse.snapshot_data
@@ -28,7 +28,7 @@ const snapshot = () => props.horse.snapshot_data
     :class="{ 'is-dnf': isDnf, 'is-dragging': isDragging }"
     draggable="true"
     @dragstart="emit('dragStart', index)"
-    @dragend="emit('dragEnd')"
+    @dragend="emit('dragEnd', $event)"
   >
     <div class="drag-handle" aria-label="拖拽排序" title="拖拽排序">
       <span class="handle-dots">⠿</span>

@@ -8,7 +8,7 @@ import { useRouter } from 'vue-router'
 import GradeBadge from '@/components/GradeBadge.vue'
 import StatusBadge from '@/components/StatusBadge.vue'
 import ConfirmDeleteModal from '@/components/ConfirmDeleteModal.vue'
-import { getRaces, deleteRace } from '@/api/races'
+import { getRaces, deleteRace, lockRace } from '@/api/races'
 import type { RaceListItem } from '@/types/race'
 
 type PageState = 'loading' | 'empty' | 'error' | 'success'
@@ -88,6 +88,26 @@ function formatDate(dateStr: string): string {
 const canDelete = (race: RaceListItem): boolean => {
   return race.status !== 'settled'
 }
+
+const canLock = (race: RaceListItem): boolean => {
+  return race.status === 'voting'
+}
+
+const lockingId = ref<number | null>(null)
+
+async function handleLock(race: RaceListItem) {
+  lockingId.value = race.id
+  try {
+    await lockRace(race.id)
+    // Update the race status in-place
+    const found = races.value.find(r => r.id === race.id)
+    if (found) found.status = 'locked'
+  } catch {
+    // Silently fail — the user can retry
+  } finally {
+    lockingId.value = null
+  }
+}
 </script>
 
 <template>
@@ -152,6 +172,21 @@ const canDelete = (race: RaceListItem): boolean => {
                 @click="router.push(`/admin/races/${race.id}/edit`)"
               >
                 编辑
+              </button>
+              <button
+                v-if="canLock(race)"
+                class="btn btn-sm btn-lock"
+                :disabled="lockingId === race.id"
+                @click="handleLock(race)"
+              >
+                {{ lockingId === race.id ? '锁定中…' : '锁定' }}
+              </button>
+              <button
+                v-if="race.status === 'locked' || race.status === 'settled'"
+                class="btn btn-sm btn-outline"
+                @click="router.push(`/admin/races/${race.id}/results`)"
+              >
+                结果录入
               </button>
               <button
                 v-if="canDelete(race)"
@@ -323,6 +358,22 @@ const canDelete = (race: RaceListItem): boolean => {
 
 .btn-destructive-outline:hover {
   background: var(--color-destructive-light, #FED7D7);
+}
+
+.btn-lock {
+  background: var(--color-surface-raised, #FFFFFF);
+  color: var(--color-accent, #B8960C);
+  border: 1px solid var(--color-accent, #B8960C);
+  margin-right: var(--spacing-2, 8px);
+}
+
+.btn-lock:hover:not(:disabled) {
+  background: #FFF8E1;
+}
+
+.btn-lock:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 .delete-error {

@@ -35,3 +35,10 @@ export async function updateRace(
 export async function deleteRace(id: number): Promise<void> {
   await apiClient.delete(`/races/${id}`)
 }
+
+export async function lockRace(raceId: number): Promise<{ id: number; name: string; status: string }> {
+  const res = await apiClient.post<{ data: { id: number; name: string; status: string } }>(
+    `/races/${raceId}/lock`,
+  )
+  return res.data.data
+}

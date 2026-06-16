@@ -1,7 +1,7 @@
 /** Drag-sort composable — native HTML5 DnD + Touch Events.
  *
  * Manages two lists: active horses (sorted by position) and DNF horses.
- * Supports desktop drag-and-drop and mobile touch with 300ms long-press.
+ * Reordering happens on drop (not during dragover) to avoid DOM mutation mid-drag.
  */
 
 import { ref, type Ref } from 'vue'
@@ -13,8 +13,10 @@ interface DragSortState {
   isDragging: Ref<boolean>
   draggedIndex: Ref<number>
   startDrag: (index: number) => void
-  onDragOver: (event: DragEvent, index: number) => void
-  endDrag: (event?: DragEvent) => void
+  commitReorder: (fromIndex: number, toIndex: number) => void
+  moveToDnf: (index: number) => void
+  moveToActive: (index: number) => void
+  endDrag: () => void
   reset: () => void
 }
 
@@ -56,30 +58,12 @@ export function useDragSort(
     draggedIndex.value = index
   }
 
-  function onDragOver(event: DragEvent, index: number): void {
-    event.preventDefault()
-    if (!isDragging.value || draggedIndex.value === index) return
-
-    const item = activeList.value.splice(draggedIndex.value, 1)[0]
-    activeList.value.splice(index, 0, item)
-    draggedIndex.value = index
-  }
-
-  function endDrag(event?: DragEvent): void {
-    if (!isDragging.value) return
-
-    // Check if dropped on DNF zone
-    if (event && draggedIndex.value >= 0) {
-      const target = event.target as HTMLElement
-      const dnfZone = target.closest('.dnf-zone')
-      if (dnfZone && draggedIndex.value < activeList.value.length) {
-        const horse = activeList.value.splice(draggedIndex.value, 1)[0]
-        dnfList.value.push(horse)
-      }
-    }
-
-    isDragging.value = false
-    draggedIndex.value = -1
+  function commitReorder(fromIndex: number, toIndex: number): void {
+    if (fromIndex < 0 || fromIndex >= activeList.value.length) return
+    if (toIndex < 0 || toIndex >= activeList.value.length) return
+    if (fromIndex === toIndex) return
+    const item = activeList.value.splice(fromIndex, 1)[0]
+    activeList.value.splice(toIndex, 0, item)
   }
 
   function moveToDnf(index: number): void {
@@ -96,6 +80,11 @@ export function useDragSort(
     }
   }
 
+  function endDrag(): void {
+    isDragging.value = false
+    draggedIndex.value = -1
+  }
+
   function reset(): void {
     initLists()
   }
@@ -106,7 +95,9 @@ export function useDragSort(
     isDragging,
     draggedIndex,
     startDrag,
-    onDragOver,
+    commitReorder,
+    moveToDnf,
+    moveToActive,
     endDrag,
     reset,
   }

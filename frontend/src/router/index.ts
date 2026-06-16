@@ -50,39 +50,46 @@ const routes: RouteRecordRaw[] = [
   },
   {
     path: '/admin',
-    name: 'admin-dashboard',
-    component: () => import('@/pages/admin/DashboardPage.vue'),
-    meta: { title: '管理后台', requiresAuth: true, isAdmin: true }
-  },
-  {
-    path: '/admin/horses',
-    name: 'admin-horses',
-    component: () => import('@/pages/admin/HorsesPage.vue'),
-    meta: { title: '马匹管理', requiresAuth: true, isAdmin: true }
-  },
-  {
-    path: '/admin/races/new',
-    name: 'admin-create-race',
-    component: () => import('@/pages/admin/CreateRacePage.vue'),
-    meta: { title: '创建比赛', requiresAuth: true, isAdmin: true }
-  },
-  {
-    path: '/admin/races/:id/edit',
-    name: 'admin-edit-race',
-    component: () => import('@/pages/admin/EditRacePage.vue'),
-    meta: { title: '编辑比赛', requiresAuth: true, isAdmin: true }
-  },
-  {
-    path: '/admin/races/:id/results',
-    name: 'admin-results',
-    component: () => import('@/pages/admin/ResultsPage.vue'),
-    meta: { title: '结果录入', requiresAuth: true, isAdmin: true }
-  },
-  {
-    path: '/admin/invite-codes',
-    name: 'admin-invite-codes',
-    component: () => import('@/pages/admin/InviteCodesPage.vue'),
-    meta: { title: '邀请码管理', requiresAuth: true, isAdmin: true }
+    component: () => import('@/layouts/AdminLayout.vue'),
+    meta: { requiresAuth: true, isAdmin: true },
+    children: [
+      {
+        path: '',
+        name: 'admin-dashboard',
+        component: () => import('@/pages/admin/DashboardPage.vue'),
+        meta: { title: '管理后台' }
+      },
+      {
+        path: 'horses',
+        name: 'admin-horses',
+        component: () => import('@/pages/admin/HorsesPage.vue'),
+        meta: { title: '马匹管理' }
+      },
+      {
+        path: 'races/new',
+        name: 'admin-create-race',
+        component: () => import('@/pages/admin/CreateRacePage.vue'),
+        meta: { title: '创建比赛' }
+      },
+      {
+        path: 'races/:id/edit',
+        name: 'admin-edit-race',
+        component: () => import('@/pages/admin/EditRacePage.vue'),
+        meta: { title: '编辑比赛' }
+      },
+      {
+        path: 'races/:id/results',
+        name: 'admin-results',
+        component: () => import('@/pages/admin/ResultsPage.vue'),
+        meta: { title: '结果录入' }
+      },
+      {
+        path: 'invite-codes',
+        name: 'admin-invite-codes',
+        component: () => import('@/pages/admin/InviteCodesPage.vue'),
+        meta: { title: '邀请码管理' }
+      }
+    ]
   }
 ]
 

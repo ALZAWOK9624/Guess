@@ -96,7 +96,7 @@ window.addEventListener('resize', () => {
 
     <!-- Main Content -->
     <div class="admin-content">
-      <slot />
+      <router-view />
     </div>
   </div>
 </template>

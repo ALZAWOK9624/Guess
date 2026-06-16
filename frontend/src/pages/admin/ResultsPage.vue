@@ -32,6 +32,9 @@ const touchStartY = ref(0)
 const touchCurrentY = ref(0)
 let longPressTimer: ReturnType<typeof setTimeout> | null = null
 
+// Track which list the drag originated from
+const dragSource = ref<'active' | 'dnf'>('active')
+
 let isMounted = true
 
 // Initialize drag-sort composable
@@ -95,39 +98,56 @@ const draggedIndex = computed(() => dragSort?.draggedIndex.value ?? -1)
 const dragOverIndex = ref(-1)
 
 // Desktop drag handlers using composable
-function handleDragStart(index: number) {
+function handleDragStart(index: number, source: 'active' | 'dnf' = 'active') {
   dragSort?.startDrag(index)
+  dragSource.value = source
   dragOverIndex.value = -1
 }
 
-function handleDragOver(event: DragEvent, index: number) {
+function handleDrop(event: DragEvent) {
   event.preventDefault()
-  dragOverIndex.value = index
-  dragSort?.onDragOver(event, index)
+  if (!dragSort || dragSort.draggedIndex.value < 0) return
+
+  if (dragSource.value === 'dnf') {
+    // Dragged from DNF → move back to active (append to end)
+    dragSort.moveToActive(dragSort.draggedIndex.value)
+  } else {
+    // Dragged within active list → reorder
+    const dropZone = event.currentTarget as HTMLElement
+    const cards = dropZone.querySelectorAll('.drag-item-wrapper')
+    let targetIndex = cards.length - 1
+    const mouseY = event.clientY
+    for (let i = 0; i < cards.length; i++) {
+      const rect = cards[i].getBoundingClientRect()
+      const midY = rect.top + rect.height / 2
+      if (mouseY < midY) {
+        targetIndex = i
+        break
+      }
+    }
+    dragSort.commitReorder(dragSort.draggedIndex.value, targetIndex)
+  }
+  dragOverIndex.value = -1
 }
 
-function handleDragEnd(event?: DragEvent) {
-  dragSort?.endDrag(event)
+function handleDragEnd() {
+  dragSort?.endDrag()
   dragOverIndex.value = -1
 }
 
 // DNF zone drop
-function handleDnfDragOver(event: DragEvent) {
-  event.preventDefault()
-}
-
 function handleDnfDrop(event: DragEvent) {
   event.preventDefault()
-  dragSort?.endDrag(event)
+  if (dragSort && dragSort.draggedIndex.value >= 0 && dragSource.value === 'active') {
+    dragSort.moveToDnf(dragSort.draggedIndex.value)
+  }
+  dragSort?.endDrag()
+  dragOverIndex.value = -1
 }
 
 // Move horse back from DNF to active (click on DNF item)
 function handleDnfClick(index: number) {
-  const horse = dnfList.value[index]
-  if (horse && dragSort) {
-    dragSort.dnfList.value = dragSort.dnfList.value.filter((_, i) => i !== index)
-    dragSort.activeList.value.push(horse)
-  }
+  dragSort?.moveToActive(index)
 }
 
 // ===== Mobile Touch Support (AC-3) =====
@@ -311,7 +331,7 @@ async function handleSubmit() {
       </div>
 
       <!-- Active horses -->
-      <div class="drop-zone">
+      <div class="drop-zone" @dragover.prevent @drop="handleDrop">
         <div
           v-for="(horse, index) in activeList"
           :key="horse.race_horse_id"
@@ -324,7 +344,6 @@ async function handleSubmit() {
             :index="index"
             :is-dragging="isDragging && draggedIndex === index"
             @drag-start="handleDragStart"
-            @drag-over="(e: DragEvent) => handleDragOver(e, index)"
             @drag-end="handleDragEnd"
             @touchstart="(e: TouchEvent) => handleTouchStart(e, index)"
             @touchmove="handleTouchMove"
@@ -336,7 +355,7 @@ async function handleSubmit() {
       <!-- DNF Zone -->
       <div
         class="dnf-zone"
-        @dragover="handleDnfDragOver"
+        @dragover.prevent
         @drop="handleDnfDrop"
       >
         <div class="dnf-zone-header">
@@ -356,7 +375,7 @@ async function handleSubmit() {
             :horse="horse"
             :is-dnf="true"
             :index="index"
-            @drag-start="handleDragStart"
+            @drag-start="(idx: number) => handleDragStart(idx, 'dnf')"
             @drag-end="handleDragEnd"
           />
         </div>
