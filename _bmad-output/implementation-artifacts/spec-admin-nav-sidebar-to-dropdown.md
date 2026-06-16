@@ -1,5 +1,5 @@
 ---
-title: 'Admin Layout: Sidebar → Top Nav Dropdown'
+title: 'Admin Layout: Sidebar → AppLayout Dropdown'
 type: 'refactor'
 created: '2026-06-16'
 status: 'done'
@@ -8,14 +8,15 @@ route: 'one-shot'
 
 ## Intent
 
-**Problem:** AdminLayout used a fixed 240px sidebar (desktop) + hamburger overlay (mobile), which took up horizontal space and felt heavy for a management panel with only 4 navigation items.
+**Problem:** AdminLayout had its own sidebar layout, and admin pages used a separate layout tree. "管理" in the nav bar navigated directly to `/admin`, bypassing the sub-navigation UX.
 
-**Approach:** Replace the sidebar entirely with a compact green top navigation bar containing the brand, title, and a dropdown menu trigger for admin navigation. The dropdown closes on click-outside, Escape key, and route change.
+**Approach:** Flatten admin routes as top-level routes sharing AppLayout. Replace the "管理" `<router-link>` in the nav bar with a dropdown trigger that shows admin sub-items (仪表盘/创建比赛/马匹管理/邀请码). AdminLayout simplified to a pass-through. Works on both desktop header and mobile bottom nav.
 
 ## Suggested Review Order
 
-1. `frontend/src/layouts/AdminLayout.vue:1` — Script: verify NavItem data is type-safe and v-html was removed in favor of inline SVG templates
-2. `frontend/src/layouts/AdminLayout.vue:75` — Template: dropdown trigger uses `aria-expanded` + `aria-haspopup`, menu uses `role="menu"`/`role="menuitem"`; Escape key listener on document closes the dropdown
-3. `frontend/src/layouts/AdminLayout.vue:136` — Styles: `nav-dropdown` has `max-height: 360px` + `overflow-y: auto` for overflow safety; `prefers-reduced-motion: reduce` disables the fade transition
-4. `frontend/src/assets/styles/variables.css:80` — Removed unused `--sidebar-width: 240px` token
-5. `_bmad-output/project-context.md:84` — Updated AdminLayout description to reflect top-nav + dropdown
+1. `frontend/src/router/index.ts` — Admin routes are now top-level (no AdminLayout wrapper), each with `requiresAuth: true, isAdmin: true` meta
+2. `frontend/src/layouts/AppLayout.vue:1` — Script: `isAdminRoute` removed; admin dropdown toggle with click-outside, Escape, route change listeners
+3. `frontend/src/layouts/AppLayout.vue:39` — Template: desktop nav-links has `v-if="authStore.isAdmin"` dropdown button + nested `<nav role="menu">` items
+4. `frontend/src/layouts/AppLayout.vue:92` — Template: mobile bottom nav has `admin-dropdown-area` with dropdown rising upward (`bottom: calc(100% + 8px)`)
+5. `frontend/src/layouts/AdminLayout.vue` — Reduced to pass-through `<router-view />` only
+6. `_bmad-output/project-context.md` — Updated AdminLayout/AppLayout descriptions

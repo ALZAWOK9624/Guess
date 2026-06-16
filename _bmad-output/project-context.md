@@ -81,20 +81,17 @@ _This file contains critical rules and patterns that AI agents must follow when 
 - Styles: **scoped CSS** + CSS custom properties (no UI library)
 - Layout components in `src/layouts/`, page components in `src/pages/`, reusable components in `src/components/`
 - Composable functions in `src/composables/` (`useAuth.ts`, `useVote.ts`, `useDragSort.ts`)
-- Admin routes prefixed `/admin/`, using `AdminLayout` with a top navigation bar and dropdown menu
-- Auth guard implementation in `router/index.ts`: `beforeEach` with `useAuthStore()` for three guard layers:
-  1. `isAdmin` → redirect to home for non-admin users
-  2. `requiresAuth` → redirect to `/login?redirect={path}` for unauthenticated users
-  3. Guest pages (login/register/reset-password) → redirect to home for logged-in users
+- Admin routes prefixed `/admin/`, sharing `AppLayout` with all other pages. No separate layout — admin nav is in a dropdown menu.
+- Auth guard implementation in `router/index.ts`: `beforeEach` with `useAuthStore()` guards admin routes (`isAdmin`), auth-required routes (`requiresAuth`), and guest-only pages (login/register/reset-password).
 - **RouteMeta must be extended** for custom meta fields used in guards: add `declare module 'vue-router' { interface RouteMeta { requiresAuth?: boolean; isAdmin?: boolean } }` in router/index.ts. This avoids `as Record<string, unknown>` type assertions.
 - Guest page name list (`guestPageNames: string[]`) extracted to module-level constant in router/index.ts — NOT defined inside beforeEach.
 - `@` path alias configured in both `vite.config.ts` and `tsconfig.app.json` — use `@/pages/`, `@/components/`, etc.
-- Responsive navigation via `AppLayout` (global wrapper in `App.vue`): desktop top nav (≥768px, green bg) and mobile bottom nav (<768px, with SVG icons + text). Both hidden on admin routes via `v-if="!isAdminRoute"`
+- Responsive navigation via `AppLayout` (global wrapper in `App.vue`): desktop top nav (≥768px, green bg) and mobile bottom nav (<768px, with SVG icons + text). Admin users see a "管理" dropdown trigger in both navs. Admin pages share the same AppLayout — no separate layout wrapping.
 - `safe-area-inset-bottom` applied via `viewport-fit=cover` meta + CSS `env(safe-area-inset-bottom)` — always add to mobile fixed elements
 - `prefers-reduced-motion: reduce` respected globally in `base.css` — overrides all animations/transitions. 全局 `scroll-behavior: smooth` 也被覆盖为 `auto`。
 - `*:focus-visible` 全局统一样式在 `base.css` 中定义（2px 竞马绿 outline + 2px offset），所有可聚焦元素自动继承。组件内如需自定义 focus 样式，使用 scoped CSS 覆盖。
 - **ARIA combobox 模式**：搜索下拉组件（如 `HorseSearchSelect.vue`）必须遵循 combobox 无障碍模式：`role="combobox"` + `:aria-expanded="showDropdown"`（动态绑定，不能硬编码 `"false"`）+ `aria-controls` 指向 listbox + `role="listbox"` + `role="option"` + `aria-selected`。`aria-expanded` 必须响应式绑定到下拉展开状态。
-- `AdminLayout` top nav bar (`z-index: 200`): fixed green header with brand + title on left, dropdown trigger on right. Dropdown shows admin items (仪表盘/创建比赛/马匹管理/邀请码) on white background. Closes on click-outside and route change.
+- Admin nav in `AppLayout`: desktop header nav-links and mobile bottom nav both have a "管理" dropdown trigger. Dropdown shows 仪表盘/创建比赛/马匹管理/邀请码. Closes on click-outside, Escape, and route change. Desktop dropdown drops downward; mobile dropdown rises upward from bottom bar.
 
 **FastAPI:**
 - App entry: `app/main.py` with `lifespan` for DB engine lifecycle
@@ -189,7 +186,7 @@ _This file contains critical rules and patterns that AI agents must follow when 
 - Do NOT use WebSocket/SSE — poll or optimistic updates only
 - Do NOT implement OAuth/3rd-party login — username + password + invite code only
 - Do NOT implement dark mode — v1 is light mode only
-- Do NOT wrap admin routes with AppLayout nav — AppLayout already hides desktop header and mobile nav on `/admin` paths via `v-if="!isAdminRoute"`
+- Admin routes are top-level routes (no child layout) — they share `AppLayout` with all other pages. The nav bar has a "管理" dropdown for admin sub-navigation.
 - Do NOT use `!important` globally except in utility classes (`.hidden`, `.mobile-only`, `.desktop-only`) and reduced-motion override
 - **Do NOT import `useAuthStore` in `client.ts`** — circular dependency (authStore → api/auth.ts → client.ts). Auth token source of truth is **localStorage**, read by request interceptor. Store's `accessToken` ref is synced via `persistAuth()`/`clearAuth()`/`restoreSession()`.
 - Do NOT use bare `catch` blocks on async functions — always use `catch (err)` to enable error differentiation. Future stories should follow the async/await + structured error handling pattern.
