@@ -562,27 +562,42 @@ onUnmounted(() => {
                 母父
                 <input v-model="formDamsire" type="text" class="form-input" maxlength="100" placeholder="母父名称" />
               </label>
-              <label class="form-label">
-                前走成绩
-                <input v-model="formPreviousResult" type="text" class="form-input" maxlength="100" placeholder="如 东京优骏 1着" />
-              </label>
-              <label class="form-label">
-                前走日期
-                <input v-model="formPreviousResultDate" type="date" class="form-input" />
-              </label>
-              <label class="form-label">
-                前走名次
-                <input v-model.number="formPreviousResultPosition" type="number" class="form-input" min="0" max="99" placeholder="如 1" />
-              </label>
-              <label class="form-label">
-                主要胜鞍
-                <input v-model="formBestWin" type="text" class="form-input" maxlength="100" placeholder="如 有马纪念(G1)" />
-              </label>
-              <label class="form-label">
-                胜鞍日期
-                <input v-model="formBestWinDate" type="date" class="form-input" />
-              </label>
             </div>
+
+            <!-- 前走成绩 box (3 sub-fields) -->
+            <div class="field-box">
+              <div class="field-box-header">前走成绩</div>
+              <div class="field-box-body field-box-col-3">
+                <label class="form-label">
+                  比赛名称
+                  <input v-model="formPreviousResult" type="text" class="form-input" maxlength="100" placeholder="如 东京优骏 1着" />
+                </label>
+                <label class="form-label">
+                  日期
+                  <input v-model="formPreviousResultDate" type="date" class="form-input" />
+                </label>
+                <label class="form-label">
+                  名次
+                  <input v-model.number="formPreviousResultPosition" type="number" class="form-input" min="0" max="99" placeholder="如 1" />
+                </label>
+              </div>
+            </div>
+
+            <!-- 主要胜鞍 box (2 sub-fields) -->
+            <div class="field-box">
+              <div class="field-box-header">主要胜鞍</div>
+              <div class="field-box-body field-box-col-2">
+                <label class="form-label">
+                  比赛名称
+                  <input v-model="formBestWin" type="text" class="form-input" maxlength="100" placeholder="如 有马纪念(G1)" />
+                </label>
+                <label class="form-label">
+                  日期
+                  <input v-model="formBestWinDate" type="date" class="form-input" />
+                </label>
+              </div>
+            </div>
+
             <div class="form-actions">
               <button type="button" class="btn btn-cancel" @click="showModal = false">取消</button>
               <button type="submit" class="btn btn-primary" :disabled="saving">
@@ -698,6 +713,39 @@ select.form-input { cursor: pointer; appearance: auto; }
 .btn-hemisphere-toggle { margin-top: 4px; margin-left: 8px; padding: 2px 8px; font-size: var(--text-caption, 12px); border: 1px solid var(--color-border-strong); border-radius: var(--rounded-sm, 6px); background: transparent; cursor: pointer; min-height: 28px; color: var(--color-primary); }
 .btn-hemisphere-toggle:hover:not(:disabled) { background: var(--color-surface-base); }
 .btn-hemisphere-toggle:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* Field boxes for grouped form sections */
+.field-box {
+  border: 1px solid var(--color-border-hairline, #D4DCD0);
+  border-radius: var(--rounded-md, 10px);
+  background: var(--color-surface-base, #F8FAF7);
+  padding: var(--spacing-3, 12px);
+}
+.field-box-header {
+  font-size: var(--text-body-sm, 14px);
+  font-weight: 600;
+  color: var(--color-ink-secondary, #4A5A4A);
+  margin-bottom: var(--spacing-2, 8px);
+  padding-bottom: var(--spacing-1, 4px);
+  border-bottom: 1px solid var(--color-border-hairline, #D4DCD0);
+}
+.field-box-body {
+  display: grid;
+  gap: var(--spacing-3, 12px);
+}
+.field-box-col-3 {
+  grid-template-columns: 1fr 1fr 1fr;
+}
+.field-box-col-2 {
+  grid-template-columns: 1fr 1fr;
+}
+@media (max-width: 768px) {
+  .field-box-col-3,
+  .field-box-col-2 {
+    grid-template-columns: 1fr;
+  }
+}
+
 .form-actions { display: flex; gap: var(--spacing-3, 12px); justify-content: flex-end; margin-top: var(--spacing-8, 12px); }
 .error-banner { padding: var(--spacing-3, 12px); margin-bottom: var(--spacing-3, 12px); background: var(--color-destructive-light, #FED7D7); color: var(--color-destructive, #C53030); border-radius: var(--rounded-sm, 6px); font-size: var(--text-body-sm, 14px); }
 
