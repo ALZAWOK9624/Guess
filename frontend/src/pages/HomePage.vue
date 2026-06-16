@@ -97,7 +97,7 @@ onMounted(loadData)
               <h2 class="race-name">{{ race.name }}</h2>
               <StatusBadge :status="race.status as any" />
               <span
-                v-if="race.status === 'voting' && authStore.isLoggedIn"
+                v-if="race.status === 'voting' && authStore.isLoggedIn && !authStore.isAdmin"
                 class="vote-status"
                 :class="{ voted: race.has_voted }"
               >
