@@ -12,10 +12,14 @@ class HorseSnapshot(BaseModel):
     birth_year: int | None = None
     origin: str | None = None
     hemisphere: str | None = None
+    location: str | None = None
     sire: str | None = None
     damsire: str | None = None
     previous_result: str | None = None
+    previous_result_date: str | None = None
+    previous_result_position: int | None = None
     best_win: str | None = None
+    best_win_date: str | None = None
 
 
 class PenaltyRule(BaseModel):

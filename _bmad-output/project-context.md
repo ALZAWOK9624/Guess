@@ -2,7 +2,7 @@
 project_name: 'guess'
 user_name: 'tkd'
 date: '2026-06-16'
-story: '3.7-result-modification-recalculation'
+story: 'horse-card-display-improvement'
 sections_completed:
   ['technology_stack', 'language_rules', 'framework_rules', 'testing_rules', 'code_quality', 'workflow', 'critical_rules']
 status: 'complete'
@@ -356,4 +356,4 @@ _This file contains critical rules and patterns that AI agents must follow when 
 - Review quarterly for outdated rules
 - Remove rules that become obvious over time
 
-Last Updated: 2026-06-16 (horse info enhancement: weight/jockey per-race, sex/country dropdowns, birth_year+hemisphere age, location, auto-update previous_result)
+Last Updated: 2026-06-16 (horse card table layout, location in snapshots, weight removed, jockey per-race simplified)

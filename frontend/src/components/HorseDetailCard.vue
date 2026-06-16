@@ -2,6 +2,28 @@
 import { computed } from 'vue'
 import type { HorseSnapshotData } from '@/types/race'
 
+function positionLabel(pos: number): string {
+  if (pos === 1) return '第一'
+  if (pos === 2) return '第二'
+  if (pos === 3) return '第三'
+  return `第${pos}`
+}
+
+function formatPrevResult(snap: HorseSnapshotData): string {
+  if (!snap.previous_result) return '-'
+  const parts: string[] = []
+  if (snap.previous_result_date) parts.push(snap.previous_result_date)
+  parts.push(snap.previous_result)
+  if (snap.previous_result_position != null) parts.push(positionLabel(snap.previous_result_position))
+  return parts.join(' ')
+}
+
+function formatBestWin(snap: HorseSnapshotData): string {
+  if (!snap.best_win) return '-'
+  if (snap.best_win_date) return `${snap.best_win_date} ${snap.best_win}`
+  return snap.best_win
+}
+
 function computeAge(birthYear: number, hemisphere: string, onDate: Date): number {
   const cutoffMonth = hemisphere === 'south' ? 8 : 1
   const thisYear = onDate.getFullYear()
@@ -13,7 +35,6 @@ function computeAge(birthYear: number, hemisphere: string, onDate: Date): number
 const props = withDefaults(defineProps<{
   snapshotData?: HorseSnapshotData | null
   horseId: number
-  weight?: string | null
   jockey?: string | null
   birthYear?: number | null
   hemisphere?: string | null
@@ -27,13 +48,16 @@ const props = withDefaults(defineProps<{
     sex: null,
     birth_year: null,
     hemisphere: null,
+    location: null,
     origin: null,
     sire: null,
     damsire: null,
     previous_result: null,
+    previous_result_date: null,
+    previous_result_position: null,
     best_win: null,
+    best_win_date: null,
   }),
-  weight: null,
   jockey: null,
   birthYear: null,
   hemisphere: null,
@@ -52,11 +76,15 @@ const safeData = computed(() => props.snapshotData ?? {
   sex: null,
   birth_year: null,
   hemisphere: null,
+  location: null,
   origin: null,
   sire: null,
   damsire: null,
   previous_result: null,
+  previous_result_date: null,
+  previous_result_position: null,
   best_win: null,
+  best_win_date: null,
 })
 
 // Compute age: from props (new) → snapshotData.birth_year (new snap) → snapshotData.age (legacy snap)
@@ -70,17 +98,12 @@ const displayAge = computed(() => {
   return computeAge(rawBirthYear.value, hs, refDate)
 })
 
-const infoLine = computed(() => {
-  const parts: string[] = []
+const displayJockey = computed(() => props.jockey ?? null)
+
+const sexAgeStr = computed(() => {
   const sex = safeData.value.sex || '-'
   const age = displayAge.value !== null ? `${displayAge.value}` : '-'
-  parts.push(`${sex}${age}`)
-  parts.push(`产:${safeData.value.origin || '-'}`)
-  parts.push(`父:${safeData.value.sire || '-'}`)
-  parts.push(`母父:${safeData.value.damsire || '-'}`)
-  parts.push(`前走:${safeData.value.previous_result || '-'}`)
-  parts.push(`主胜鞍:${safeData.value.best_win || '-'}`)
-  return parts.join(' ')
+  return `${sex}${age}`
 })
 
 function handleClick() {
@@ -100,15 +123,48 @@ function handleClick() {
     @keydown.enter="handleClick"
     @keydown.space.prevent="handleClick"
   >
-    <div class="card-inner">
-      <span class="horse-name">{{ safeData.name }}</span>
-      <span class="info-line">{{ infoLine }}</span>
-      <div v-if="votable && voted" class="vote-badge" aria-hidden="true">
-        <span class="vote-checkmark">✓</span>
-        <span class="vote-label">已投</span>
-      </div>
-      <div v-if="submitting && voted" class="vote-spinner" aria-hidden="true" />
-    </div>
+    <table class="horse-table">
+      <colgroup>
+        <col style="width:18%" />
+        <col style="width:5.5%" />
+        <col style="width:7.5%" />
+        <col style="width:5.5%" />
+        <col style="width:7.5%" />
+        <col style="width:5.5%" />
+        <col style="width:7.5%" />
+        <col style="width:5.5%" />
+        <col style="width:14%" />
+        <col style="width:5.5%" />
+        <col style="width:14%" />
+      </colgroup>
+      <tr>
+        <td class="name-cell" rowspan="2">
+          <div class="horse-name">{{ safeData.name }}</div>
+          <div class="horse-suffix">{{ sexAgeStr }}</div>
+          <div v-if="votable && voted" class="vote-badge" aria-hidden="true">
+            <span class="vote-checkmark">✓</span>
+            <span class="vote-label">已投</span>
+          </div>
+          <div v-if="submitting && voted" class="vote-spinner" aria-hidden="true" />
+        </td>
+        <th class="cl-lbl">骑手</th>
+        <td class="cl-val">{{ displayJockey || '-' }}</td>
+        <th class="cl-lbl">产地</th>
+        <td class="cl-val">{{ safeData.origin || '-' }}</td>
+        <th class="cl-lbl">属地</th>
+        <td class="cl-val">{{ safeData.location || '-' }}</td>
+        <th class="cl-lbl">父</th>
+        <td class="cl-val">{{ safeData.sire || '-' }}</td>
+        <th class="cl-lbl">母父</th>
+        <td class="cl-val">{{ safeData.damsire || '-' }}</td>
+      </tr>
+      <tr>
+        <th class="cl-lbl">前走</th>
+        <td class="cl-val-wide" colspan="5">{{ formatPrevResult(safeData) }}</td>
+        <th class="cl-lbl">主胜</th>
+        <td class="cl-val-wide" colspan="3">{{ formatBestWin(safeData) }}</td>
+      </tr>
+    </table>
   </div>
 </template>
 
@@ -118,7 +174,7 @@ function handleClick() {
   background: var(--color-surface-raised, #FFFFFF);
   border: 2px solid var(--color-border-hairline, #D4DCD0);
   border-radius: var(--rounded-md, 10px);
-  padding: var(--spacing-3, 12px) var(--spacing-4, 16px);
+  padding: 4px;
   transition: border-color 0.15s, box-shadow 0.15s, background-color 0.15s;
 }
 
@@ -152,11 +208,28 @@ function handleClick() {
   pointer-events: none;
 }
 
-.card-inner {
-  display: flex;
-  align-items: baseline;
-  gap: var(--spacing-3, 12px);
-  flex-wrap: wrap;
+/* ===== HTML Table Layout ===== */
+.horse-table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+}
+
+.horse-table th,
+.horse-table td {
+  border: 1px solid var(--color-border-hairline, #D4DCD0);
+  padding: 10px 8px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Name cell spans 2 rows */
+.name-cell {
+  position: relative;
+  text-align: left;
+  vertical-align: middle;
+  min-width: 80px;
 }
 
 .horse-name {
@@ -164,36 +237,54 @@ function handleClick() {
   font-size: var(--text-subheading, 18px);
   font-weight: 600;
   color: var(--color-ink-primary, #1A2E1A);
-  white-space: nowrap;
-  flex-shrink: 0;
 }
 
-.info-line {
+.horse-suffix {
+  font-size: var(--text-body-sm, 14px);
+  color: var(--color-ink-secondary, #4A5A4A);
+}
+
+/* Label cells */
+.cl-lbl {
+  font-size: var(--text-caption, 12px);
+  color: var(--color-ink-secondary, #4A5A4A);
+  font-weight: 600;
+  text-align: center;
+  background: var(--color-surface-base, #F8FAF7);
+}
+
+/* Value cells */
+.cl-val {
   font-size: var(--text-body-sm, 14px);
   color: var(--color-ink-primary, #1A2E1A);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  flex: 1;
-  min-width: 0;
+  text-align: center;
 }
 
+.cl-val-wide {
+  font-size: var(--text-body-sm, 14px);
+  color: var(--color-ink-primary, #1A2E1A);
+  text-align: center;
+}
+
+/* Vote badge & spinner */
 .vote-badge {
+  position: absolute;
+  top: 2px;
+  right: 2px;
   display: flex;
   align-items: center;
   gap: 4px;
   background: var(--color-accent, #B8960C);
   color: #ffffff;
   border-radius: 20px;
-  padding: 2px 10px;
-  font-size: var(--text-caption, 12px);
+  padding: 1px 8px;
+  font-size: var(--text-caption, 11px);
   font-weight: 600;
   white-space: nowrap;
-  flex-shrink: 0;
 }
 
 .vote-checkmark {
-  font-size: 14px;
+  font-size: 12px;
   line-height: 1;
 }
 
@@ -202,13 +293,15 @@ function handleClick() {
 }
 
 .vote-spinner {
-  width: 14px;
-  height: 14px;
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  width: 12px;
+  height: 12px;
   border: 2px solid rgba(185, 150, 12, 0.3);
   border-top-color: var(--color-accent, #B8960C);
   border-radius: 50%;
   animation: horse-spin 0.6s linear infinite;
-  flex-shrink: 0;
 }
 
 @keyframes horse-spin {
@@ -217,21 +310,20 @@ function handleClick() {
 
 @media (max-width: 767px) {
   .horse-detail-card {
-    padding: var(--spacing-2, 8px) var(--spacing-3, 12px);
-  }
-
-  .card-inner {
-    gap: var(--spacing-2, 8px);
+    padding: 2px;
   }
 
   .horse-name {
     font-size: var(--text-body, 16px);
   }
 
-  .info-line {
-    font-size: var(--text-caption, 12px);
-    white-space: normal;
-    overflow: visible;
+  .cl-lbl {
+    font-size: 11px;
+  }
+
+  .cl-val,
+  .cl-val-wide {
+    font-size: 11px;
   }
 }
 </style>

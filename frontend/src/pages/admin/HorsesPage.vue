@@ -435,15 +435,18 @@ onUnmounted(() => {
               <td>{{ horse.damsire || '-' }}</td>
               <td>
                 <template v-if="horse.previous_result">
+                  <template v-if="horse.previous_result_date">{{ horse.previous_result_date }} </template>
                   {{ horse.previous_result }}
-                  <span v-if="horse.previous_result_date" class="text-muted">({{ horse.previous_result_date }})</span>
+                  <template v-if="horse.previous_result_position !== null">
+                    {{ horse.previous_result_position === 1 ? '第一' : horse.previous_result_position === 2 ? '第二' : horse.previous_result_position === 3 ? '第三' : `第${horse.previous_result_position}` }}
+                  </template>
                 </template>
                 <span v-else>-</span>
               </td>
               <td>
                 <template v-if="horse.best_win">
+                  <template v-if="horse.best_win_date">{{ horse.best_win_date }} </template>
                   {{ horse.best_win }}
-                  <span v-if="horse.best_win_date" class="text-muted">({{ horse.best_win_date }})</span>
                 </template>
                 <span v-else>-</span>
               </td>

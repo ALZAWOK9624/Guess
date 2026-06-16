@@ -198,7 +198,8 @@ onMounted(async () => {
           :key="horse.horse_id"
           :snapshot-data="horse.snapshot_data"
           :horse-id="horse.horse_id"
-          :weight="horse.weight"
+
+
           :jockey="horse.jockey"
           :birth-year="horse.snapshot_data.birth_year ?? horse.snapshot_data.age"
           :hemisphere="horse.snapshot_data.hemisphere"

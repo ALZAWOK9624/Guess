@@ -24,10 +24,9 @@ const formError = ref('')
 const notEditable = ref(false)
 const notEditableMessage = ref('')
 
-// Per-horse weight/jockey (keyed by race_horse_id for PATCH updates)
-const horseWeights = ref<Record<number, string>>({})
+// Per-horse jockey (keyed by race_horse_id for PATCH updates)
 const horseJockeys = ref<Record<number, string>>({})
-// Map race_horse_id → horse_id for weight/jockey submission
+// Map race_horse_id → horse_id for jockey submission
 const raceHorseIdMap = ref<Record<number, number>>({})
 
 // Delete state
@@ -50,11 +49,10 @@ const initialValues = ref<{
   date: string
   grade: string
   horses: Horse[]
-  weights: Record<number, string>
   jockeys: Record<number, string>
 }>({
   name: '', date: '', grade: 'G1', horses: [],
-  weights: {}, jockeys: {},
+  jockeys: {},
 })
 
 const canSubmit = computed(() => {
@@ -66,19 +64,15 @@ const canSubmit = computed(() => {
   return true
 })
 
-function loadRaceHorseWeights(race: RaceDetail) {
-  const w: Record<number, string> = {}
+function loadRaceHorseJockeys(race: RaceDetail) {
   const j: Record<number, string> = {}
   const idMap: Record<number, number> = {}
   for (const rh of race.horses) {
-    // Use weight/jockey from RaceHorse (new) or fallback to snapshot_data (old)
-    const weight = (rh as any).weight || rh.snapshot_data.weight || ''
+    // Use jockey from RaceHorse (new) or fallback to snapshot_data (old)
     const jockey = (rh as any).jockey || rh.snapshot_data.jockey || ''
-    w[rh.race_horse_id] = weight
     j[rh.race_horse_id] = jockey
     idMap[rh.race_horse_id] = rh.horse_id
   }
-  horseWeights.value = w
   horseJockeys.value = j
   raceHorseIdMap.value = idMap
 }
@@ -120,8 +114,8 @@ onMounted(async () => {
     }))
     selectedHorses.value = mapped
 
-    // Load per-horse weight and jockey
-    loadRaceHorseWeights(race)
+    // Load per-horse jockey
+    loadRaceHorseJockeys(race)
 
     // Store initial values
     initialValues.value = {
@@ -129,7 +123,6 @@ onMounted(async () => {
       date: race.date,
       grade: race.grade,
       horses: [...selectedHorses.value],
-      weights: { ...horseWeights.value },
       jockeys: { ...horseJockeys.value },
     }
 
@@ -199,19 +192,14 @@ async function handleSubmit() {
       payload.horse_ids = changedHorses
     }
 
-    // Check weight/jockey changes (keyed by race_horse_id)
-    const weightChanges: Record<string, string> = {}
+    // Check jockey changes (keyed by race_horse_id)
     const jockeyChanges: Record<string, string> = {}
-    for (const rhId of Object.keys(horseWeights.value)) {
+    for (const rhId of Object.keys(horseJockeys.value)) {
       const numRhId = Number(rhId)
-      const currentW = horseWeights.value[numRhId]
       const currentJ = horseJockeys.value[numRhId]
-      const initialW = initialValues.value.weights[numRhId] || ''
       const initialJ = initialValues.value.jockeys[numRhId] || ''
-      if (currentW !== initialW) weightChanges[rhId] = currentW || ''
       if (currentJ !== initialJ) jockeyChanges[rhId] = currentJ || ''
     }
-    if (Object.keys(weightChanges).length > 0) payload.horse_weights = weightChanges
     if (Object.keys(jockeyChanges).length > 0) payload.horse_jockeys = jockeyChanges
 
     if (raceGrade.value !== 'CUSTOM' && 'custom_scoring' in payload) {
@@ -312,25 +300,18 @@ async function handleDelete() {
         <HorseSearchSelect v-model:selectedHorses="selectedHorses" />
       </div>
 
-      <!-- Per-horse weight and jockey -->
+      <!-- Per-horse jockey -->
       <div v-if="Object.keys(raceHorseIdMap).length > 0" class="form-group">
-        <label class="form-label">鞍上信息（每匹马的体重和骑手）</label>
-        <div class="horse-weight-jockey-list">
-          <div v-for="(horseId, rhId) in raceHorseIdMap" :key="rhId" class="horse-weight-jockey-row">
+        <label class="form-label">骑手信息</label>
+        <div class="horse-jockey-list">
+          <div v-for="(horseId, rhId) in raceHorseIdMap" :key="rhId" class="horse-jockey-row">
             <span class="horse-label">
               {{ selectedHorses.find(h => h.id === horseId)?.name || `马匹#${horseId}` }}
             </span>
             <input
-              v-model="horseWeights[Number(rhId)]"
-              type="text"
-              class="form-input weight-input"
-              placeholder="体重（如 520kg）"
-              maxlength="20"
-            />
-            <input
               v-model="horseJockeys[Number(rhId)]"
               type="text"
-              class="form-input jockey-input"
+              class="form-input"
               placeholder="骑手名"
               maxlength="50"
             />
@@ -392,12 +373,10 @@ async function handleDelete() {
 .btn-destructive { background: var(--color-surface-raised, #FFFFFF); color: var(--color-destructive, #C53030); border: 1px solid var(--color-destructive, #C53030); }
 .btn-destructive:hover:not(:disabled) { background: var(--color-destructive-light, #FED7D7); }
 
-/* Per-horse weight/jockey */
-.horse-weight-jockey-list { display: flex; flex-direction: column; gap: var(--spacing-2, 8px); }
-.horse-weight-jockey-row { display: flex; align-items: center; gap: var(--spacing-3, 12px); padding: 8px 12px; background: var(--color-surface-base, #F8FAF7); border-radius: var(--rounded-md, 8px); }
+/* Per-horse jockey */
+.horse-jockey-list { display: flex; flex-direction: column; gap: var(--spacing-2, 8px); }
+.horse-jockey-row { display: flex; align-items: center; gap: var(--spacing-3, 12px); padding: 8px 12px; background: var(--color-surface-base, #F8FAF7); border-radius: var(--rounded-md, 8px); }
 .horse-label { min-width: 100px; font-weight: 600; font-size: var(--text-body-sm, 14px); color: var(--color-ink-primary, #1A2E1A); }
-.weight-input { flex: 1; min-width: 0; }
-.jockey-input { flex: 1; min-width: 0; }
 </style>
 
 <style scoped>

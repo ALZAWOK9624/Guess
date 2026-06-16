@@ -62,10 +62,14 @@ export interface HorseSnapshotData {
   age?: number | null  // legacy: old snapshots used age
   origin: string | null
   hemisphere: string | null
+  location: string | null
   sire: string | null
   damsire: string | null
   previous_result: string | null
+  previous_result_date: string | null
+  previous_result_position: number | null
   best_win: string | null
+  best_win_date: string | null
 }
 
 export interface CustomScoring {

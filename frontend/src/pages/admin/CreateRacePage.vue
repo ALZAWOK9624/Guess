@@ -18,24 +18,19 @@ const isSubmitting = ref(false)
 const formError = ref('')
 const errors = ref<Record<string, string>>({})
 
-// Per-horse weight and jockey (keyed by horse id)
-const horseWeights = ref<Record<number, string>>({})
+// Per-horse jockey (keyed by horse id)
 const horseJockeys = ref<Record<number, string>>({})
 
-// Initialize weight/jockey when horses change
+// Initialize jockey when horses change
 watch(selectedHorses, (horses) => {
   for (const h of horses) {
-    if (!(h.id in horseWeights.value)) {
-      horseWeights.value[h.id] = ''
-    }
     if (!(h.id in horseJockeys.value)) {
       horseJockeys.value[h.id] = ''
     }
   }
   const currentIds = new Set(horses.map(h => h.id))
-  for (const id of Object.keys(horseWeights.value)) {
+  for (const id of Object.keys(horseJockeys.value)) {
     if (!currentIds.has(Number(id))) {
-      delete horseWeights.value[Number(id)]
       delete horseJockeys.value[Number(id)]
     }
   }
@@ -125,13 +120,9 @@ async function handleSubmit() {
   formError.value = ''
 
   try {
-    // Build horse_weights and horse_jockeys with non-empty values only
-    const hw: Record<string, string> = {}
+    // Build horse_jockeys with non-empty values only
     const hj: Record<string, string> = {}
     for (const h of selectedHorses.value) {
-      if (horseWeights.value[h.id]?.trim()) {
-        hw[String(h.id)] = horseWeights.value[h.id].trim()
-      }
       if (horseJockeys.value[h.id]?.trim()) {
         hj[String(h.id)] = horseJockeys.value[h.id].trim()
       }
@@ -142,7 +133,6 @@ async function handleSubmit() {
       date: raceDate.value,
       grade: raceGrade.value as 'G1' | 'G2_JPN1' | 'YOUNG_G1' | 'CUSTOM',
       horse_ids: selectedHorses.value.map(h => h.id),
-      horse_weights: Object.keys(hw).length > 0 ? hw : undefined,
       horse_jockeys: Object.keys(hj).length > 0 ? hj : undefined,
       custom_scoring: showCustomFields.value ? parseCustomScoring() : undefined,
     }
@@ -267,27 +257,20 @@ async function handleSubmit() {
         <p v-if="errors.horses" class="field-error">{{ errors.horses }}</p>
       </div>
 
-      <!-- Per-horse weight and jockey -->
+      <!-- Per-horse jockey -->
       <div v-if="selectedHorses.length > 0" class="form-group">
-        <label class="form-label">鞍上信息（每匹马的体重和骑手）</label>
-        <div class="horse-weight-jockey-list">
+        <label class="form-label">骑手信息</label>
+        <div class="horse-jockey-list">
           <div
             v-for="horse in selectedHorses"
             :key="horse.id"
-            class="horse-weight-jockey-row"
+            class="horse-jockey-row"
           >
             <span class="horse-label">{{ horse.name }}</span>
             <input
-              v-model="horseWeights[horse.id]"
-              type="text"
-              class="form-input weight-input"
-              placeholder="体重（如 520kg）"
-              maxlength="20"
-            />
-            <input
               v-model="horseJockeys[horse.id]"
               type="text"
-              class="form-input jockey-input"
+              class="form-input"
               placeholder="骑手名"
               maxlength="50"
             />
@@ -383,13 +366,13 @@ async function handleSubmit() {
 .btn-primary:hover:not(:disabled) { background: var(--color-primary-light, #2D7A4F); }
 .btn-cancel { background: var(--color-surface-raised, #FFFFFF); color: var(--color-ink-primary, #1A2E1A); border: 1px solid var(--color-border-strong, #A8B8A4); }
 
-/* Per-horse weight/jockey */
-.horse-weight-jockey-list {
+/* Per-horse jockey */
+.horse-jockey-list {
   display: flex;
   flex-direction: column;
   gap: var(--spacing-2, 8px);
 }
-.horse-weight-jockey-row {
+.horse-jockey-row {
   display: flex;
   align-items: center;
   gap: var(--spacing-3, 12px);
@@ -403,8 +386,6 @@ async function handleSubmit() {
   font-size: var(--text-body-sm, 14px);
   color: var(--color-ink-primary, #1A2E1A);
 }
-.weight-input { flex: 1; min-width: 0; }
-.jockey-input { flex: 1; min-width: 0; }
 
 @media (prefers-reduced-motion: reduce) {
   .grade-option, .btn, .form-input { transition: none; }

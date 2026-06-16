@@ -118,10 +118,14 @@ def _build_snapshot(horse: Horse, weight: str | None = None, jockey: str | None 
         "birth_year": horse.birth_year,
         "origin": horse.origin,
         "hemisphere": horse.hemisphere,
+        "location": horse.location,
         "sire": horse.sire,
         "damsire": horse.damsire,
         "previous_result": horse.previous_result,
+        "previous_result_date": str(horse.previous_result_date) if horse.previous_result_date else None,
+        "previous_result_position": horse.previous_result_position,
         "best_win": horse.best_win,
+        "best_win_date": str(horse.best_win_date) if horse.best_win_date else None,
     }
 
 
