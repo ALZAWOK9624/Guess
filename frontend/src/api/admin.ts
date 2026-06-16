@@ -9,12 +9,11 @@ export async function getInviteCodes(search?: string): Promise<InviteCode[]> {
   return res.data.data
 }
 
-export async function createInviteCode(): Promise<InviteCode> {
-  const res = await apiClient.post<{ data: InviteCode }>('/admin/invite-codes')
+export async function createInviteCode(qq: string): Promise<InviteCode> {
+  const res = await apiClient.post<{ data: InviteCode }>('/admin/invite-codes', { qq })
   return res.data.data
 }
 
-export async function invalidateInviteCode(code: string): Promise<InviteCode> {
-  const res = await apiClient.patch<{ data: InviteCode }>(`/admin/invite-codes/${code}`)
-  return res.data.data
+export async function deleteInviteCode(code: string): Promise<void> {
+  await apiClient.delete(`/admin/invite-codes/${code}`)
 }

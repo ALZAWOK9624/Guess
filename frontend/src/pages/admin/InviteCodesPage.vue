@@ -6,7 +6,8 @@ import InviteCodeTable from '@/components/InviteCodeTable.vue'
   <div class="invite-codes-page">
     <h1 class="page-title">邀请码管理</h1>
     <p class="page-description">
-      邀请码是用户注册的唯一凭证，每个码终生绑定一个用户。
+      邀请码是用户注册的唯一凭证。生成时需要绑定 QQ 号，用户注册时需提供匹配的 QQ 号和邀请码。
+      已绑定的邀请码可点击「删除」同时移除用户和其投票记录。
     </p>
     <InviteCodeTable />
   </div>

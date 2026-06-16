@@ -31,20 +31,76 @@ from app.schemas.auth import (
 async def login(db: AsyncSession, request: LoginRequest) -> LoginResponse:
     """Authenticate user credentials and return JWT tokens.
 
-    Flow:
-    1. Look up user by username
-    2. Verify password hash
-    3. Generate JWT tokens
-    4. Return response with user info
+    Supports three login modes:
+    1. Username + password
+    2. QQ + password
+    3. Invite code (passwordless)
 
-    Returns 401 for both wrong username and wrong password
-    (no field-specific leak).
+    Returns 401 for invalid credentials (no field-specific leak).
     """
-    # Step 1: Look up user
-    result = await db.execute(
-        select(User).where(User.username == request.username)
-    )
-    user = result.scalar_one_or_none()
+    user = None
+
+    # Mode 3: Invite code login (passwordless)
+    if request.invite_code:
+        result = await db.execute(
+            select(InviteCode).where(InviteCode.code == request.invite_code)
+        )
+        invite_code = result.scalar_one_or_none()
+        if invite_code is None:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail={
+                    "code": "INVALID_CREDENTIALS",
+                    "message": "用户名或密码错误",
+                },
+            )
+        if invite_code.status == "unused":
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail={
+                    "code": "INVITE_CODE_NOT_BOUND",
+                    "message": "该邀请码尚未绑定用户",
+                },
+            )
+        if invite_code.status == "used" and invite_code.bound_username:
+            user_result = await db.execute(
+                select(User).where(User.username == invite_code.bound_username)
+            )
+            user = user_result.scalar_one_or_none()
+
+    # Mode 2: QQ + password
+    elif request.qq:
+        if not request.password:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail={
+                    "code": "INVALID_CREDENTIALS",
+                    "message": "用户名或密码错误",
+                },
+            )
+        result = await db.execute(
+            select(User).where(User.qq == request.qq)
+        )
+        user = result.scalar_one_or_none()
+        if user and not verify_password(request.password, user.password_hash):
+            user = None
+
+    # Mode 1: Username + password
+    else:
+        if not request.username or not request.password:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail={
+                    "code": "INVALID_CREDENTIALS",
+                    "message": "用户名或密码错误",
+                },
+            )
+        result = await db.execute(
+            select(User).where(User.username == request.username)
+        )
+        user = result.scalar_one_or_none()
+        if user and not verify_password(request.password, user.password_hash):
+            user = None
 
     if user is None:
         raise HTTPException(
@@ -55,23 +111,12 @@ async def login(db: AsyncSession, request: LoginRequest) -> LoginResponse:
             },
         )
 
-    # Step 2: Verify password
-    if not verify_password(request.password, user.password_hash):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail={
-                "code": "INVALID_CREDENTIALS",
-                "message": "用户名或密码错误",
-            },
-        )
-
-    # Step 3: Generate JWT tokens
     access_token = create_access_token(data={"sub": user.username})
-    refresh_token = create_refresh_token(data={"sub": user.username})
+    refresh_token_val = create_refresh_token(data={"sub": user.username})
 
     return LoginResponse(
         access_token=access_token,
-        refresh_token=refresh_token,
+        refresh_token=refresh_token_val,
         user=UserInfo(
             id=user.id,
             username=user.username,
@@ -181,12 +226,13 @@ async def register(
             },
         )
 
-    if invite_code.status == "disabled":
+    # Step 2.5: Validate QQ matches the bound QQ on the invite code
+    if invite_code.bound_qq and invite_code.bound_qq != request.qq:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail={
-                "code": "INVITE_CODE_INVALID",
-                "message": "邀请码无效或已被使用",
+                "code": "QQ_MISMATCH",
+                "message": "QQ 号与邀请码不匹配",
             },
         )
 
@@ -255,21 +301,35 @@ async def register(
 async def reset_password(
     db: AsyncSession, request: ResetPasswordRequest
 ) -> ResetPasswordResponse:
-    """Reset password using username + bound invite code verification.
+    """Reset password using bound invite code verification.
 
     Flow:
-    1. Look up user by username
-    2. Look up invite_code by code string
-    3. Verify invite_code is bound to this user
-    4. Hash new password
-    5. Update user's password_hash
-    6. Return response with user info
+    1. Look up invite_code by code string
+    2. Verify invite_code is bound to a user (status == "used")
+    3. Hash new password
+    4. Update user's password_hash
+    5. Return response with user info
 
     Returns 400 for all mismatch cases (no field-specific leak).
     """
-    # Step 1: Look up user
+    # Step 1: Look up invite code
+    invite_result = await db.execute(
+        select(InviteCode).where(InviteCode.code == request.invite_code)
+    )
+    invite_code = invite_result.scalar_one_or_none()
+
+    if invite_code is None or invite_code.status != "used" or not invite_code.bound_username:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "code": "INVITE_CODE_MISMATCH",
+                "message": "邀请码无效",
+            },
+        )
+
+    # Step 2: Look up user by bound username
     result = await db.execute(
-        select(User).where(User.username == request.username)
+        select(User).where(User.username == invite_code.bound_username)
     )
     user = result.scalar_one_or_none()
 
@@ -278,49 +338,14 @@ async def reset_password(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail={
                 "code": "INVITE_CODE_MISMATCH",
-                "message": "邀请码与用户不匹配",
+                "message": "邀请码无效",
             },
         )
 
-    # Step 2: Look up invite code
-    invite_result = await db.execute(
-        select(InviteCode).where(InviteCode.code == request.invite_code)
-    )
-    invite_code = invite_result.scalar_one_or_none()
-
-    if invite_code is None:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail={
-                "code": "INVITE_CODE_MISMATCH",
-                "message": "邀请码与用户不匹配",
-            },
-        )
-
-    # Step 3: Verify invite_code is bound to this user
-    if invite_code.bound_username != user.username:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail={
-                "code": "INVITE_CODE_MISMATCH",
-                "message": "邀请码与用户不匹配",
-            },
-        )
-
-    # Step 4: Verify invite_code is not disabled
-    if invite_code.status == "disabled":
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail={
-                "code": "INVITE_CODE_MISMATCH",
-                "message": "邀请码与用户不匹配",
-            },
-        )
-
-    # Step 5: Hash new password
+    # Step 3: Hash new password
     new_password_hash = get_password_hash(request.new_password)
 
-    # Step 6: Update user's password_hash
+    # Step 4: Update user's password_hash
     user.password_hash = new_password_hash
     await db.flush()
 

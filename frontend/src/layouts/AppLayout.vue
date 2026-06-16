@@ -143,7 +143,6 @@ function isAdminItemActive(item: AdminNavItem): boolean {
 
         <div class="user-area">
           <template v-if="authStore.isLoggedIn">
-            <router-link v-if="authStore.isAdmin" to="/admin" class="admin-link">管理</router-link>
             <span class="username">{{ authStore.user?.username }}</span>
             <button class="logout-btn" @click="handleLogout">退出</button>
           </template>
@@ -351,22 +350,6 @@ function isAdminItemActive(item: AdminNavItem): boolean {
 
 .login-btn:hover {
   background: rgba(255, 255, 255, 0.25);
-}
-
-.admin-link {
-  display: inline-flex;
-  align-items: center;
-  padding: var(--spacing-1) var(--spacing-3);
-  border-radius: var(--rounded-sm);
-  color: rgba(255, 255, 255, 0.85);
-  font-size: var(--text-body-sm);
-  text-decoration: none;
-  transition: background var(--transition-fast);
-}
-
-.admin-link:hover {
-  background: rgba(255, 255, 255, 0.1);
-  color: #fff;
 }
 
 .username {

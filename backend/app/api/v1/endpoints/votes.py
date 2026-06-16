@@ -22,11 +22,18 @@ async def cast_vote(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Cast or modify a vote on a race. Requires authentication."""
+    """Cast or modify a vote on a race. Requires authentication.
+    Admin accounts are not allowed to vote.
+    """
     if current_user is None:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail={"code": "NOT_AUTHENTICATED", "message": "请先登录"},
+        )
+    if current_user.is_admin:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail={"code": "ADMIN_CANNOT_VOTE", "message": "管理员无法参与投票"},
         )
 
     vote, sc = await vote_service.create_or_update_vote(

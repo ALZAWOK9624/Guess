@@ -3,11 +3,16 @@ import { ref } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useAuthStore } from '@/stores/authStore'
 
+type LoginMode = 'username' | 'qq' | 'invite_code'
+
 const router = useRouter()
 const route = useRoute()
 const authStore = useAuthStore()
 
+const loginMode = ref<LoginMode>('username')
 const username = ref('')
+const qq = ref('')
+const inviteCode = ref('')
 const password = ref('')
 const loading = ref(false)
 const errorMessage = ref('')
@@ -15,22 +20,49 @@ const successMessage = ref(
   route.query.reset === 'success' ? '密码重置成功，请用新密码登录' : ''
 )
 
+const tabs = [
+  { mode: 'username' as LoginMode, label: '用户名登录' },
+  { mode: 'qq' as LoginMode, label: 'QQ登录' },
+  { mode: 'invite_code' as LoginMode, label: '邀请码登录' },
+]
+
+function switchMode(mode: LoginMode) {
+  loginMode.value = mode
+  errorMessage.value = ''
+}
+
 function clearError() {
   errorMessage.value = ''
 }
 
 function validateForm(): boolean {
-  if (!username.value.trim()) {
-    errorMessage.value = '用户名不能为空'
-    return false
-  }
-  if (!password.value) {
-    errorMessage.value = '密码不能为空'
-    return false
-  }
-  if (password.value.length < 6) {
-    errorMessage.value = '密码至少需要 6 个字符'
-    return false
+  if (loginMode.value === 'username') {
+    if (!username.value.trim()) {
+      errorMessage.value = '用户名不能为空'
+      return false
+    }
+    if (!password.value) {
+      errorMessage.value = '密码不能为空'
+      return false
+    }
+  } else if (loginMode.value === 'qq') {
+    if (!qq.value.trim()) {
+      errorMessage.value = 'QQ 号不能为空'
+      return false
+    }
+    if (!password.value) {
+      errorMessage.value = '密码不能为空'
+      return false
+    }
+  } else {
+    if (!inviteCode.value.trim()) {
+      errorMessage.value = '邀请码不能为空'
+      return false
+    }
+    if (inviteCode.value.trim().length !== 8) {
+      errorMessage.value = '邀请码必须为 8 位字符'
+      return false
+    }
   }
   return true
 }
@@ -42,31 +74,22 @@ async function handleSubmit() {
   errorMessage.value = ''
 
   try {
-    await authStore.login({
-      username: username.value.trim(),
-      password: password.value,
-    })
-    // Redirect after successful login
+    const loginData: Record<string, string> = {}
+    if (loginMode.value === 'username') {
+      loginData.username = username.value.trim()
+      loginData.password = password.value
+    } else if (loginMode.value === 'qq') {
+      loginData.qq = qq.value.trim()
+      loginData.password = password.value
+    } else {
+      loginData.invite_code = inviteCode.value.trim().toUpperCase()
+    }
+    await authStore.login(loginData as any)
     const redirect = (route.query.redirect as string) || '/'
     router.push(redirect)
   } catch (err: any) {
     if (err?.response?.status === 422) {
-      // Validation error — map field-level errors
-      const errors = err?.response?.data?.detail || []
-      for (const e of errors) {
-        if (e.loc?.includes('body')) {
-          const field = e.loc[e.loc.length - 1]
-          if (field === 'username') {
-            errorMessage.value = '用户名格式不正确'
-          } else if (field === 'password') {
-            errorMessage.value = '密码格式不正确'
-          }
-          break
-        }
-      }
-      if (!errorMessage.value) {
-        errorMessage.value = '输入格式有误'
-      }
+      errorMessage.value = '输入格式有误'
     } else if (err?.message === 'Network Error') {
       errorMessage.value = '网络错误，请重试'
     } else if (err?.response?.status === 500) {
@@ -86,45 +109,107 @@ async function handleSubmit() {
       <h1 class="login-title">登录</h1>
 
       <form @submit.prevent="handleSubmit" novalidate>
-        <!-- Success banner (from password reset) -->
+        <!-- Success banner -->
         <div v-if="successMessage" class="success-banner" role="status" aria-live="polite">
           {{ successMessage }}
         </div>
 
-        <!-- Global error -->
+        <!-- Error -->
         <div v-if="errorMessage" class="error-banner" role="alert" aria-live="polite">
           {{ errorMessage }}
         </div>
 
-        <!-- Username -->
-        <div class="form-field">
-          <label for="username">用户名</label>
-          <input
-            id="username"
-            v-model="username"
-            type="text"
-            placeholder="请输入用户名"
-            maxlength="20"
-            :aria-invalid="!!errorMessage"
-            autocomplete="username"
-            @input="clearError"
-          />
+        <!-- Mode tabs -->
+        <div class="tab-bar" role="tablist">
+          <button
+            v-for="tab in tabs"
+            :key="tab.mode"
+            :class="['tab-btn', { active: loginMode === tab.mode }]"
+            :aria-selected="loginMode === tab.mode"
+            role="tab"
+            type="button"
+            @click="switchMode(tab.mode)"
+          >
+            {{ tab.label }}
+          </button>
         </div>
 
-        <!-- Password -->
-        <div class="form-field">
-          <label for="password">密码</label>
-          <input
-            id="password"
-            v-model="password"
-            type="password"
-            placeholder="请输入密码"
-            maxlength="128"
-            :aria-invalid="!!errorMessage"
-            autocomplete="current-password"
-            @input="clearError"
-          />
-        </div>
+        <!-- Username mode -->
+        <template v-if="loginMode === 'username'">
+          <div class="form-field">
+            <label for="username">用户名</label>
+            <input
+              id="username"
+              v-model="username"
+              type="text"
+              placeholder="请输入用户名"
+              maxlength="20"
+              :aria-invalid="!!errorMessage"
+              autocomplete="username"
+              @input="clearError"
+            />
+          </div>
+          <div class="form-field">
+            <label for="password">密码</label>
+            <input
+              id="password"
+              v-model="password"
+              type="password"
+              placeholder="请输入密码"
+              maxlength="128"
+              :aria-invalid="!!errorMessage"
+              autocomplete="current-password"
+              @input="clearError"
+            />
+          </div>
+        </template>
+
+        <!-- QQ mode -->
+        <template v-if="loginMode === 'qq'">
+          <div class="form-field">
+            <label for="login-qq">QQ 号</label>
+            <input
+              id="login-qq"
+              v-model="qq"
+              type="text"
+              placeholder="请输入绑定的 QQ 号"
+              maxlength="20"
+              inputmode="numeric"
+              :aria-invalid="!!errorMessage"
+              @input="clearError"
+            />
+          </div>
+          <div class="form-field">
+            <label for="qq-password">密码</label>
+            <input
+              id="qq-password"
+              v-model="password"
+              type="password"
+              placeholder="请输入密码"
+              maxlength="128"
+              :aria-invalid="!!errorMessage"
+              autocomplete="current-password"
+              @input="clearError"
+            />
+          </div>
+        </template>
+
+        <!-- Invite code mode -->
+        <template v-if="loginMode === 'invite_code'">
+          <div class="form-field">
+            <label for="login-invite-code">邀请码</label>
+            <input
+              id="login-invite-code"
+              v-model="inviteCode"
+              type="text"
+              placeholder="请输入 8 位邀请码"
+              maxlength="8"
+              :aria-invalid="!!errorMessage"
+              autocomplete="off"
+              @input="clearError"
+            />
+          </div>
+        </template>
 
         <!-- Submit -->
         <button
@@ -172,7 +257,42 @@ async function handleSubmit() {
   font-weight: 600;
   color: var(--color-primary);
   text-align: center;
-  margin-bottom: var(--spacing-32);
+  margin-bottom: var(--spacing-24);
+}
+
+.tab-bar {
+  display: flex;
+  gap: 4px;
+  margin-bottom: var(--spacing-20);
+  background: var(--color-surface-base);
+  border-radius: var(--rounded-md);
+  padding: 4px;
+}
+
+.tab-btn {
+  flex: 1;
+  padding: 8px 4px;
+  font-size: 13px;
+  font-weight: 600;
+  border: none;
+  border-radius: var(--rounded-sm);
+  cursor: pointer;
+  background: transparent;
+  color: var(--color-ink-secondary);
+  transition: all 0.15s;
+  white-space: nowrap;
+  min-height: 44px;
+}
+
+.tab-btn.active {
+  background: var(--color-surface-raised);
+  color: var(--color-primary);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.tab-btn:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
 }
 
 .form-field {
@@ -303,6 +423,9 @@ async function handleSubmit() {
     transition: none;
   }
   .submit-btn {
+    transition: none;
+  }
+  .tab-btn {
     transition: none;
   }
 }

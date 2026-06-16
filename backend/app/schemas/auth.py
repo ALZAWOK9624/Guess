@@ -54,8 +54,31 @@ class RegisterResponse(BaseModel):
 
 
 class LoginRequest(BaseModel):
-    username: str
-    password: str
+    username: str | None = None
+    password: str | None = None
+    qq: str | None = None
+    invite_code: str | None = None
+
+    @field_validator("username")
+    @classmethod
+    def validate_username(cls, v: str | None) -> str | None:
+        if v is not None and (len(v) < 3 or len(v) > 20):
+            raise ValueError("用户名长度需在 3-20 个字符之间")
+        return v
+
+    @field_validator("invite_code")
+    @classmethod
+    def validate_invite_code(cls, v: str | None) -> str | None:
+        if v is not None and len(v) != 8:
+            raise ValueError("邀请码必须为 8 位字符")
+        return v
+
+    @field_validator("qq")
+    @classmethod
+    def validate_qq(cls, v: str | None) -> str | None:
+        if v is not None and (len(v) < 5 or len(v) > 20):
+            raise ValueError("QQ 号长度需在 5-20 个字符之间")
+        return v
 
 
 class LoginResponse(BaseModel):
@@ -73,16 +96,8 @@ class TokenRefreshResponse(BaseModel):
 
 
 class ResetPasswordRequest(BaseModel):
-    username: str
     invite_code: str
     new_password: str
-
-    @field_validator("username")
-    @classmethod
-    def validate_username(cls, v: str) -> str:
-        if len(v) < 3 or len(v) > 20:
-            raise ValueError("用户名长度需在 3-20 个字符之间")
-        return v
 
     @field_validator("invite_code")
     @classmethod

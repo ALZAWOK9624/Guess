@@ -1,26 +1,26 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted, watch } from 'vue'
-import { getInviteCodes, createInviteCode, invalidateInviteCode } from '@/api/admin'
+import { getInviteCodes, createInviteCode, deleteInviteCode } from '@/api/admin'
 import type { InviteCode, InviteCodeStatus } from '@/types/admin'
 
 const search = ref('')
+const qq = ref('')
 const inviteCodes = ref<InviteCode[]>([])
 const loading = ref(false)
 const error = ref<string | null>(null)
 const generating = ref(false)
+const deletingCode = ref<string | null>(null)
 
 let debounceTimer: ReturnType<typeof setTimeout> | null = null
 
 const statusLabels: Record<InviteCodeStatus, string> = {
   unused: '尚未使用',
   used: '已绑定',
-  disabled: '已失效',
 }
 
 const statusColors: Record<InviteCodeStatus, string> = {
   unused: 'var(--color-primary-light)',
   used: 'var(--color-ink-disabled)',
-  disabled: 'var(--color-destructive)',
 }
 
 function statusLabel(status: InviteCodeStatus): string {
@@ -53,10 +53,21 @@ function debouncedSearch() {
 watch(search, debouncedSearch)
 
 async function handleCreate() {
+  if (!qq.value.trim()) {
+    error.value = '请先输入 QQ 号'
+    setTimeout(() => { error.value = null }, 3000)
+    return
+  }
+  if (qq.value.trim().length < 5 || qq.value.trim().length > 20) {
+    error.value = 'QQ 号长度需在 5-20 个字符之间'
+    setTimeout(() => { error.value = null }, 3000)
+    return
+  }
   generating.value = true
   try {
-    const code = await createInviteCode()
+    const code = await createInviteCode(qq.value.trim())
     inviteCodes.value.unshift(code)
+    qq.value = ''
   } catch {
     error.value = '生成邀请码失败，请重试'
     setTimeout(() => { error.value = null }, 3000)
@@ -65,21 +76,22 @@ async function handleCreate() {
   }
 }
 
-async function handleInvalidate(code: InviteCode) {
-  const confirmed = confirm(`确定将邀请码 ${code.code} 失效？该操作不可撤销。`)
+async function handleDelete(item: InviteCode) {
+  const msg = item.status === 'used'
+    ? `确定删除邀请码 ${item.code}？这将同时删除用户 "${item.bound_username}" 及其所有投票记录，不可撤销！`
+    : `确定删除邀请码 ${item.code}？此操作不可撤销。`
+  const confirmed = confirm(msg)
   if (!confirmed) return
 
+  deletingCode.value = item.code
   try {
-    const updated = await invalidateInviteCode(code.code)
-    const idx = inviteCodes.value.findIndex((c) => c.code === code.code)
-    if (idx !== -1) {
-      inviteCodes.value[idx] = updated
-    }
-  } catch (err: unknown) {
-    const detail = (err as Record<string, unknown>)?.response as Record<string, unknown> | undefined
-    const message = (detail?.data as Record<string, unknown> | undefined)?.detail as Record<string, unknown> | undefined
-    error.value = (message?.message as string) || '操作失败，请重试'
+    await deleteInviteCode(item.code)
+    inviteCodes.value = inviteCodes.value.filter((c) => c.code !== item.code)
+  } catch {
+    error.value = '删除失败，请重试'
     setTimeout(() => { error.value = null }, 3000)
+  } finally {
+    deletingCode.value = null
   }
 }
 
@@ -87,7 +99,6 @@ async function copyCode(code: string) {
   try {
     await navigator.clipboard.writeText(code)
   } catch {
-    // Fallback for older browsers
     const textarea = document.createElement('textarea')
     textarea.value = code
     document.body.appendChild(textarea)
@@ -113,13 +124,24 @@ onUnmounted(() => {
         placeholder="搜索邀请码、用户名或QQ号..."
         aria-label="搜索邀请码、用户名或QQ号"
       />
-      <button
-        class="btn btn-primary"
-        :disabled="generating"
-        @click="handleCreate"
-      >
-        {{ generating ? '生成中...' : '生成邀请码' }}
-      </button>
+      <div class="generate-group">
+        <input
+          v-model="qq"
+          type="text"
+          class="qq-input"
+          placeholder="输入 QQ 号"
+          maxlength="20"
+          inputmode="numeric"
+          aria-label="绑定 QQ 号"
+        />
+        <button
+          class="btn btn-primary"
+          :disabled="generating"
+          @click="handleCreate"
+        >
+          {{ generating ? '生成中...' : '生成邀请码' }}
+        </button>
+      </div>
     </div>
 
     <div v-if="error" class="error-banner">
@@ -132,7 +154,7 @@ onUnmounted(() => {
     </div>
 
     <div v-else-if="inviteCodes.length === 0" class="empty-state">
-      还没有邀请码。点击「生成邀请码」创建第一个。
+      还没有邀请码。输入 QQ 号后点击「生成邀请码」创建第一个。
     </div>
 
     <div v-else class="table-wrapper">
@@ -159,11 +181,11 @@ onUnmounted(() => {
             <td class="actions-cell">
               <button class="btn btn-sm" aria-label="复制邀请码" @click="copyCode(item.code)">复制</button>
               <button
-                v-if="item.status === 'unused'"
                 class="btn btn-sm btn-danger"
-                @click="handleInvalidate(item)"
+                :disabled="deletingCode === item.code"
+                @click="handleDelete(item)"
               >
-                失效
+                {{ deletingCode === item.code ? '删除中...' : '删除' }}
               </button>
             </td>
           </tr>
@@ -198,6 +220,28 @@ onUnmounted(() => {
 }
 
 .search-input:focus {
+  outline: 2px solid var(--color-primary, #1A5632);
+  outline-offset: 2px;
+}
+
+.generate-group {
+  display: flex;
+  gap: var(--spacing-2, 8px);
+  align-items: center;
+}
+
+.qq-input {
+  width: 130px;
+  padding: 8px 12px;
+  border: 1px solid var(--color-border-hairline, #D4DCD0);
+  border-radius: var(--rounded-sm, 6px);
+  font-size: var(--text-body, 16px);
+  font-family: var(--font-body);
+  color: var(--color-ink-primary, #1A2E1A);
+  background: var(--color-surface-raised, #FFFFFF);
+}
+
+.qq-input:focus {
   outline: 2px solid var(--color-primary, #1A5632);
   outline-offset: 2px;
 }
@@ -248,7 +292,7 @@ onUnmounted(() => {
   border-color: var(--color-destructive, #C53030);
 }
 
-.btn-danger:hover {
+.btn-danger:hover:not(:disabled) {
   background: var(--color-destructive-light, #FED7D7);
 }
 

@@ -21,8 +21,10 @@ export interface RegisterResponse {
 }
 
 export interface LoginRequest {
-  username: string
-  password: string
+  username?: string
+  password?: string
+  qq?: string
+  invite_code?: string
 }
 
 export interface LoginResponse {
@@ -36,7 +38,6 @@ export interface TokenRefreshResponse {
 }
 
 export interface ResetPasswordRequest {
-  username: string
   invite_code: string
   new_password: string
 }

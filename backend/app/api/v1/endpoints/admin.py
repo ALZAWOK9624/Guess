@@ -5,7 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_admin
 from app.core.database import get_db
-from app.schemas.invite_code import InviteCodeResponse
+from app.schemas.invite_code import InviteCodeCreate, InviteCodeResponse
 from app.services import invite_code_service
 
 router = APIRouter(prefix="/api/v1/admin", tags=["admin"])
@@ -24,20 +24,20 @@ async def list_invite_codes(
 
 @router.post("/invite-codes", status_code=201, response_model=dict)
 async def create_invite_code(
+    request: InviteCodeCreate,
     db: AsyncSession = Depends(get_db),
     _admin=Depends(get_current_admin),
 ):
-    """Generate a new invite code."""
-    code = await invite_code_service.create_invite_code(db)
+    """Generate a new invite code bound to a QQ number."""
+    code = await invite_code_service.create_invite_code(db, request.qq)
     return {"data": InviteCodeResponse.model_validate(code)}
 
 
-@router.patch("/invite-codes/{code}", response_model=dict)
-async def invalidate_invite_code(
+@router.delete("/invite-codes/{code}", status_code=204)
+async def delete_invite_code(
     code: str,
     db: AsyncSession = Depends(get_db),
     _admin=Depends(get_current_admin),
 ):
-    """Mark an invite code as disabled (only if unused)."""
-    result = await invite_code_service.invalidate_invite_code(db, code)
-    return {"data": InviteCodeResponse.model_validate(result)}
+    """Delete an invite code and cascade delete its bound user and votes."""
+    await invite_code_service.delete_invite_code_cascade(db, code)

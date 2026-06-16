@@ -7,6 +7,7 @@ from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.invite_code import InviteCode
+from app.models.user import User
 from app.utils.invite_code import generate_invite_code, MAX_RETRIES
 
 
@@ -30,8 +31,8 @@ async def get_invite_codes(
     return list(result.scalars().all())
 
 
-async def create_invite_code(db: AsyncSession) -> InviteCode:
-    """Generate a unique invite code and save to database.
+async def create_invite_code(db: AsyncSession, qq: str) -> InviteCode:
+    """Generate a unique invite code bound to the given QQ number.
 
     Retries up to MAX_RETRIES times if the generated code already exists.
     Raises 500 if unable to generate a unique code.
@@ -42,7 +43,7 @@ async def create_invite_code(db: AsyncSession) -> InviteCode:
             select(InviteCode).where(InviteCode.code == code_str)
         )
         if existing.scalar_one_or_none() is None:
-            invite_code = InviteCode(code=code_str)
+            invite_code = InviteCode(code=code_str, bound_qq=qq)
             db.add(invite_code)
             await db.flush()
             return invite_code
@@ -56,13 +57,15 @@ async def create_invite_code(db: AsyncSession) -> InviteCode:
     )
 
 
-async def invalidate_invite_code(db: AsyncSession, code: str) -> InviteCode:
-    """Mark an invite code as disabled.
+async def delete_invite_code_cascade(db: AsyncSession, code: str) -> None:
+    """Delete an invite code and cascade delete its bound user and votes.
 
-    Only unused codes can be disabled. Bound codes are rejected.
+    - Unused code: just deletes the invite code record.
+    - Used code: also deletes the bound user (cascade deletes user's votes).
     """
     result = await db.execute(
         select(InviteCode).where(InviteCode.code == code)
+        .execution_options(populate_existing=True)
     )
     invite_code = result.scalar_one_or_none()
 
@@ -72,24 +75,15 @@ async def invalidate_invite_code(db: AsyncSession, code: str) -> InviteCode:
             detail={"code": "NOT_FOUND", "message": "邀请码不存在"},
         )
 
-    if invite_code.status == "used":
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail={
-                "code": "CODE_ALREADY_BOUND",
-                "message": "该邀请码已绑定用户，无法失效",
-            },
+    # If bound to a user, delete the user (cascade deletes votes)
+    if invite_code.status == "used" and invite_code.bound_username:
+        user_result = await db.execute(
+            select(User).where(User.username == invite_code.bound_username)
         )
+        user = user_result.scalar_one_or_none()
+        if user:
+            await db.delete(user)
 
-    if invite_code.status == "disabled":
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail={
-                "code": "CODE_ALREADY_DISABLED",
-                "message": "该邀请码已失效",
-            },
-        )
-
-    invite_code.status = "disabled"
+    # Delete the invite code
+    await db.delete(invite_code)
     await db.flush()
-    return invite_code

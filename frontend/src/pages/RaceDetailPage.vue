@@ -59,6 +59,8 @@ function handleVoteClick() {
     router.push({ path: '/login', query: { redirect: `/races/${raceId}` } })
     return
   }
+  // Admin cannot vote
+  if (authStore.isAdmin) return
   // Logged-in: enter selection mode with pre-selected current vote
   if (race.value) {
     enterSelectionMode(race.value.horses)
@@ -66,6 +68,8 @@ function handleVoteClick() {
 }
 
 function handleVotedClick() {
+  // Admin cannot vote
+  if (authStore.isAdmin) return
   // Already voted — enter selection mode to modify
   if (race.value) {
     enterSelectionMode(race.value.horses)
@@ -209,7 +213,7 @@ onMounted(async () => {
 
       <!-- VoteButton — fixed bottom bar on mobile, inline on desktop -->
       <div
-        v-if="isRaceVoting || isRaceLocked || isRaceSettled"
+        v-if="!authStore.isAdmin && (isRaceVoting || isRaceLocked || isRaceSettled)"
         class="vote-bar"
       >
         <!-- Locked/unvoted message -->

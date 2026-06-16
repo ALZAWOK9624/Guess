@@ -213,8 +213,13 @@ _This file contains critical rules and patterns that AI agents must follow when 
 - `DashboardPage.vue`（`/admin` 路由）为管理后台比赛列表主页，显示所有比赛及其 GradeBadge/StatusBadge/日期/参赛数，提供「编辑」（跳转 `/admin/races/:id/edit`）、「锁定」（仅 voting 状态金色边框按钮，调用 `POST /api/v1/races/{race_id}/lock` 后原地更新 status）、「结果录入」（仅 locked/settled 状态）、「删除」（仅非已结算比赛可见）操作按钮。锁定按钮使用 `lockingId` ref 防重复点击，锁定后按钮禁用显示"锁定中…"。使用 PageState 枚举模式管理 loading/empty/error/success 状态。
 - DNF/scratched horses score 0 points and are excluded from deduction calculation denominators
 - Custom scoring rules apply only to the current race — not saved as templates
-- Password reset uses **invite_code bound_username** as verification (no email/phone) — all failure cases (user not found, invite_code mismatch, disabled code) return the same `INVITE_CODE_MISMATCH` error to prevent user enumeration
-- ResetPasswordPage uses a **two-step form**: step 1 collects username + invite_code (frontend-only validation), step 2 collects new password (triggers API call). 400 errors fall back to step 1.
+- Password reset uses **invite_code** only (no username needed) — looks up the bound user via `invite_code.bound_username`. All failure cases return the same `INVITE_CODE_MISMATCH` error to prevent user enumeration. ResetPasswordPage is a single-step form (invite_code + new_password).
+- **邀请码系统三大变更**：
+  1. **生成时绑定 QQ**：管理员在后台输入 QQ 号后点击生成邀请码，`bound_qq` 在创建时即设值，`status` 为 `unused`。
+  2. **注册时校验 QQ**：`register()` 校验 `invite_code.bound_qq == request.qq`，不匹配返回 `QQ_MISMATCH`。
+  3. **管理员删除级联**：`DELETE /api/v1/admin/invite-codes/{code}` 级联删除邀请码 + 绑定用户 + 用户投票（User FK CASCADE）。`unused` 码只删邀请码本身。
+- **邀请码只有两种状态**：`unused`（未绑定）和 `used`（已绑定），不再有 `disabled` 状态。
+- **登录三种模式**（`LoginRequest` 所有字段可选，按优先级判断）：`invite_code`（无密码，查 `bound_username` 登录）/ `qq`（+密码查 `User.qq`）/ `username`（+密码查 `User.username`）。`unused` 码返回 `"该邀请码尚未绑定用户"`，不存在的码返回 `"用户名或密码错误"`。
 
 **Voting System 模式（Story 3.2）：**
 - Vote 模型：`(user_id, race_id)` 唯一约束实现一用户一票一赛。`race_horse_id` FK 指向 `race_horses.id`（**无** CASCADE——防止编辑比赛移除马匹时静默删除投票）。`user_id` 和 `race_id` FK 有 CASCADE（用户删除或比赛删除时级联清理）。
@@ -319,4 +324,4 @@ _This file contains critical rules and patterns that AI agents must follow when 
 - Review quarterly for outdated rules
 - Remove rules that become obvious over time
 
-Last Updated: 2026-06-16 (AdminLayout sidebar + lock race button + useDragSort refactor + leaderboard NUMERIC cast fix)
+Last Updated: 2026-06-16 (invite code QQ binding + three login modes + delete cascade + removed disabled status)
