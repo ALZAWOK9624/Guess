@@ -46,23 +46,8 @@ onMounted(loadData)
   <div class="leaderboard-page">
     <!-- Loading skeleton -->
     <template v-if="pageState === 'loading'">
-      <div class="leaderboard-container" role="status" aria-live="polite" aria-label="加载中">
-        <div class="skeleton-table">
-          <div class="skeleton-header-row">
-            <div class="skeleton-block col-rank"></div>
-            <div class="skeleton-block col-name"></div>
-            <div class="skeleton-block col-points"></div>
-            <div class="skeleton-block col-races"></div>
-            <div class="skeleton-block col-avg"></div>
-          </div>
-          <div v-for="i in 5" :key="i" class="skeleton-row">
-            <div class="skeleton-block col-rank"></div>
-            <div class="skeleton-block col-name"></div>
-            <div class="skeleton-block col-points"></div>
-            <div class="skeleton-block col-races"></div>
-            <div class="skeleton-block col-avg"></div>
-          </div>
-        </div>
+      <div class="skeleton-container" role="status" aria-live="polite" aria-label="加载中">
+        <div v-for="i in 5" :key="i" class="skeleton-row"></div>
       </div>
     </template>
 
@@ -90,23 +75,27 @@ onMounted(loadData)
 
     <!-- Leaderboard data -->
     <template v-else>
-      <div class="leaderboard-container">
-        <div class="leaderboard-table" role="table" aria-label="排行榜">
-          <div class="leaderboard-header" role="row">
-            <span class="col-rank" role="columnheader">排名</span>
-            <span class="col-name" role="columnheader">用户名</span>
-            <span class="col-points" role="columnheader">积分</span>
-            <span class="col-races" role="columnheader">场数</span>
-            <span class="col-avg" role="columnheader">场均</span>
-          </div>
-          <LeaderboardRow
-            v-for="(entry, index) in leaderboard"
-            :key="entry.username"
-            :entry="entry"
-            :rank="index + 1"
-            :is-current-user="entry.username === authStore.user?.username"
-          />
-        </div>
+      <div class="table-wrapper">
+        <table>
+          <thead>
+            <tr>
+              <th scope="col" class="col-rank">排名</th>
+              <th scope="col" class="col-name">用户名</th>
+              <th scope="col" class="col-points">积分</th>
+              <th scope="col" class="col-races">场数</th>
+              <th scope="col" class="col-avg">场均</th>
+            </tr>
+          </thead>
+          <tbody>
+            <LeaderboardRow
+              v-for="(entry, index) in leaderboard"
+              :key="entry.username"
+              :entry="entry"
+              :rank="index + 1"
+              :is-current-user="entry.username === authStore.user?.username"
+            />
+          </tbody>
+        </table>
       </div>
       <p class="updated-hint">积分在每次比赛结算后自动更新</p>
     </template>
@@ -120,50 +109,20 @@ onMounted(loadData)
   margin: 0 auto;
 }
 
-.leaderboard-container {
-  width: 100%;
-  overflow-x: auto;
-  -webkit-overflow-scrolling: touch;
-}
-
-/* Skeleton table */
-.skeleton-table {
+/* Skeleton */
+.skeleton-container {
   display: flex;
   flex-direction: column;
-  gap: var(--spacing-8, 8px);
-  min-width: 320px;
+  gap: var(--spacing-8);
 }
 
-.skeleton-header-row,
 .skeleton-row {
-  display: flex;
-  gap: var(--spacing-12, 12px);
-  padding: var(--spacing-12, 12px) var(--spacing-8, 8px);
-  border-bottom: 1px solid var(--color-border-hairline, #D4DCD0);
-}
-
-.skeleton-header-row {
-  border-bottom: 2px solid var(--color-border-hairline, #D4DCD0);
-}
-
-.skeleton-block {
-  background: linear-gradient(
-    90deg,
-    var(--color-surface-base, #F8FAF7) 25%,
-    var(--color-border-hairline, #D4DCD0) 50%,
-    var(--color-surface-base, #F8FAF7) 75%
-  );
+  height: 40px;
+  background: linear-gradient(90deg, var(--color-surface-base) 25%, var(--color-border-hairline) 50%, var(--color-surface-base) 75%);
   background-size: 200% 100%;
   animation: skeleton-shimmer 1.5s ease-in-out infinite;
-  border-radius: var(--rounded-sm, 6px);
-  height: 16px;
+  border-radius: var(--rounded-sm);
 }
-
-.col-rank { width: 40px; flex-shrink: 0; }
-.col-name { flex: 1; max-width: 120px; }
-.col-points { width: 60px; flex-shrink: 0; }
-.col-races { width: 50px; flex-shrink: 0; }
-.col-avg { width: 50px; flex-shrink: 0; }
 
 /* State patterns */
 .state-container {
@@ -218,27 +177,34 @@ onMounted(loadData)
   cursor: not-allowed;
 }
 
-/* Leaderboard table */
-.leaderboard-table {
-  min-width: 320px;
-  background: var(--color-surface-raised, #FFFFFF);
-  border-radius: var(--rounded-md, 10px);
-  overflow: hidden;
+/* Table */
+.table-wrapper {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
-.leaderboard-header {
-  display: flex;
-  gap: var(--spacing-12, 12px);
-  padding: var(--spacing-3, 12px) var(--spacing-4, 16px);
-  border-bottom: 2px solid var(--color-border-hairline, #D4DCD0);
+table {
+  width: 100%;
+  border-collapse: collapse;
   font-size: var(--text-body-sm, 14px);
+}
+
+thead tr {
+  border-bottom: 2px solid var(--color-border-hairline, #D4DCD0);
+}
+
+th {
+  padding: var(--spacing-3, 12px) var(--spacing-2, 8px);
   font-weight: 600;
   color: var(--color-ink-secondary, #4A5A4A);
-  position: sticky;
-  top: 0;
-  background: var(--color-surface-raised, #FFFFFF);
-  z-index: 1;
+  white-space: nowrap;
+  text-align: left;
 }
+
+th.col-rank { text-align: center; }
+th.col-points { text-align: right; }
+th.col-races { text-align: center; }
+th.col-avg { text-align: right; }
 
 .updated-hint {
   text-align: center;
@@ -248,9 +214,9 @@ onMounted(loadData)
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .skeleton-block {
+  .skeleton-row {
     animation: none;
-    background: var(--color-surface-base, #F8FAF7);
+    background: var(--color-surface-base);
   }
   .refresh-btn {
     transition: none;
