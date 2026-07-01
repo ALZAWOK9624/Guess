@@ -1,7 +1,7 @@
 ---
 project_name: 'guess'
 user_name: 'tkd'
-date: '2026-06-16'
+date: '2026-07-01'
 story: 'horse-card-display-improvement'
 sections_completed:
   ['technology_stack', 'language_rules', 'framework_rules', 'testing_rules', 'code_quality', 'workflow', 'critical_rules']
@@ -22,13 +22,13 @@ _This file contains critical rules and patterns that AI agents must follow when 
 | Layer | Technology | Version | Notes |
 |-------|-----------|---------|-------|
 | Frontend Framework | Vue 3 | ^3.5.34 | Composition API + `<script setup>` |
-| Build Tool | Vite | ^8.0.12 | HMR, vue plugin |
+| Build Tool | Vite | ^8.0.16 | HMR, vue plugin |
 | Language | TypeScript | ~6.0.2 | Strict mode |
 | State Management | Pinia | ^2.3.1 | `use{Name}Store` pattern |
 | Router | Vue Router 4 | ^4.6.4 | Lazy loaded routes |
 | HTTP Client | Axios | ^1.17.0 | Interceptors for auth/refresh |
 | CSS | CSS Variables + scoped CSS | — | JRA design system, no UI library |
-| Package Manager | pnpm | ^9+ | Frontend only |
+| Package Manager | pnpm | ^9+ | Frontend only; workspace uses `nodeLinker: hoisted` |
 | Backend Framework | FastAPI | >=0.110 | Async native |
 | ORM | SQLAlchemy 2.0 | >=2.0 | Async mode with asyncpg |
 | Migration | Alembic | >=1.13 | Async template (`-t async`) |
@@ -356,4 +356,4 @@ _This file contains critical rules and patterns that AI agents must follow when 
 - Review quarterly for outdated rules
 - Remove rules that become obvious over time
 
-Last Updated: 2026-06-16 (horse card table layout, location in snapshots, weight removed, jockey per-race simplified)
+Last Updated: 2026-07-01 (sync Vite to 8.0.16, add pnpm nodeLinker: hoisted note)

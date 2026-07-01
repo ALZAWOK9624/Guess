@@ -1,2 +1,3 @@
 allowBuilds:
   vue-demi: false
+nodeLinker: hoisted
