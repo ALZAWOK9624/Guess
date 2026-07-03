@@ -1,7 +1,5 @@
 """Result entry business logic — drag-sort result submission and settlement."""
 
-from typing import Any
-
 from fastapi import HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -148,15 +146,14 @@ async def submit_results(
         )
 
     # Auto-update previous_result for all horses in the race
+    # NOTE: We bypass auto_update_service for previous_result fields because
+    # these are time-series data — the latest race result should always win,
+    # regardless of manual edit protection (manually_updated_fields).
+    # The date-based condition (race.date >= prev_date) is the correct guard.
     try:
-        from app.services import auto_update_service
+        from app.models.auto_update import HorseAutoUpdateLog
 
-        # Build horse_updates: for each horse that has a position in this race,
-        # if race.date is not earlier than the horse's current previous_result_date,
-        # update previous_result, previous_result_date, previous_result_position
-        horse_updates: dict[int, dict[str, Any]] = {}
         for rh in race.race_horses:
-            # Load the Horse record to check current previous_result_date
             horse_obj = await db.get(Horse, rh.horse_id)
             if horse_obj is None:
                 continue
@@ -168,14 +165,50 @@ async def submit_results(
                     f"{rh.position}着" if rh.position and rh.position > 0
                     else "除外/取消"
                 )
-                horse_updates[rh.horse_id] = {
-                    "previous_result": f"{race.name} {pos_text}",
-                    "previous_result_date": race.date,
-                    "previous_result_position": rh.position if rh.position else 0,
-                }
+                new_prev_result = f"{race.name} {pos_text}"
+                new_prev_date = race.date
+                new_prev_pos = rh.position if rh.position else 0
 
-        if horse_updates:
-            await auto_update_service.apply_auto_updates(db, race_id, horse_updates)
+                # Capture old values for audit logging
+                old_prev_result = horse_obj.previous_result
+                old_prev_date = horse_obj.previous_result_date
+                old_prev_pos = horse_obj.previous_result_position
+
+                # Directly update horse fields (bypass manual edit protection)
+                horse_obj.previous_result = new_prev_result
+                horse_obj.previous_result_date = new_prev_date
+                horse_obj.previous_result_position = new_prev_pos
+
+                # Create change log entries for each changed field
+                if old_prev_result != new_prev_result:
+                    db.add(HorseAutoUpdateLog(
+                        horse_id=rh.horse_id,
+                        race_id=race_id,
+                        field_name="previous_result",
+                        old_value=str(old_prev_result) if old_prev_result is not None else None,
+                        new_value=new_prev_result,
+                        trigger_source="settlement",
+                    ))
+                if old_prev_date != new_prev_date:
+                    db.add(HorseAutoUpdateLog(
+                        horse_id=rh.horse_id,
+                        race_id=race_id,
+                        field_name="previous_result_date",
+                        old_value=str(old_prev_date) if old_prev_date is not None else None,
+                        new_value=str(new_prev_date),
+                        trigger_source="settlement",
+                    ))
+                if old_prev_pos != new_prev_pos:
+                    db.add(HorseAutoUpdateLog(
+                        horse_id=rh.horse_id,
+                        race_id=race_id,
+                        field_name="previous_result_position",
+                        old_value=str(old_prev_pos) if old_prev_pos is not None else None,
+                        new_value=str(new_prev_pos),
+                        trigger_source="settlement",
+                    ))
+
+        await db.flush()
     except Exception:
         import logging
         logging.warning("Auto-update failed after settlement (non-blocking)", exc_info=True)

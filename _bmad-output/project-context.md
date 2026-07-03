@@ -236,6 +236,7 @@ _This file contains critical rules and patterns that AI agents must follow when 
 - Pydantic schemas：PATCH endpoint 使用的 Update schema（如 `HorseUpdate`）必须包含与 Create schema（如 `HorseCreate`）相同的 `@field_validator`，包括 `.strip()` 处理——因为用户可通过 API 直接调用 PATCH 绕过前端校验。
 - **PATCH 防 null 覆盖模式**：在 `update_race` 等 PATCH 服务中，`data.model_dump(exclude_unset=True)` 后必须过滤 `None` 值：`update_data = {k: v for k, v in update_data.items() if v is not None}`。否则客户端发送 `{"name": null}` 会覆盖数据库字段为 null 导致 500 错误。同时前端编辑页应通过差异检测**仅发送变更的字段**（参考 `EditRacePage.vue` 中 `getChangedHorseIds()` + `initialValues` 比较模式）。
 - **手动编辑追踪模式**：Horse 模型有 `manually_updated_fields` JSON 字段（存储字段名列表），`horse_service.update_horse()` 自动追踪手动编辑的字段（`name` 和 `manually_updated_fields` 自身被排除）。自动更新框架 `auto_update_service.apply_auto_updates()` 检查此列表：在列表中的字段跳过更新（手动优先），不在列表中的字段更新并记录到 `HorseAutoUpdateLog`。管理员可通过 `POST /api/v1/horses/{id}/reset-auto-protection` 清空保护列表。
+- **前走字段自动更新例外规则**：`previous_result`, `previous_result_date`, `previous_result_position` 三个字段在 `result_service.submit_results()` 中**绕过** `auto_update_service.apply_auto_updates()` 的编辑保护检查，直接更新 Horse 表。原因是前走是时间序列数据——更晚的比赛结果始终应该覆盖旧结果，以 `race.date >= prev_date` 日期比较为唯一判断条件。变更仍会记录到 `HorseAutoUpdateLog`。此例外规则避免了管理员手动编辑马匹后，后续比赛结算无法更新前走的问题。
 - **事务原子性模式**：`apply_auto_updates` 遵循"先全部验证再批量更新"模式——先验证所有 horse_id 存在，再逐个更新 + flush + refresh。调用方必须在同一事务中包裹此调用。
 - **字段名校验模式**：通过 `inspect(Horse).columns` 获取有效列名集合，在 `apply_auto_updates` 中验证 `field_name` 是否有效，无效字段返回 400 `INVALID_FIELD`。避免 `setattr` 动态创建属性导致静默丢失更新。
 - **变更日志模式**：`HorseAutoUpdateLog` 模型记录每次自动更新的字段级变更（old_value/new_value 为 Text 类型避免截断），`trigger_source` 标记触发来源（v1 固定 "settlement"）。外键：`horse_id` CASCADE, `race_id` SET NULL。
@@ -318,7 +319,8 @@ _This file contains critical rules and patterns that AI agents must follow when 
 **审计日志与重算模式（Story 3.7）：**
 - **ScoreChangeLog 审计模型模式**：`ScoreChangeLog` 模型（`models/change_log.py`）记录每次积分变更。字段包括 `race_id`（FK CASCADE）、`vote_id`（FK CASCADE）、`user_id`（FK CASCADE——投票者）、`admin_user_id`（FK CASCADE——操作管理员）、`old_points`（首次结算为 NULL）、`new_points`、`created_at`。`Vote` 和 `User` 模型各有反向关系指向此表。
 - **结果重算审计模式**：`result_service.submit_results()` 在重算时：先 `is_resettle = race.status == RaceStatus.SETTLED` 判断是否重算，然后 `old_points_map = {vote.id: vote.points for vote in race.votes}` 捕获旧值，再 `vote.points = None` 清除旧积分，重算后遍历 votes 创建 `ScoreChangeLog` 条目（仅 `old_val != new_val` 时记录）。同一 `flush()` 内完成所有操作确保事务原子性。
-- **Service 层延迟导入模式**：为避免循环导入，`ScoreChangeLog` 在 `result_service.py` 中使用函数内局部导入：`from app.models.change_log import ScoreChangeLog`。此模式适用于服务层需要引用新模型而模型层也引用服务层涉及的模型时的场景。
+- **Service 层延迟导入模式**：为避免循环导入，`ScoreChangeLog` 在 `result_service.py` 中使用函数内局部导入：`from app.models.change_log import ScoreChangeLog`。此模式适用于服务层需要引用新模型而模型层也引用服务层涉及的模型时的场景。同样 `HorseAutoUpdateLog` 也在 `submit_results()` 内延迟导入。
+- **结算自动更新前走模式**：`result_service.submit_results()` 在同一事务中（同一 `flush()` 前）逐个遍历 `race.race_horses`，按 `race.date >= prev_date` 条件判断是否需要更新前走。直接更新 Horse 表字段并创建 `HorseAutoUpdateLog` 条目（仅字段值实际变化时记录），绕过 `manually_updated_fields` 保护检查。
 - **审计查询端点模式**：`GET /api/v1/races/{race_id}/results/history` 管理员专用端点，返回 `{"race_id": ..., "race_name": ..., "changes": [{"vote_id": ..., "username": ..., "race_id": ..., "old_points": ..., "new_points": ..., "modified_at": ..., "admin_username": ...}]}`。使用 `selectinload(ScoreChangeLog.vote_rel).selectinload(Vote.user)` 链式加载避免 N+1。
 
 ---
@@ -357,4 +359,4 @@ _This file contains critical rules and patterns that AI agents must follow when 
 - Review quarterly for outdated rules
 - Remove rules that become obvious over time
 
-Last Updated: 2026-07-03 (add HorseDetailCard refresh pattern + refresh-snapshot endpoint)
+Last Updated: 2026-07-03 (fix previous_result auto-update to bypass manual edit protection)
