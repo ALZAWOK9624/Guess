@@ -437,9 +437,6 @@ onUnmounted(() => {
                 <template v-if="horse.previous_result">
                   <template v-if="horse.previous_result_date">{{ horse.previous_result_date }} </template>
                   {{ horse.previous_result }}
-                  <template v-if="horse.previous_result_position !== null">
-                    {{ horse.previous_result_position === 1 ? '第一' : horse.previous_result_position === 2 ? '第二' : horse.previous_result_position === 3 ? '第三' : `第${horse.previous_result_position}` }}
-                  </template>
                 </template>
                 <span v-else>-</span>
               </td>
