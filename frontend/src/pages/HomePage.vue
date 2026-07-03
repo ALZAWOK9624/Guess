@@ -5,8 +5,9 @@ import { useAuthStore } from '@/stores/authStore'
 import RaceCard from '@/components/RaceCard.vue'
 import GradeBadge from '@/components/GradeBadge.vue'
 import StatusBadge from '@/components/StatusBadge.vue'
-import { getRaces } from '@/api/races'
+import { getRaces, createRace } from '@/api/races'
 import type { RaceListItem } from '@/types/race'
+import type { Grade } from '@/types/race'
 
 type PageState = 'loading' | 'empty' | 'error' | 'success'
 
@@ -16,6 +17,23 @@ const pageState = ref<PageState>('loading')
 const races = ref<RaceListItem[]>([])
 const errorMessage = ref('加载失败，请刷新重试')
 const refreshing = ref(false)
+
+// Create race modal
+const showCreateModal = ref(false)
+const createForm = ref({
+  name: '',
+  date: '',
+  grade: 'G1' as Grade,
+})
+const creating = ref(false)
+const createError = ref('')
+
+const gradeOptions: { value: Grade; label: string }[] = [
+  { value: 'G1', label: 'G1' },
+  { value: 'G2_JPN1', label: 'G2·JPN1' },
+  { value: 'YOUNG_G1', label: '2岁G1' },
+  { value: 'CUSTOM', label: '自定义' },
+]
 
 async function loadData() {
   pageState.value = 'loading'
@@ -42,6 +60,36 @@ async function handleRefresh() {
 
 function goToRaceDetail(raceId: number) {
   router.push(`/races/${raceId}`)
+}
+
+function openCreateModal() {
+  createForm.value = { name: '', date: '', grade: 'G1' }
+  createError.value = ''
+  showCreateModal.value = true
+}
+
+function closeCreateModal() {
+  showCreateModal.value = false
+}
+
+async function handleCreateRace() {
+  if (!createForm.value.name.trim() || !createForm.value.date || creating.value) return
+  creating.value = true
+  createError.value = ''
+  try {
+    const data = await createRace({
+      name: createForm.value.name.trim(),
+      date: createForm.value.date,
+      grade: createForm.value.grade,
+      horse_ids: [],
+    })
+    closeCreateModal()
+    router.push(`/races/${data.id}`)
+  } catch (err: any) {
+    createError.value = err?.response?.data?.detail?.message || '创建失败'
+  } finally {
+    creating.value = false
+  }
 }
 
 onMounted(loadData)
@@ -113,7 +161,68 @@ onMounted(loadData)
           </div>
         </div>
       </div>
+
+      <button
+        v-if="authStore.isAdmin"
+        class="create-race-fab"
+        type="button"
+        aria-label="创建比赛"
+        @click="openCreateModal"
+      >
+        + 创建比赛
+      </button>
     </template>
+
+    <!-- Create race modal -->
+    <div v-if="showCreateModal" class="modal-backdrop" @click.self="closeCreateModal">
+      <div class="modal-content">
+        <h3 class="modal-title">创建比赛</h3>
+        <div class="form-group">
+          <label for="race-name">比赛名称</label>
+          <input
+            id="race-name"
+            v-model="createForm.name"
+            type="text"
+            placeholder="输入比赛名称"
+          />
+        </div>
+        <div class="form-group">
+          <label for="race-date">比赛日期</label>
+          <input id="race-date" v-model="createForm.date" type="date" />
+        </div>
+        <div class="form-group">
+          <label>比赛等级</label>
+          <div class="grade-options">
+            <label
+              v-for="option in gradeOptions"
+              :key="option.value"
+              class="grade-option"
+              :class="{ active: createForm.grade === option.value }"
+            >
+              <input
+                v-model="createForm.grade"
+                type="radio"
+                :value="option.value"
+              />
+              <span>{{ option.label }}</span>
+            </label>
+          </div>
+        </div>
+        <p v-if="createError" class="modal-error">{{ createError }}</p>
+        <div class="modal-actions">
+          <button
+            class="modal-btn modal-confirm"
+            :disabled="creating || !createForm.name.trim() || !createForm.date"
+            @click="handleCreateRace"
+          >
+            {{ creating ? '创建中…' : '创建' }}
+          </button>
+          <button class="modal-btn modal-cancel" @click="closeCreateModal">
+            取消
+          </button>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -122,6 +231,7 @@ onMounted(loadData)
   padding: var(--spacing-4, 16px);
   max-width: 1280px;
   margin: 0 auto;
+  padding-bottom: calc(var(--spacing-4, 16px) + env(safe-area-inset-bottom, 0px));
 }
 
 .race-list {
@@ -242,8 +352,176 @@ onMounted(loadData)
 
 @media (prefers-reduced-motion: reduce) {
   .race-card,
-  .refresh-btn {
+  .refresh-btn,
+  .create-race-fab {
     transition: none;
   }
 }
+
+.create-race-fab {
+  position: fixed;
+  right: var(--spacing-4, 16px);
+  bottom: calc(var(--spacing-4, 16px) + env(safe-area-inset-bottom, 0px));
+  padding: 14px 24px;
+  background: var(--color-primary, #1A5632);
+  color: #FFFFFF;
+  border: none;
+  border-radius: var(--rounded-md, 10px);
+  font-size: var(--text-body, 16px);
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 4px 12px rgba(26, 86, 50, 0.25);
+  min-height: 52px;
+  z-index: 50;
+}
+
+.create-race-fab:hover {
+  background: var(--color-primary-light, #2D7A4F);
+}
+
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+  padding: var(--spacing-4, 16px);
+}
+
+.modal-content {
+  background: var(--color-surface-raised, #FFFFFF);
+  border-radius: var(--rounded-md, 10px);
+  padding: var(--spacing-6, 24px);
+  width: 100%;
+  max-width: 480px;
+  max-height: 80vh;
+  overflow-y: auto;
+}
+
+.modal-title {
+  font-size: var(--text-subheading, 18px);
+  font-weight: 600;
+  margin: 0 0 var(--spacing-4, 16px);
+  color: var(--color-ink-primary, #1A2E1A);
+}
+
+.form-group {
+  margin-bottom: var(--spacing-4, 16px);
+}
+
+.form-group label {
+  display: block;
+  font-size: var(--text-body-sm, 14px);
+  color: var(--color-ink-secondary, #4A5A4A);
+  margin-bottom: var(--spacing-2, 8px);
+  font-weight: 600;
+}
+
+.form-group input[type="text"],
+.form-group input[type="date"] {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--color-border-strong, #A8B8A4);
+  border-radius: var(--rounded-sm, 6px);
+  font-size: var(--text-body, 16px);
+  color: var(--color-ink-primary, #1A2E1A);
+  background: var(--color-surface-raised, #FFFFFF);
+}
+
+.form-group input:focus {
+  outline: 2px solid var(--color-primary, #1A5632);
+  outline-offset: 2px;
+}
+
+.grade-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-2, 8px);
+}
+
+.grade-option {
+  flex: 1;
+  min-width: 80px;
+  padding: 10px 12px;
+  border: 1px solid var(--color-border-strong, #A8B8A4);
+  border-radius: var(--rounded-sm, 6px);
+  text-align: center;
+  cursor: pointer;
+  font-size: var(--text-body-sm, 14px);
+  color: var(--color-ink-primary, #1A2E1A);
+  background: var(--color-surface-raised, #FFFFFF);
+  transition: border-color 0.15s, background-color 0.15s;
+}
+
+.grade-option.active {
+  border-color: var(--color-primary, #1A5632);
+  background: #F0F7F2;
+  color: var(--color-primary, #1A5632);
+  font-weight: 600;
+}
+
+.grade-option input {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.modal-error {
+  color: var(--color-destructive, #C53030);
+  font-size: var(--text-body-sm, 14px);
+  margin: 0 0 var(--spacing-3, 12px);
+}
+
+.modal-actions {
+  display: flex;
+  gap: var(--spacing-3, 12px);
+  margin-top: var(--spacing-4, 16px);
+}
+
+.modal-btn {
+  flex: 1;
+  padding: 10px 20px;
+  border-radius: var(--rounded-md, 10px);
+  font-size: var(--text-body, 16px);
+  font-weight: 600;
+  cursor: pointer;
+  min-height: 44px;
+  border: none;
+}
+
+.modal-confirm {
+  background: var(--color-primary, #1A5632);
+  color: #FFFFFF;
+}
+
+.modal-confirm:hover:not(:disabled) {
+  background: var(--color-primary-light, #2D7A4F);
+}
+
+.modal-confirm:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.modal-cancel {
+  background: var(--color-surface-base, #F8FAF7);
+  color: var(--color-ink-primary, #1A2E1A);
+  border: 1px solid var(--color-border-strong, #A8B8A4);
+}
+
+@media (max-width: 767px) {
+  .create-race-fab {
+    left: var(--spacing-4, 16px);
+    right: var(--spacing-4, 16px);
+    width: auto;
+  }
+
+  .modal-actions {
+    flex-direction: column;
+  }
+}
+
 </style>

@@ -32,6 +32,7 @@ export interface RaceHorseSnapshot {
   race_horse_id: number
   snapshot_data: HorseSnapshotData
   position: number | null
+  gate: number | null
   weight: string | null
   jockey: string | null
 }
@@ -89,7 +90,7 @@ export interface RaceCreatePayload {
   name: string
   date: string
   grade: Grade
-  horse_ids: number[]
+  horse_ids?: number[] | null
   horse_weights?: Record<string, string> | null
   horse_jockeys?: Record<string, string> | null
   custom_scoring?: CustomScoring | null
@@ -99,10 +100,25 @@ export interface RaceUpdatePayload {
   name?: string
   date?: string
   grade?: Grade
-  horse_ids?: number[]
+  horse_ids?: number[] | null
   horse_weights?: Record<string, string> | null
   horse_jockeys?: Record<string, string> | null
   custom_scoring?: CustomScoring | null
+}
+
+export interface RaceHorseUpdatePayload {
+  weight?: string | null
+  jockey?: string | null
+}
+
+export interface AddRaceHorsePayload {
+  horse_id: number
+  weight?: string | null
+  jockey?: string | null
+}
+
+export interface GateOrderPayload {
+  order: number[]
 }
 
 /** Result entry types */

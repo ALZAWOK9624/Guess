@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref, nextTick } from 'vue'
 import type { HorseSnapshotData } from '@/types/race'
 
 function positionLabel(pos: number): string {
@@ -42,6 +42,11 @@ const props = withDefaults(defineProps<{
   votable?: boolean
   voted?: boolean
   submitting?: boolean
+  gate?: number | null
+  position?: number | null
+  editable?: boolean
+  draggable?: boolean
+  isDnf?: boolean
 }>(), {
   snapshotData: () => ({
     name: '',
@@ -65,10 +70,18 @@ const props = withDefaults(defineProps<{
   votable: false,
   voted: false,
   submitting: false,
+  gate: null,
+  position: null,
+  editable: false,
+  draggable: false,
+  isDnf: false,
 })
 
 const emit = defineEmits<{
   voteToggle: []
+  updateField: [{ field: 'jockey'; value: string | null }]
+  dragStart: []
+  dragEnd: []
 }>()
 
 const safeData = computed(() => props.snapshotData ?? {
@@ -87,7 +100,6 @@ const safeData = computed(() => props.snapshotData ?? {
   best_win_date: null,
 })
 
-// Compute age: from props (new) → snapshotData.birth_year (new snap) → snapshotData.age (legacy snap)
 const rawBirthYear = computed(() => props.birthYear ?? props.snapshotData?.birth_year ?? props.snapshotData?.age ?? null)
 const rawHemisphere = computed(() => props.hemisphere ?? props.snapshotData?.hemisphere ?? null)
 
@@ -100,82 +112,161 @@ const displayAge = computed(() => {
 
 const displayJockey = computed(() => props.jockey ?? null)
 
+const editingField = ref(false)
+const editValue = ref('')
+const jockeyInput = ref<HTMLInputElement | null>(null)
+
+function startEdit() {
+  if (!props.editable) return
+  editingField.value = true
+  editValue.value = displayJockey.value || ''
+  nextTick(() => jockeyInput.value?.focus())
+}
+
+function submitEdit() {
+  if (!editingField.value) return
+  const trimmed = editValue.value.trim()
+  const value = trimmed === '' ? null : trimmed
+  if (value !== displayJockey.value) {
+    emit('updateField', { field: 'jockey', value })
+  }
+  editingField.value = false
+}
+
+function cancelEdit() {
+  editingField.value = false
+}
+
+function handleEditKeydown(e: KeyboardEvent) {
+  if (e.key === 'Enter') {
+    e.preventDefault()
+    submitEdit()
+  } else if (e.key === 'Escape') {
+    cancelEdit()
+  }
+}
+
+function handleDragStart(e: DragEvent) {
+  if (!props.draggable) {
+    e.preventDefault()
+    return
+  }
+  emit('dragStart')
+}
+
+function handleDragEnd() {
+  emit('dragEnd')
+}
+
+function handleClick() {
+  if (props.editable && editingField.value) return
+  if (props.submitting || !props.votable) return
+  emit('voteToggle')
+}
+
 const sexAgeStr = computed(() => {
   const sex = safeData.value.sex || '-'
   const age = displayAge.value !== null ? `${displayAge.value}` : '-'
   return `${sex}${age}`
 })
-
-function handleClick() {
-  if (props.submitting || !props.votable) return
-  emit('voteToggle')
-}
 </script>
 
 <template>
   <div
     class="horse-detail-card"
-    :class="{ votable, voted, submitting: submitting && voted }"
+    :class="{
+      votable,
+      voted,
+      'submitting': submitting && voted,
+      'draggable-card': draggable,
+      'dnf-card': isDnf,
+    }"
     :role="votable ? 'button' : undefined"
     :tabindex="votable ? 0 : undefined"
     :aria-pressed="votable ? voted : undefined"
+    :draggable="draggable"
     @click="handleClick"
     @keydown.enter="handleClick"
     @keydown.space.prevent="handleClick"
+    @dragstart="handleDragStart"
+    @dragend="handleDragEnd"
   >
-    <table class="horse-table">
-      <colgroup>
-        <col style="width:18%" />
-        <col style="width:5.5%" />
-        <col style="width:7.5%" />
-        <col style="width:5.5%" />
-        <col style="width:7.5%" />
-        <col style="width:5.5%" />
-        <col style="width:7.5%" />
-        <col style="width:5.5%" />
-        <col style="width:14%" />
-        <col style="width:5.5%" />
-        <col style="width:14%" />
-      </colgroup>
-      <tr>
-        <td class="name-cell" rowspan="2">
-          <div class="horse-name">{{ safeData.name }}</div>
-          <div class="horse-suffix">{{ sexAgeStr }}</div>
-          <div v-if="votable && voted" class="vote-badge" aria-hidden="true">
-            <span class="vote-checkmark">✓</span>
-            <span class="vote-label">已投</span>
-          </div>
-          <div v-if="submitting && voted" class="vote-spinner" aria-hidden="true" />
-        </td>
-        <th class="cl-lbl">骑手</th>
-        <td class="cl-val">{{ displayJockey || '-' }}</td>
-        <th class="cl-lbl">产地</th>
-        <td class="cl-val">{{ safeData.origin || '-' }}</td>
-        <th class="cl-lbl">属地</th>
-        <td class="cl-val">{{ safeData.location || '-' }}</td>
-        <th class="cl-lbl">父</th>
-        <td class="cl-val">{{ safeData.sire || '-' }}</td>
-        <th class="cl-lbl">母父</th>
-        <td class="cl-val">{{ safeData.damsire || '-' }}</td>
-      </tr>
-      <tr>
-        <th class="cl-lbl">前走</th>
-        <td class="cl-val-wide" colspan="5">{{ formatPrevResult(safeData) }}</td>
-        <th class="cl-lbl">主胜</th>
-        <td class="cl-val-wide" colspan="3">{{ formatBestWin(safeData) }}</td>
-      </tr>
-    </table>
+    <div v-if="position != null" class="side-badge left-badge" :class="{ 'badge-dnf': position === 0 }">
+      {{ position === 0 ? 'DNF' : position }}
+    </div>
+
+    <div class="card-body">
+      <div v-if="draggable" class="drag-handle" aria-hidden="true">⠿</div>
+
+      <table class="horse-table">
+        <colgroup>
+          <col style="width:18%" />
+          <col style="width:6%" />
+          <col style="width:16.5%" />
+          <col style="width:6%" />
+          <col style="width:8.5%" />
+          <col style="width:6%" />
+          <col style="width:6%" />
+          <col style="width:10.5%" />
+          <col style="width:6%" />
+          <col style="width:16.5%" />
+        </colgroup>
+        <tr>
+          <td class="name-cell" rowspan="2">
+            <div class="horse-name">{{ safeData.name }}</div>
+            <div class="horse-suffix">{{ sexAgeStr }}</div>
+            <div v-if="votable && voted" class="vote-badge" aria-hidden="true">
+              <span class="vote-checkmark">✓</span>
+              <span class="vote-label">已投</span>
+            </div>
+            <div v-if="submitting && voted" class="vote-spinner" aria-hidden="true" />
+          </td>
+          <th class="cl-lbl">骑手</th>
+          <td class="cl-val" :class="{ editable: editable }" @dblclick.stop="startEdit()">
+            <input
+              v-if="editingField"
+              ref="jockeyInput"
+              v-model="editValue"
+              class="inline-input"
+              type="text"
+              @blur="submitEdit"
+              @keydown="handleEditKeydown"
+            />
+            <span v-else>{{ displayJockey || '-' }}</span>
+          </td>
+          <th class="cl-lbl">属地</th>
+          <td class="cl-val">{{ safeData.location || '-' }}</td>
+          <th class="cl-lbl">父</th>
+          <td class="cl-val" colspan="2">{{ safeData.sire || '-' }}</td>
+          <th class="cl-lbl">母父</th>
+          <td class="cl-val">{{ safeData.damsire || '-' }}</td>
+        </tr>
+        <tr>
+          <th class="cl-lbl">前走</th>
+          <td class="cl-val-wide" colspan="4">{{ formatPrevResult(safeData) }}</td>
+          <th class="cl-lbl">主胜</th>
+          <td class="cl-val-wide" colspan="3">{{ formatBestWin(safeData) }}</td>
+        </tr>
+      </table>
+    </div>
+
+    <div v-if="gate != null" class="side-badge right-badge">
+      {{ gate }}
+    </div>
   </div>
 </template>
 
 <style scoped>
 .horse-detail-card {
   position: relative;
+  display: flex;
+  align-items: stretch;
   background: var(--color-surface-raised, #FFFFFF);
   border: 2px solid var(--color-border-hairline, #D4DCD0);
   border-radius: var(--rounded-md, 10px);
   padding: 4px;
   transition: border-color 0.15s, box-shadow 0.15s, background-color 0.15s;
+  overflow: hidden;
 }
 
 .horse-detail-card.votable {
@@ -206,6 +297,73 @@ function handleClick() {
 .horse-detail-card.submitting {
   opacity: 0.7;
   pointer-events: none;
+}
+
+.horse-detail-card.draggable-card {
+  cursor: grab;
+}
+
+.horse-detail-card.draggable-card:active {
+  cursor: grabbing;
+}
+
+.horse-detail-card.dnf-card {
+  opacity: 0.5;
+  background: #F9FAFB;
+}
+
+.card-body {
+  flex: 1;
+  display: flex;
+  align-items: stretch;
+  min-width: 0;
+}
+
+.drag-handle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 6px;
+  color: var(--color-ink-secondary, #4A5A4A);
+  font-size: 18px;
+  letter-spacing: 2px;
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+}
+
+.drag-handle:active {
+  cursor: grabbing;
+}
+
+.side-badge {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 36px;
+  font-family: var(--font-display, 'Barlow Condensed', system-ui, sans-serif);
+  font-size: var(--text-subheading, 18px);
+  font-weight: 700;
+  color: #FFFFFF;
+  background: var(--color-primary, #1A5632);
+  margin: -4px;
+}
+
+.left-badge {
+  border-radius: var(--rounded-md, 10px) 0 0 var(--rounded-md, 10px);
+  margin-right: 4px;
+}
+
+.right-badge {
+  border-radius: 0 var(--rounded-md, 10px) var(--rounded-md, 10px) 0;
+  margin-left: 4px;
+  background: var(--color-accent, #B8960C);
+}
+
+.badge-dnf {
+  background: var(--color-destructive, #C53030);
+  font-size: var(--text-caption, 11px);
+  letter-spacing: 0.5px;
 }
 
 /* ===== HTML Table Layout ===== */
@@ -260,10 +418,34 @@ function handleClick() {
   text-align: center;
 }
 
+.cl-val.editable {
+  cursor: text;
+  background: #FAFDFB;
+}
+
+.cl-val.editable:hover {
+  background: #F0F7F2;
+}
+
 .cl-val-wide {
   font-size: var(--text-body-sm, 14px);
   color: var(--color-ink-primary, #1A2E1A);
   text-align: center;
+}
+
+.inline-input {
+  width: 100%;
+  padding: 2px 4px;
+  border: 1px solid var(--color-primary, #1A5632);
+  border-radius: 4px;
+  font-size: var(--text-body-sm, 14px);
+  text-align: center;
+  background: #FFFFFF;
+}
+
+.inline-input:focus {
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(26, 86, 50, 0.2);
 }
 
 /* Vote badge & spinner */
@@ -324,6 +506,24 @@ function handleClick() {
   .cl-val,
   .cl-val-wide {
     font-size: 11px;
+  }
+
+  .side-badge {
+    min-width: 28px;
+    font-size: var(--text-body, 16px);
+  }
+
+  .drag-handle {
+    padding: 0 2px;
+    font-size: 14px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .horse-detail-card,
+  .vote-spinner {
+    transition: none;
+    animation: none;
   }
 }
 </style>

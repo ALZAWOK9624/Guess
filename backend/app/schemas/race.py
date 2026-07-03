@@ -36,7 +36,7 @@ class RaceCreate(BaseModel):
     name: str
     date: date_type
     grade: str  # "G1" | "G2_JPN1" | "YOUNG_G1" | "CUSTOM"
-    horse_ids: list[int]
+    horse_ids: list[int] | None = None
     horse_weights: dict[int, str] | None = None  # horse_id → weight
     horse_jockeys: dict[int, str] | None = None  # horse_id → jockey
     custom_scoring: CustomScoring | None = None
@@ -58,11 +58,12 @@ class RaceCreate(BaseModel):
 
     @field_validator("horse_ids")
     @classmethod
-    def validate_horse_ids(cls, v: list[int]) -> list[int]:
-        if len(v) < 2:
-            raise ValueError("至少需要 2 匹参赛马")
-        if len(v) != len(set(v)):
-            raise ValueError("参赛马匹不能重复")
+    def validate_horse_ids(cls, v: list[int] | None) -> list[int] | None:
+        if v is not None:
+            if len(v) > 0 and len(v) < 2:
+                raise ValueError("至少需要 2 匹参赛马")
+            if len(v) != len(set(v)):
+                raise ValueError("参赛马匹不能重复")
         return v
 
 
@@ -104,11 +105,34 @@ class RaceUpdate(BaseModel):
         return v
 
 
+class RaceHorseUpdate(BaseModel):
+    weight: str | None = None
+    jockey: str | None = None
+
+
+class AddRaceHorseRequest(BaseModel):
+    horse_id: int
+    weight: str | None = None
+    jockey: str | None = None
+
+
+class GateOrderUpdate(BaseModel):
+    order: list[int]
+
+    @field_validator("order")
+    @classmethod
+    def validate_order(cls, v: list[int]) -> list[int]:
+        if len(v) != len(set(v)):
+            raise ValueError("闸位排序不能包含重复马匹")
+        return v
+
+
 class RaceHorseResponse(BaseModel):
     race_horse_id: int
     horse_id: int
     snapshot_data: HorseSnapshot
     position: int | None = None
+    gate: int | None = None
     weight: str | None = None
     jockey: str | None = None
 

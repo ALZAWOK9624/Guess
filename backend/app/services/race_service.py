@@ -135,12 +135,14 @@ async def create_race(
     """Create a new race with horse snapshots.
 
     Validates:
-    - At least 2 horses
+    - At least 2 horses when horses are provided
     - All horse IDs exist
     - Custom scoring valid for CUSTOM grade
     """
-    # Validate at least 2 horses
-    if len(data.horse_ids) < 2:
+    horse_ids = data.horse_ids or []
+
+    # Validate at least 2 horses only when horses are provided
+    if len(horse_ids) > 0 and len(horse_ids) < 2:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail={
@@ -163,7 +165,7 @@ async def create_race(
 
     # Validate custom scoring if grade is CUSTOM
     if grade == GradeEnum.CUSTOM:
-        validate_custom_scoring(data.custom_scoring, horse_count=len(data.horse_ids))
+        validate_custom_scoring(data.custom_scoring, horse_count=len(horse_ids))
     elif data.custom_scoring is not None:
         # Custom scoring provided for non-CUSTOM grade → ignore
         pass
@@ -195,7 +197,7 @@ async def create_race(
         )
 
     # Fetch each horse and create snapshot
-    for horse_id in data.horse_ids:
+    for index, horse_id in enumerate(horse_ids):
         horse = await db.get(Horse, horse_id)
         if not horse:
             await db.rollback()
@@ -217,6 +219,7 @@ async def create_race(
             snapshot_data=_build_snapshot(horse, weight=w, jockey=j),
             weight=w,
             jockey=j,
+            gate=index + 1,
         )
         db.add(race_horse)
 
@@ -380,6 +383,155 @@ async def update_race(
     await db.flush()
     # Re-query with eagerly loaded relationships
     race = await get_race(db, race.id)
+    return race
+
+
+async def add_horse_to_race(
+    db: AsyncSession,
+    race_id: int,
+    horse_id: int,
+    weight: str | None = None,
+    jockey: str | None = None,
+) -> RaceHorse:
+    """Add a single horse to a voting race."""
+    race = await get_race(db, race_id)
+    if race is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={"code": "NOT_FOUND", "message": "比赛不存在"},
+        )
+    if race.status != RaceStatus.VOTING:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "code": "RACE_NOT_EDITABLE",
+                "message": "比赛已锁定/已结算，不可添加马匹",
+            },
+        )
+
+    existing = [rh for rh in race.race_horses if rh.horse_id == horse_id]
+    if existing:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "code": "HORSE_ALREADY_IN_RACE",
+                "message": "该马匹已在比赛中",
+            },
+        )
+
+    horse = await db.get(Horse, horse_id)
+    if not horse:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={
+                "code": "HORSE_NOT_FOUND",
+                "message": f"马匹 {horse_id} 不存在",
+            },
+        )
+
+    max_gate = max((rh.gate or 0 for rh in race.race_horses), default=0)
+    race_horse = RaceHorse(
+        race_id=race.id,
+        horse_id=horse.id,
+        snapshot_data=_build_snapshot(horse, weight=weight, jockey=jockey),
+        weight=weight,
+        jockey=jockey,
+        gate=max_gate + 1,
+    )
+    db.add(race_horse)
+    await db.flush()
+    await db.refresh(race_horse)
+    return race_horse
+
+
+async def update_race_horse(
+    db: AsyncSession,
+    race_id: int,
+    race_horse_id: int,
+    weight: str | None = None,
+    jockey: str | None = None,
+) -> RaceHorse:
+    """Update per-race weight/jockey for a single RaceHorse."""
+    race = await get_race(db, race_id)
+    if race is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={"code": "NOT_FOUND", "message": "比赛不存在"},
+        )
+    if race.status != RaceStatus.VOTING:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "code": "RACE_NOT_EDITABLE",
+                "message": "比赛已锁定/已结算，不可编辑马匹",
+            },
+        )
+
+    race_horse = next((rh for rh in race.race_horses if rh.id == race_horse_id), None)
+    if race_horse is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={
+                "code": "RACE_HORSE_NOT_FOUND",
+                "message": "比赛马匹不存在",
+            },
+        )
+
+    if weight is not None:
+        race_horse.weight = weight
+        snap = dict(race_horse.snapshot_data)
+        snap["weight"] = weight
+        race_horse.snapshot_data = snap
+    if jockey is not None:
+        race_horse.jockey = jockey
+        snap = dict(race_horse.snapshot_data)
+        snap["jockey"] = jockey
+        race_horse.snapshot_data = snap
+
+    await db.flush()
+    await db.refresh(race_horse)
+    return race_horse
+
+
+async def update_gate_order(
+    db: AsyncSession,
+    race_id: int,
+    order: list[int],
+) -> Race:
+    """Update gate numbers for all race horses based on the provided order.
+
+    order: list of race_horse_id in the desired gate order.
+    """
+    race = await get_race(db, race_id)
+    if race is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={"code": "NOT_FOUND", "message": "比赛不存在"},
+        )
+    if race.status != RaceStatus.VOTING:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "code": "RACE_NOT_EDITABLE",
+                "message": "比赛已锁定/已结算，不可修改闸位",
+            },
+        )
+
+    race_horse_map = {rh.id: rh for rh in race.race_horses}
+    if set(order) != set(race_horse_map.keys()):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "code": "INVALID_GATE_ORDER",
+                "message": "闸位排序必须包含所有参赛马匹",
+            },
+        )
+
+    for gate, race_horse_id in enumerate(order, start=1):
+        race_horse_map[race_horse_id].gate = gate
+
+    await db.flush()
+    await db.refresh(race, ["race_horses"])
     return race
 
 

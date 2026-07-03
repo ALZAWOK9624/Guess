@@ -25,7 +25,7 @@ defineProps<{
     <ul v-else class="vote-list">
       <li
         v-for="vote in votes"
-        :key="index"
+        :key="vote.user_id"
         class="vote-item"
       >
         <span class="vote-user">{{ vote.username }}</span>

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, watch, onUnmounted, computed } from 'vue'
+import { ref, onMounted, watch, onUnmounted } from 'vue'
 import { getHorses, getOriginsStats, getLocationsStats, createHorse, updateHorse, deleteHorse, toggleHemisphere } from '@/api/horses'
 import type { Horse, HorseCreatePayload, HorseUpdatePayload } from '@/types/horse'
 

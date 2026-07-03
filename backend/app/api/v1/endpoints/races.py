@@ -9,9 +9,12 @@ from app.core.database import get_db
 from app.models.race import RaceStatus
 from app.models.user import User
 from app.schemas.race import (
+    AddRaceHorseRequest,
     CustomScoring,
+    GateOrderUpdate,
     RaceCreate,
     RaceDetailResponse,
+    RaceHorseUpdate,
     RaceListResponse,
     RaceUpdate,
 )
@@ -64,9 +67,18 @@ def _build_horse_dict(rh) -> dict:
         "horse_id": rh.horse_id,
         "snapshot_data": rh.snapshot_data,
         "position": rh.position,
+        "gate": rh.gate,
         "weight": rh.weight,
         "jockey": rh.jockey,
     }
+
+
+def _sort_horses_by_gate(race_horses: list) -> list:
+    """Sort race horses by gate ascending, with null gates last, then by id."""
+    return sorted(
+        race_horses,
+        key=lambda h: (h.gate if h.gate is not None else 9999, h.horse_id),
+    )
 
 
 @router.get("/{race_id}")
@@ -95,7 +107,7 @@ async def get_race(
         grade=race.grade.value,
         status=race.status.value,
         custom_scoring=CustomScoring(**race.custom_scoring) if race.custom_scoring else None,
-        horses=[_build_horse_dict(rh) for rh in sorted(race.race_horses, key=lambda h: h.horse_id)],
+        horses=[_build_horse_dict(rh) for rh in _sort_horses_by_gate(race.race_horses)],
         horse_votes={"horses": horse_votes_data} if horse_votes_data is not None else None,
         vote_count=vc,
         created_at=race.created_at,
@@ -121,7 +133,7 @@ async def create_race(
         grade=race.grade.value,
         status=race.status.value,
         custom_scoring=CustomScoring(**race.custom_scoring) if race.custom_scoring else None,
-        horses=[_build_horse_dict(rh) for rh in sorted(race.race_horses, key=lambda h: h.horse_id)],
+        horses=[_build_horse_dict(rh) for rh in _sort_horses_by_gate(race.race_horses)],
         vote_count=vc,
         created_at=race.created_at,
         updated_at=race.updated_at,
@@ -147,7 +159,7 @@ async def update_race(
         grade=race.grade.value,
         status=race.status.value,
         custom_scoring=CustomScoring(**race.custom_scoring) if race.custom_scoring else None,
-        horses=[_build_horse_dict(rh) for rh in sorted(race.race_horses, key=lambda h: h.horse_id)],
+        horses=[_build_horse_dict(rh) for rh in _sort_horses_by_gate(race.race_horses)],
         vote_count=vc,
         created_at=race.created_at,
         updated_at=race.updated_at,
@@ -163,3 +175,57 @@ async def delete_race(
 ):
     """Delete a race. Admin only. Only non-settled races can be deleted."""
     await race_service.delete_race(db, race_id)
+
+
+@router.post("/{race_id}/horses", status_code=201)
+async def add_race_horse(
+    race_id: int,
+    data: AddRaceHorseRequest,
+    db: AsyncSession = Depends(get_db),
+    admin=Depends(get_current_admin),
+):
+    """Add a single horse to a voting race. Admin only."""
+    race_horse = await race_service.add_horse_to_race(
+        db, race_id, data.horse_id, data.weight, data.jockey
+    )
+    return {"data": _build_horse_dict(race_horse)}
+
+
+@router.patch("/{race_id}/horses/gate")
+async def update_gate_order(
+    race_id: int,
+    data: GateOrderUpdate,
+    db: AsyncSession = Depends(get_db),
+    admin=Depends(get_current_admin),
+):
+    """Update gate order for all horses in a voting race. Admin only."""
+    race = await race_service.update_gate_order(db, race_id, data.order)
+    vc = await race_service.get_race_vote_count(db, race.id)
+    detail = RaceDetailResponse(
+        id=race.id,
+        name=race.name,
+        date=race.date,
+        grade=race.grade.value,
+        status=race.status.value,
+        custom_scoring=CustomScoring(**race.custom_scoring) if race.custom_scoring else None,
+        horses=[_build_horse_dict(rh) for rh in _sort_horses_by_gate(race.race_horses)],
+        vote_count=vc,
+        created_at=race.created_at,
+        updated_at=race.updated_at,
+    )
+    return {"data": detail.model_dump()}
+
+
+@router.patch("/{race_id}/horses/{race_horse_id}")
+async def update_race_horse(
+    race_id: int,
+    race_horse_id: int,
+    data: RaceHorseUpdate,
+    db: AsyncSession = Depends(get_db),
+    admin=Depends(get_current_admin),
+):
+    """Update per-race weight/jockey for a race horse. Admin only."""
+    race_horse = await race_service.update_race_horse(
+        db, race_id, race_horse_id, data.weight, data.jockey
+    )
+    return {"data": _build_horse_dict(race_horse)}

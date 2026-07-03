@@ -846,34 +846,246 @@ class TestRaceSettledResults:
 
         app.dependency_overrides.clear()
 
+
+
+class TestRaceHorseManagement:
+    """Tests for incremental horse management and gate ordering."""
+
     @pytest.mark.asyncio
-    async def test_guest_access_settled_race_public(self, db_session: AsyncSession):
-        """Settled race detail — accessible without auth (public)."""
+    async def test_create_race_with_no_horses(self, db_session: AsyncSession):
+        """Admin can create a race with zero horses."""
         from app.services.race_service import create_race
         from app.schemas.race import RaceCreate
-        from app.models.race import RaceStatus
+
+        race = await create_race(
+            db_session,
+            RaceCreate(name="EmptyRace", date=date(2026, 8, 1), grade="G1"),
+            creator_id=1,
+        )
+
+        assert race.id is not None
+        assert race.name == "EmptyRace"
+        assert len(race.race_horses) == 0
+
+        await db_session.rollback()
+
+    @pytest.mark.asyncio
+    async def test_add_horse_to_race(self, db_session: AsyncSession):
+        """Add a single horse to a voting race via service."""
+        from app.services.race_service import create_race, add_horse_to_race
+        from app.schemas.race import RaceCreate
+
+        h1 = await _create_horse(db_session, SAMPLE_HORSE)
+        h2 = await _create_horse(db_session, SAMPLE_HORSE_2)
+        h3 = await _create_horse(db_session, {"name": "NewHorse"})
+
+        race = await create_race(
+            db_session,
+            RaceCreate(name="AddHorse", date=date(2026, 8, 1), grade="G1", horse_ids=[h1.id, h2.id]),
+            creator_id=1,
+        )
+        race_id = race.id
+
+        rh = await add_horse_to_race(db_session, race_id, h3.id, weight="500kg", jockey="J. Moreira")
+        assert rh.horse_id == h3.id
+        assert rh.weight == "500kg"
+        assert rh.jockey == "J. Moreira"
+        assert rh.gate == 3
+
+        await db_session.rollback()
+
+    @pytest.mark.asyncio
+    async def test_add_duplicate_horse_to_race(self, db_session: AsyncSession):
+        """Adding a horse already in the race returns 400."""
+        from app.services.race_service import create_race, add_horse_to_race
+        from app.schemas.race import RaceCreate
+        from fastapi import HTTPException
 
         h1 = await _create_horse(db_session, SAMPLE_HORSE)
         h2 = await _create_horse(db_session, SAMPLE_HORSE_2)
 
-        race = await create_race(db_session, RaceCreate(
-            name="GuestTest", date=date(2026, 7, 15), grade="G1",
-            horse_ids=[h1.id, h2.id],
-        ), creator_id=1)
-        race_id = race.id
-        race.race_horses[0].position = 1
-        race.race_horses[1].position = 2
-        race.status = RaceStatus.SETTLED
+        race = await create_race(
+            db_session,
+            RaceCreate(name="DupHorse", date=date(2026, 8, 1), grade="G1", horse_ids=[h1.id, h2.id]),
+            creator_id=1,
+        )
+
+        with pytest.raises(HTTPException) as exc_info:
+            await add_horse_to_race(db_session, race.id, h1.id)
+        assert exc_info.value.status_code == 400
+        assert exc_info.value.detail["code"] == "HORSE_ALREADY_IN_RACE"
+
+        await db_session.rollback()
+
+    @pytest.mark.asyncio
+    async def test_add_horse_to_locked_race(self, db_session: AsyncSession):
+        """Adding a horse to a locked race returns 400."""
+        from app.services.race_service import create_race, add_horse_to_race
+        from app.schemas.race import RaceCreate
+        from app.models.race import RaceStatus
+        from fastapi import HTTPException
+
+        h1 = await _create_horse(db_session, SAMPLE_HORSE)
+        h2 = await _create_horse(db_session, SAMPLE_HORSE_2)
+        h3 = await _create_horse(db_session, {"name": "LateHorse"})
+
+        race = await create_race(
+            db_session,
+            RaceCreate(name="LockedRace", date=date(2026, 8, 1), grade="G1", horse_ids=[h1.id, h2.id]),
+            creator_id=1,
+        )
+        race.status = RaceStatus.LOCKED
         await db_session.flush()
 
+        with pytest.raises(HTTPException) as exc_info:
+            await add_horse_to_race(db_session, race.id, h3.id)
+        assert exc_info.value.status_code == 400
+        assert exc_info.value.detail["code"] == "RACE_NOT_EDITABLE"
+
+        await db_session.rollback()
+
+    @pytest.mark.asyncio
+    async def test_update_race_horse(self, db_session: AsyncSession):
+        """Update per-race weight/jockey for a race horse."""
+        from app.services.race_service import create_race, update_race_horse
+        from app.schemas.race import RaceCreate
+
+        h1 = await _create_horse(db_session, SAMPLE_HORSE)
+        h2 = await _create_horse(db_session, SAMPLE_HORSE_2)
+
+        race = await create_race(
+            db_session,
+            RaceCreate(name="UpdateHorse", date=date(2026, 8, 1), grade="G1", horse_ids=[h1.id, h2.id]),
+            creator_id=1,
+        )
+        rh = race.race_horses[0]
+
+        updated = await update_race_horse(db_session, race.id, rh.id, weight="510kg", jockey="Y. Kawada")
+        assert updated.weight == "510kg"
+        assert updated.jockey == "Y. Kawada"
+        assert updated.snapshot_data["weight"] == "510kg"
+        assert updated.snapshot_data["jockey"] == "Y. Kawada"
+
+        await db_session.rollback()
+
+    @pytest.mark.asyncio
+    async def test_update_gate_order(self, db_session: AsyncSession):
+        """Update gate order for all horses in a race."""
+        from app.services.race_service import create_race, update_gate_order
+        from app.schemas.race import RaceCreate
+
+        h1 = await _create_horse(db_session, SAMPLE_HORSE)
+        h2 = await _create_horse(db_session, SAMPLE_HORSE_2)
+        h3 = await _create_horse(db_session, {"name": "Third"})
+
+        race = await create_race(
+            db_session,
+            RaceCreate(name="GateOrder", date=date(2026, 8, 1), grade="G1", horse_ids=[h1.id, h2.id, h3.id]),
+            creator_id=1,
+        )
+        rh_ids = [rh.id for rh in race.race_horses]
+
+        # Reverse the order
+        new_order = list(reversed(rh_ids))
+        updated = await update_gate_order(db_session, race.id, new_order)
+
+        gate_map = {rh.id: rh.gate for rh in updated.race_horses}
+        assert gate_map[new_order[0]] == 1
+        assert gate_map[new_order[1]] == 2
+        assert gate_map[new_order[2]] == 3
+
+        await db_session.rollback()
+
+    @pytest.mark.asyncio
+    async def test_update_gate_order_incomplete(self, db_session: AsyncSession):
+        """Gate order missing a horse returns 400."""
+        from app.services.race_service import create_race, update_gate_order
+        from app.schemas.race import RaceCreate
+        from fastapi import HTTPException
+
+        h1 = await _create_horse(db_session, SAMPLE_HORSE)
+        h2 = await _create_horse(db_session, SAMPLE_HORSE_2)
+
+        race = await create_race(
+            db_session,
+            RaceCreate(name="GateOrderBad", date=date(2026, 8, 1), grade="G1", horse_ids=[h1.id, h2.id]),
+            creator_id=1,
+        )
+        rh_ids = [rh.id for rh in race.race_horses]
+
+        with pytest.raises(HTTPException) as exc_info:
+            await update_gate_order(db_session, race.id, [rh_ids[0]])
+        assert exc_info.value.status_code == 400
+        assert exc_info.value.detail["code"] == "INVALID_GATE_ORDER"
+
+        await db_session.rollback()
+
+    @pytest.mark.asyncio
+    async def test_add_race_horse_api(self, db_session: AsyncSession):
+        """POST /api/v1/races/{id}/horses adds a horse."""
+        from app.services.race_service import create_race
+        from app.schemas.race import RaceCreate
+
+        h1 = await _create_horse(db_session, SAMPLE_HORSE)
+        h2 = await _create_horse(db_session, SAMPLE_HORSE_2)
+        h3 = await _create_horse(db_session, {"name": "APIAdd"})
+
+        race = await create_race(
+            db_session,
+            RaceCreate(name="APIAddHorse", date=date(2026, 8, 1), grade="G1", horse_ids=[h1.id, h2.id]),
+            creator_id=1,
+        )
+
         app.dependency_overrides[get_db] = lambda: db_session
+        app.dependency_overrides[get_current_admin] = override_get_admin
 
         transport = ASGITransport(app=app)
         async with AsyncClient(transport=transport, base_url="http://test") as client:
-            resp = await client.get(f"/api/v1/races/{race_id}")
-            assert resp.status_code == 200
+            resp = await client.post(f"/api/v1/races/{race.id}/horses", json={
+                "horse_id": h3.id,
+                "weight": "505kg",
+                "jockey": "K. Fujioka",
+            })
+            assert resp.status_code == 201
             data = resp.json()["data"]
-            assert "horse_votes" in data
-            assert len(data["horse_votes"]["horses"]) == 2
+            assert data["horse_id"] == h3.id
+            assert data["weight"] == "505kg"
+            assert data["jockey"] == "K. Fujioka"
+            assert data["gate"] == 3
 
         app.dependency_overrides.clear()
+        await db_session.rollback()
+
+    @pytest.mark.asyncio
+    async def test_update_gate_order_api(self, db_session: AsyncSession):
+        """PATCH /api/v1/races/{id}/horses/gate updates gate order."""
+        from app.services.race_service import create_race
+        from app.schemas.race import RaceCreate
+
+        h1 = await _create_horse(db_session, SAMPLE_HORSE)
+        h2 = await _create_horse(db_session, SAMPLE_HORSE_2)
+
+        race = await create_race(
+            db_session,
+            RaceCreate(name="APIGate", date=date(2026, 8, 1), grade="G1", horse_ids=[h1.id, h2.id]),
+            creator_id=1,
+        )
+        rh_ids = [rh.id for rh in race.race_horses]
+
+        app.dependency_overrides[get_db] = lambda: db_session
+        app.dependency_overrides[get_current_admin] = override_get_admin
+
+        transport = ASGITransport(app=app)
+        async with AsyncClient(transport=transport, base_url="http://test") as client:
+            resp = await client.patch(f"/api/v1/races/{race.id}/horses/gate", json={
+                "order": list(reversed(rh_ids)),
+            })
+            assert resp.status_code == 200
+            data = resp.json()["data"]
+            gate_map = {h["race_horse_id"]: h["gate"] for h in data["horses"]}
+            assert gate_map[rh_ids[0]] == 2
+            assert gate_map[rh_ids[1]] == 1
+
+        app.dependency_overrides.clear()
+        await db_session.rollback()
+

@@ -7,6 +7,12 @@
 import { ref, type Ref } from 'vue'
 import type { RaceHorseSnapshot } from '@/types/race'
 
+type DragMode = 'result' | 'gate'
+
+interface DragSortOptions {
+  mode?: DragMode
+}
+
 interface DragSortState {
   activeList: Ref<RaceHorseSnapshot[]>
   dnfList: Ref<RaceHorseSnapshot[]>
@@ -23,7 +29,9 @@ interface DragSortState {
 export function useDragSort(
   allHorses: RaceHorseSnapshot[],
   existingPositions?: Map<number, number>,
+  options: DragSortOptions = {},
 ): DragSortState {
+  const mode = options.mode || 'result'
   const activeList = ref<RaceHorseSnapshot[]>([])
   const dnfList = ref<RaceHorseSnapshot[]>([])
   const isDragging = ref(false)
@@ -31,6 +39,17 @@ export function useDragSort(
 
   // Initialize lists
   function initLists(): void {
+    if (mode === 'gate') {
+      // Gate mode: single list sorted by gate, no DNF
+      activeList.value = [...allHorses].sort((a, b) => {
+        const gateA = a.gate ?? 999
+        const gateB = b.gate ?? 999
+        return gateA - gateB
+      })
+      dnfList.value = []
+      return
+    }
+
     if (existingPositions && existingPositions.size > 0) {
       // Pre-sort by existing positions (re-entry mode)
       const sorted = [...allHorses].sort((a, b) => {
@@ -67,6 +86,7 @@ export function useDragSort(
   }
 
   function moveToDnf(index: number): void {
+    if (mode === 'gate') return
     if (index >= 0 && index < activeList.value.length) {
       const horse = activeList.value.splice(index, 1)[0]
       dnfList.value.push(horse)
@@ -74,6 +94,7 @@ export function useDragSort(
   }
 
   function moveToActive(index: number): void {
+    if (mode === 'gate') return
     if (index >= 0 && index < dnfList.value.length) {
       const horse = dnfList.value.splice(index, 1)[0]
       activeList.value.push(horse)

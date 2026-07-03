@@ -10,7 +10,7 @@ import DragCard from '@/components/DragCard.vue'
 import { getRace } from '@/api/races'
 import { submitResults } from '@/api/results'
 import { useDragSort } from '@/composables/useDragSort'
-import type { RaceDetail, RaceHorseSnapshot, ResultPosition } from '@/types/race'
+import type { RaceDetail, ResultPosition } from '@/types/race'
 
 type PageState = 'loading' | 'empty' | 'error' | 'success'
 

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+
 import HorseDetailCard from '@/components/HorseDetailCard.vue'
 import type { RaceHorseResult } from '@/types/race'
 
@@ -60,7 +60,7 @@ const isDnf = (position: number | null) => position === 0
 
         <div class="horse-card-area">
           <HorseDetailCard
-            :snapshot-data="horse.snapshot_data"
+            :snapshot-data="horse.snapshot_data as any"
             :horse-id="horse.horse_id"
           />
         </div>

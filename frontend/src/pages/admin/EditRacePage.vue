@@ -1,11 +1,11 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import HorseSearchSelect from '@/components/HorseSearchSelect.vue'
 import ConfirmDeleteModal from '@/components/ConfirmDeleteModal.vue'
 import { getRace, updateRace, deleteRace } from '@/api/races'
 import type { Horse } from '@/types/horse'
-import type { RaceDetail, RaceHorseSnapshot, Grade } from '@/types/race'
+import type { RaceDetail, Grade } from '@/types/race'
 
 const route = useRoute()
 const router = useRouter()
@@ -69,7 +69,7 @@ function loadRaceHorseJockeys(race: RaceDetail) {
   const idMap: Record<number, number> = {}
   for (const rh of race.horses) {
     // Use jockey from RaceHorse (new) or fallback to snapshot_data (old)
-    const jockey = (rh as any).jockey || rh.snapshot_data.jockey || ''
+    const jockey = rh.jockey || ''
     j[rh.race_horse_id] = jockey
     idMap[rh.race_horse_id] = rh.horse_id
   }

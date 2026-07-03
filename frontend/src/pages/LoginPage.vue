@@ -216,7 +216,7 @@ async function handleSubmit() {
           type="submit"
           class="submit-btn"
           :disabled="loading"
-          :aria-busy="loading.toString()"
+          :aria-busy="loading"
         >
           <span v-if="loading" class="spinner"></span>
           {{ loading ? '登录中…' : '登录' }}

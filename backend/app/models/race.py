@@ -69,6 +69,7 @@ class RaceHorse(Base):
     )
     snapshot_data: Mapped[dict] = mapped_column(JSON, nullable=False)
     position: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    gate: Mapped[int | None] = mapped_column(Integer, nullable=True)
 
     # Per-race weight and jockey (race-specific, not from Horse library)
     weight: Mapped[str | None] = mapped_column(String(20), nullable=True)

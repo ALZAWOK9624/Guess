@@ -1,8 +1,8 @@
 ---
 project_name: 'guess'
 user_name: 'tkd'
-date: '2026-07-01'
-story: 'horse-card-display-improvement'
+date: '2026-07-03'
+story: 'unified-admin-race-page'
 sections_completed:
   ['technology_stack', 'language_rules', 'framework_rules', 'testing_rules', 'code_quality', 'workflow', 'critical_rules']
 status: 'complete'
