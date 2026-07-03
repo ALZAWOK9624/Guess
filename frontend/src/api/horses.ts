@@ -2,6 +2,7 @@
 
 import apiClient from './client'
 import type { Horse, HorseCreatePayload, HorseUpdatePayload, OriginStat, LocationStat } from '@/types/horse'
+import type { RaceHorseSnapshot } from '@/types/race'
 
 export async function getHorses(name?: string): Promise<Horse[]> {
   const params = name ? { name } : undefined
@@ -47,5 +48,11 @@ export async function toggleHemisphere(origin: string): Promise<{ origin: string
 
 export async function updateBestWin(horseId: number, raceId: number): Promise<Horse> {
   const res = await apiClient.post<{ data: Horse }>(`/horses/${horseId}/update-best-win`, { race_id: raceId })
+  return res.data.data
+}
+
+/** Refresh a race horse's snapshot data from the latest Horse data. */
+export async function refreshRaceHorseSnapshot(raceId: number, raceHorseId: number): Promise<RaceHorseSnapshot> {
+  const res = await apiClient.post<{ data: RaceHorseSnapshot }>(`/races/${raceId}/horses/${raceHorseId}/refresh-snapshot`)
   return res.data.data
 }

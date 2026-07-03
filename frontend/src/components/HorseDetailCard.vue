@@ -82,7 +82,25 @@ const emit = defineEmits<{
   updateField: [{ field: 'jockey'; value: string | null }]
   dragStart: []
   dragEnd: []
+  refresh: []
 }>()
+
+const showRefreshConfirm = ref(false)
+const refreshLoading = ref(false)
+
+function openRefreshConfirm() {
+  showRefreshConfirm.value = true
+}
+
+function closeRefreshConfirm() {
+  if (refreshLoading.value) return
+  showRefreshConfirm.value = false
+}
+
+function confirmRefresh() {
+  emit('refresh')
+  showRefreshConfirm.value = false
+}
 
 const safeData = computed(() => props.snapshotData ?? {
   name: '',
@@ -169,6 +187,12 @@ const sexAgeStr = computed(() => {
   const age = displayAge.value !== null ? `${displayAge.value}` : '-'
   return `${sex}${age}`
 })
+
+function handleConfirmKeydown(e: KeyboardEvent) {
+  if (e.key === 'Escape' && !refreshLoading.value) {
+    closeRefreshConfirm()
+  }
+}
 </script>
 
 <template>
@@ -196,7 +220,9 @@ const sexAgeStr = computed(() => {
     </div>
 
     <div class="card-body">
-      <div v-if="draggable" class="drag-handle" aria-hidden="true">⠿</div>
+      <div v-if="editable" class="refresh-btn" @click.stop="openRefreshConfirm" :title="`刷新「${safeData.name}」数据`" aria-label="刷新马匹数据">
+        <span class="refresh-icon">↻</span>
+      </div>
 
       <table class="horse-table">
         <colgroup>
@@ -254,6 +280,29 @@ const sexAgeStr = computed(() => {
       {{ gate }}
     </div>
   </div>
+
+  <!-- Refresh Confirm Modal -->
+  <Teleport to="body">
+    <div
+      v-if="showRefreshConfirm"
+      class="refresh-confirm-overlay"
+      @mousedown.self="closeRefreshConfirm"
+      @keydown="handleConfirmKeydown"
+    >
+      <div class="refresh-confirm-content" role="dialog" aria-label="确认刷新">
+        <h3 class="refresh-confirm-title">确认更新</h3>
+        <p class="refresh-confirm-message">确定刷新「{{ safeData.name }}」的数据为后台最新信息？</p>
+        <div class="refresh-confirm-actions">
+          <button class="refresh-confirm-btn cancel" :disabled="refreshLoading" @click="closeRefreshConfirm">
+            取消
+          </button>
+          <button class="refresh-confirm-btn confirm" :disabled="refreshLoading" @click="confirmRefresh">
+            更新
+          </button>
+        </div>
+      </div>
+    </div>
+  </Teleport>
 </template>
 
 <style scoped>
@@ -319,21 +368,39 @@ const sexAgeStr = computed(() => {
   min-width: 0;
 }
 
-.drag-handle {
+.refresh-btn {
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 0 6px;
+  padding: 0 8px;
   color: var(--color-ink-secondary, #4A5A4A);
-  font-size: 18px;
-  letter-spacing: 2px;
-  cursor: grab;
-  touch-action: none;
+  font-size: 16px;
+  cursor: pointer;
   user-select: none;
+  min-width: 36px;
+  transition: color 0.15s, background 0.15s;
+  border-radius: var(--rounded-sm, 6px);
+  margin: 2px;
 }
 
-.drag-handle:active {
-  cursor: grabbing;
+.refresh-btn:hover {
+  color: var(--color-primary, #1A5632);
+  background: var(--color-surface-base, #F8FAF7);
+}
+
+.refresh-icon {
+  display: inline-block;
+  font-size: 18px;
+  line-height: 1;
+}
+
+.refresh-btn:hover .refresh-icon {
+  animation: refresh-hover-spin 0.6s ease-in-out;
+}
+
+@keyframes refresh-hover-spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
 }
 
 .side-badge {
@@ -513,10 +580,86 @@ const sexAgeStr = computed(() => {
     font-size: var(--text-body, 16px);
   }
 
-  .drag-handle {
+  .refresh-btn {
     padding: 0 2px;
     font-size: 14px;
+    min-width: 28px;
   }
+}
+
+/* Refresh confirm modal */
+.refresh-confirm-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(26, 46, 26, 0.5);
+  padding: var(--spacing-4, 16px);
+}
+
+.refresh-confirm-content {
+  background: var(--color-surface-raised, #FFFFFF);
+  border-radius: var(--rounded-lg, 14px);
+  padding: var(--spacing-6, 24px);
+  max-width: 380px;
+  width: 100%;
+  box-shadow: 0 4px 12px rgba(26, 86, 50, 0.15);
+}
+
+.refresh-confirm-title {
+  font-family: var(--font-display, 'Barlow Condensed', system-ui, sans-serif);
+  font-size: var(--text-heading, 24px);
+  font-weight: 600;
+  color: var(--color-ink-primary, #1A2E1A);
+  margin: 0 0 var(--spacing-3, 12px);
+}
+
+.refresh-confirm-message {
+  font-size: var(--text-body, 16px);
+  color: var(--color-ink-primary, #1A2E1A);
+  line-height: var(--text-body-line-height, 1.6);
+  margin: 0 0 var(--spacing-5, 20px);
+}
+
+.refresh-confirm-actions {
+  display: flex;
+  gap: var(--spacing-3, 12px);
+  justify-content: flex-end;
+}
+
+.refresh-confirm-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 10px 24px;
+  border: none;
+  border-radius: var(--rounded-md, 10px);
+  font-size: var(--text-body, 16px);
+  font-weight: 600;
+  cursor: pointer;
+  min-height: 44px;
+}
+
+.refresh-confirm-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.refresh-confirm-btn.cancel {
+  background: var(--color-surface-raised, #FFFFFF);
+  color: var(--color-ink-primary, #1A2E1A);
+  border: 1px solid var(--color-border-strong, #A8B8A4);
+}
+
+.refresh-confirm-btn.confirm {
+  background: var(--color-primary, #1A5632);
+  color: #FFFFFF;
+}
+
+.refresh-confirm-btn.confirm:hover:not(:disabled) {
+  background: var(--color-primary-light, #2D7A4F);
 }
 
 @media (prefers-reduced-motion: reduce) {

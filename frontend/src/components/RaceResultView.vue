@@ -2,10 +2,25 @@
 
 import HorseDetailCard from '@/components/HorseDetailCard.vue'
 import type { RaceHorseResult } from '@/types/race'
+import { refreshRaceHorseSnapshot } from '@/api/horses'
 
 const props = defineProps<{
   horses: RaceHorseResult[]
+  raceId: number
 }>()
+
+const emit = defineEmits<{
+  refresh: []
+}>()
+
+async function handleRefresh(horse: RaceHorseResult) {
+  try {
+    await refreshRaceHorseSnapshot(props.raceId, horse.race_horse_id)
+    emit('refresh')
+  } catch (err: any) {
+    alert(err?.response?.data?.detail?.message || '刷新失败')
+  }
+}
 
 function getPositionLabel(position: number | null): string {
   if (position === null) return '-'
@@ -62,6 +77,7 @@ const isDnf = (position: number | null) => position === 0
           <HorseDetailCard
             :snapshot-data="horse.snapshot_data as any"
             :horse-id="horse.horse_id"
+            @refresh="handleRefresh(horse)"
           />
         </div>
       </div>

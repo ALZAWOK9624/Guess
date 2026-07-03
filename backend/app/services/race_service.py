@@ -493,6 +493,54 @@ async def update_race_horse(
     return race_horse
 
 
+async def refresh_race_horse_snapshot(
+    db: AsyncSession,
+    race_id: int,
+    race_horse_id: int,
+) -> RaceHorse:
+    """Refresh a race horse's snapshot data from the latest Horse data."""
+    race = await get_race(db, race_id)
+    if race is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={"code": "NOT_FOUND", "message": "比赛不存在"},
+        )
+
+    if race.status != RaceStatus.VOTING:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "code": "RACE_NOT_EDITABLE",
+                "message": "比赛已锁定/已结算，不可刷新马匹数据",
+            },
+        )
+
+    race_horse = next((rh for rh in race.race_horses if rh.id == race_horse_id), None)
+    if race_horse is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={
+                "code": "RACE_HORSE_NOT_FOUND",
+                "message": "比赛马匹不存在",
+            },
+        )
+
+    horse = await db.get(Horse, race_horse.horse_id)
+    if not horse:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={
+                "code": "HORSE_NOT_FOUND",
+                "message": "马匹不存在",
+            },
+        )
+
+    race_horse.snapshot_data = _build_snapshot(horse)
+    await db.flush()
+    await db.refresh(race_horse)
+    return race_horse
+
+
 async def update_gate_order(
     db: AsyncSession,
     race_id: int,

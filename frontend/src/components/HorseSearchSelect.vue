@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, watch, onUnmounted } from 'vue'
+import { ref, watch, onMounted, onBeforeUnmount, nextTick } from 'vue'
 import { getHorses, createHorse } from '@/api/horses'
 import type { Horse, HorseCreatePayload } from '@/types/horse'
 
@@ -19,7 +19,23 @@ const newHorseName = ref('')
 const quickCreateSaving = ref(false)
 const quickCreateError = ref('')
 
+// Refs for teleported dropdown positioning
+const searchWrapperRef = ref<HTMLElement | null>(null)
+const dropdownRef = ref<HTMLElement | null>(null)
+const dropdownStyle = ref({})
+
 let debounceTimer: ReturnType<typeof setTimeout> | null = null
+
+function updateDropdownPosition() {
+  if (!searchWrapperRef.value) return
+  const rect = searchWrapperRef.value.getBoundingClientRect()
+  dropdownStyle.value = {
+    position: 'fixed',
+    top: `${rect.bottom + 4}px`,
+    left: `${rect.left}px`,
+    width: `${rect.width}px`,
+  }
+}
 
 async function doSearch(query: string) {
   if (!query.trim()) {
@@ -37,6 +53,8 @@ async function doSearch(query: string) {
     const data = await getHorses(query)
     results.value = data
     pageState.value = data.length === 0 ? 'empty' : 'success'
+    await nextTick()
+    updateDropdownPosition()
   } catch (err) {
     pageState.value = 'error'
   }
@@ -71,14 +89,25 @@ function removeHorse(horse: Horse) {
 function handleInputFocus() {
   if (searchText.value.trim()) {
     showDropdown.value = true
+    nextTick(updateDropdownPosition)
   }
 }
 
-function handleInputBlur() {
-  // Delay hiding dropdown to allow click events on dropdown items
-  setTimeout(() => {
-    showDropdown.value = false
-  }, 200)
+// Close dropdown when clicking outside the component and the teleported dropdown
+function handleDocumentMousedown(e: MouseEvent) {
+  if (!showDropdown.value) return
+  const target = e.target as HTMLElement
+  if (searchWrapperRef.value?.contains(target)) return
+  if (dropdownRef.value?.contains(target)) return
+  showDropdown.value = false
+}
+
+function handleWindowResize() {
+  if (showDropdown.value) updateDropdownPosition()
+}
+
+function handleWindowScroll() {
+  if (showDropdown.value) updateDropdownPosition()
 }
 
 async function submitQuickCreate() {
@@ -125,36 +154,23 @@ function handleKeydown(e: KeyboardEvent) {
   }
 }
 
-onUnmounted(() => {
+onMounted(() => {
+  document.addEventListener('mousedown', handleDocumentMousedown)
+  window.addEventListener('resize', handleWindowResize)
+  window.addEventListener('scroll', handleWindowScroll, true)
+})
+
+onBeforeUnmount(() => {
+  document.removeEventListener('mousedown', handleDocumentMousedown)
+  window.removeEventListener('resize', handleWindowResize)
+  window.removeEventListener('scroll', handleWindowScroll, true)
   if (debounceTimer) clearTimeout(debounceTimer)
 })
 </script>
 
 <template>
   <div class="horse-search-select">
-    <!-- Search input -->
-    <div class="search-wrapper">
-      <label class="sr-only" for="horse-search-input">搜索马匹</label>
-      <input
-        id="horse-search-input"
-        v-model="searchText"
-        type="text"
-        class="search-input"
-        placeholder="搜索马匹名称..."
-        aria-label="搜索马匹名称"
-        :aria-expanded="showDropdown"
-        aria-controls="horse-listbox"
-        aria-haspopup="listbox"
-        aria-autocomplete="list"
-        role="combobox"
-        @focus="handleInputFocus"
-        @blur="handleInputBlur"
-        @keydown="handleKeydown"
-      />
-      <span v-if="pageState === 'loading'" class="search-spinner" aria-hidden="true"></span>
-    </div>
-
-    <!-- Selected tags -->
+    <!-- Selected tags (above search input) -->
     <div v-if="selectedHorses.length > 0" class="selected-tags">
       <span
         v-for="horse in selectedHorses"
@@ -173,8 +189,38 @@ onUnmounted(() => {
       </span>
     </div>
 
-    <!-- Dropdown -->
-    <div v-if="showDropdown" id="horse-listbox" class="dropdown" role="listbox">
+    <!-- Search input -->
+    <div ref="searchWrapperRef" class="search-wrapper">
+      <label class="sr-only" for="horse-search-input">搜索马匹</label>
+      <input
+        id="horse-search-input"
+        v-model="searchText"
+        type="text"
+        class="search-input"
+        placeholder="搜索马匹名称..."
+        aria-label="搜索马匹名称"
+        :aria-expanded="showDropdown"
+        aria-controls="horse-listbox"
+        aria-haspopup="listbox"
+        aria-autocomplete="list"
+        role="combobox"
+        @focus="handleInputFocus"
+        @keydown="handleKeydown"
+      />
+      <span v-if="pageState === 'loading'" class="search-spinner" aria-hidden="true"></span>
+    </div>
+
+    <!-- Dropdown (teleported to body to avoid overflow clipping) -->
+    <Teleport to="body">
+      <div
+        v-if="showDropdown"
+        id="horse-listbox"
+        ref="dropdownRef"
+        class="dropdown teleported-dropdown"
+        :style="dropdownStyle"
+        role="listbox"
+        @mousedown="(e: MouseEvent) => e.preventDefault()"
+      >
       <!-- Loading -->
       <div v-if="pageState === 'loading'" class="dropdown-state">
         <div class="skeleton-item"></div>
@@ -215,7 +261,8 @@ onUnmounted(() => {
           + 新建马匹
         </button>
       </div>
-    </div>
+      </div>
+    </Teleport>
 
     <!-- Quick Create Modal -->
     <Teleport to="body">
@@ -331,7 +378,7 @@ onUnmounted(() => {
   display: flex;
   flex-wrap: wrap;
   gap: var(--spacing-2, 8px);
-  margin-top: var(--spacing-2, 8px);
+  margin-bottom: var(--spacing-2, 8px);
 }
 
 .tag {
@@ -427,6 +474,10 @@ onUnmounted(() => {
 .dropdown-item:hover,
 .dropdown-item.focused {
   background: var(--color-surface-base, #F8FAF7);
+}
+
+.teleported-dropdown {
+  z-index: 200;
 }
 
 .dropdown-item.selected {

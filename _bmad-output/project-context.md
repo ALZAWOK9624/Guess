@@ -57,6 +57,7 @@ _This file contains critical rules and patterns that AI agents must follow when 
 - `RaceCard.vue` 支持 `skeleton` prop，未来故事可直接使用 `<RaceCard skeleton />` 渲染骨架屏。
 - `HorseSearchSelect.vue` 使用 `defineModel<Horse[]>('selectedHorses')` 实现 v-model 双向绑定 — 新增组件应优先使用 `defineModel` 替代手动 `emit('update:...')` 模式。
 - `HorseDetailCard.vue` 用于展示马匹 10 属性快照数据，接收 `snapshotData` prop（可空，通过 `withDefaults` 提供默认值）。新增 `votable`、`voted`、`submitting` 三个 props 支持点击投票交互：`votable` 时显示 `cursor: pointer` + hover 高亮，`voted` 时显示金色边框 + "✓ 已投"徽章。emit `voteToggle` 事件供父组件处理投票逻辑。
+- `HorseDetailCard.vue` 新增 `refresh` emit 事件 + 刷新按钮（↻图标，仅 `editable` 为 true 时显示）+ 确认弹窗（Teleport to body）。点击刷新按钮 → 弹窗确认 → emit `refresh` 事件，父组件调用 `refreshRaceHorseSnapshot` API 并重新加载数据。
 - `GradeBadge.vue` 用于展示比赛等级徽章：G1（金色底#B8960C）、G2_JPN1（灰色底#6B7280）、YOUNG_G1（亮绿底#2D7A4F）、CUSTOM（灰色底虚线边框）。接收 `grade: string` prop。
 - `StatusBadge.vue` 用于展示比赛状态胶囊：voting（绿底#2D7A4F）、locked（灰底#6B7280 + 🔒）、settled（深绿底#0D3A1F + ✓）。接收 `status: string` prop。
 - `ConfirmDeleteModal.vue` 可复用删除确认弹窗组件，接收 `title`, `itemName`, `message`, `loading` props，emit `confirm` / `cancel`。使用 `<Teleport to="body">` + `role="dialog"` + `aria-modal` + Esc 关闭 + 遮罩层点击关闭。不可点击遮罩层外部关闭（防误触）。
@@ -100,7 +101,7 @@ _This file contains critical rules and patterns that AI agents must follow when 
 - Auth check: `get_current_user` returns `None` for guests (no token), raises `TOKEN_EXPIRED` for expired tokens, `INVALID_TOKEN` for invalid tokens, `NOT_AUTHENTICATED` for valid token but user not found in DB. Returns full `User` ORM object.
 - Admin check: `get_current_admin` depends on `get_current_user`, checks `user.is_admin` ORM property, raises 403 `FORBIDDEN` for non-admins
 - Auth endpoints: `POST /api/v1/auth/login` (returns access_token + refresh_token + user), `POST /api/v1/auth/refresh` (returns new access_token from valid refresh_token). Both unauthenticated.
-- Race endpoints (`endpoints/races.py`): `GET /api/v1/races` (public, list), `GET /api/v1/races/{id}` (public, detail with snapshots), `POST /api/v1/races` (admin, create), `PATCH /api/v1/races/{id}` (admin, edit only voting), `DELETE /api/v1/races/{id}` (admin, non-settled only).
+- Race endpoints (`endpoints/races.py`): `GET /api/v1/races` (public, list), `GET /api/v1/races/{id}` (public, detail with snapshots), `POST /api/v1/races` (admin, create), `PATCH /api/v1/races/{id}` (admin, edit only voting), `DELETE /api/v1/races/{id}` (admin, non-settled only), `POST /api/v1/races/{race_id}/horses/{race_horse_id}/refresh-snapshot` (admin, refresh snapshot from latest Horse data).
 - Endpoints: `app/api/v1/endpoints/` — one file per domain (auth, races, horses, votes, results, leaderboard, admin)
 - API router: `app/api/v1/__init__.py` creates the APIRouter and includes all endpoint routers; `main.py` calls `app.include_router(api_v1_router)`
 - Business logic: `app/services/` — one service per domain; uses `db.flush()` + `get_db` auto-commit pattern
@@ -356,4 +357,4 @@ _This file contains critical rules and patterns that AI agents must follow when 
 - Review quarterly for outdated rules
 - Remove rules that become obvious over time
 
-Last Updated: 2026-07-01 (sync Vite to 8.0.16, add pnpm nodeLinker: hoisted note)
+Last Updated: 2026-07-03 (add HorseDetailCard refresh pattern + refresh-snapshot endpoint)

@@ -229,3 +229,15 @@ async def update_race_horse(
         db, race_id, race_horse_id, data.weight, data.jockey
     )
     return {"data": _build_horse_dict(race_horse)}
+
+
+@router.post("/{race_id}/horses/{race_horse_id}/refresh-snapshot")
+async def refresh_race_horse_snapshot_endpoint(
+    race_id: int,
+    race_horse_id: int,
+    db: AsyncSession = Depends(get_db),
+    admin=Depends(get_current_admin),
+):
+    """Refresh a race horse's snapshot data from the latest Horse data. Admin only."""
+    race_horse = await race_service.refresh_race_horse_snapshot(db, race_id, race_horse_id)
+    return {"data": _build_horse_dict(race_horse)}

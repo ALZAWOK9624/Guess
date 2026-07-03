@@ -19,7 +19,7 @@ import {
   lockRace,
 } from '@/api/races'
 import { submitResults } from '@/api/results'
-import { updateBestWin } from '@/api/horses'
+import { updateBestWin, refreshRaceHorseSnapshot } from '@/api/horses'
 import { useVote } from '@/composables/useVote'
 import { useDragSort } from '@/composables/useDragSort'
 import type { RaceDetail, ResultPosition } from '@/types/race'
@@ -176,6 +176,16 @@ async function handleUpdateJockey(
     race.value = await getRace(raceId)
   } catch (err: any) {
     alert(err?.response?.data?.detail?.message || '保存失败')
+  }
+}
+
+async function handleRefresh(horse: RaceDetail['horses'][0]) {
+  if (!isAdmin.value || !race.value) return
+  try {
+    await refreshRaceHorseSnapshot(raceId, horse.race_horse_id)
+    race.value = await getRace(raceId)
+  } catch (err: any) {
+    alert(err?.response?.data?.detail?.message || '刷新失败')
   }
 }
 
@@ -646,6 +656,7 @@ onUnmounted(() => {
               @update-field="(payload) => handleUpdateJockey(horse, payload.value)"
               @drag-start="handleGateDragStart(index)"
               @drag-end="handleGateDragEnd"
+              @refresh="handleRefresh(horse)"
             />
           </div>
           <AddHorseCard
@@ -680,6 +691,7 @@ onUnmounted(() => {
                 :is-dnf="false"
                 @drag-start="handleResultDragStart(index, 'active')"
                 @drag-end="handleResultDragEnd"
+                @refresh="handleRefresh(horse)"
               />
             </div>
           </div>
@@ -714,6 +726,7 @@ onUnmounted(() => {
                 :is-dnf="true"
                 @drag-start="handleResultDragStart(index, 'dnf')"
                 @drag-end="handleResultDragEnd"
+                @refresh="handleRefresh(horse)"
               />
             </div>
           </div>
@@ -745,11 +758,9 @@ onUnmounted(() => {
     </template>
 
     <!-- Add Horse Modal -->
-    <div v-if="showAddHorseModal" class="modal-backdrop" @click.self="closeAddHorseModal">
+    <div v-if="showAddHorseModal" class="modal-backdrop">
       <div class="modal-content">
         <h3 class="modal-title">添加马匹</h3>
-        <HorseSearchSelect v-model:selected-horses="selectedAddHorse" />
-        <p v-if="addHorseError" class="modal-error">{{ addHorseError }}</p>
         <div class="modal-actions">
           <button class="modal-btn modal-confirm" :disabled="addHorseSaving || selectedAddHorse.length === 0" @click="confirmAddHorse">
             {{ addHorseSaving ? '添加中…' : '添加' }}
@@ -758,6 +769,8 @@ onUnmounted(() => {
             取消
           </button>
         </div>
+        <HorseSearchSelect v-model:selected-horses="selectedAddHorse" />
+        <p v-if="addHorseError" class="modal-error">{{ addHorseError }}</p>
       </div>
     </div>
   </div>
@@ -1179,8 +1192,8 @@ onUnmounted(() => {
   border-radius: var(--rounded-md, 10px);
   padding: var(--spacing-6, 24px);
   width: 100%;
-  max-width: 480px;
-  max-height: 80vh;
+  max-width: 600px;
+  max-height: 90vh;
   overflow-y: auto;
 }
 
@@ -1200,7 +1213,7 @@ onUnmounted(() => {
 .modal-actions {
   display: flex;
   gap: var(--spacing-3, 12px);
-  margin-top: var(--spacing-4, 16px);
+  margin-bottom: var(--spacing-3, 12px);
 }
 
 .modal-btn {
