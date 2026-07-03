@@ -2,19 +2,11 @@
 import { computed, ref, nextTick } from 'vue'
 import type { HorseSnapshotData } from '@/types/race'
 
-function positionLabel(pos: number): string {
-  if (pos === 1) return '第一'
-  if (pos === 2) return '第二'
-  if (pos === 3) return '第三'
-  return `第${pos}`
-}
-
 function formatPrevResult(snap: HorseSnapshotData): string {
   if (!snap.previous_result) return '-'
   const parts: string[] = []
   if (snap.previous_result_date) parts.push(snap.previous_result_date)
   parts.push(snap.previous_result)
-  if (snap.previous_result_position != null) parts.push(positionLabel(snap.previous_result_position))
   return parts.join(' ')
 }
 
