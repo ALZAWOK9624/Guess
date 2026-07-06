@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { Doughnut } from 'vue-chartjs'
 import {
   Chart as ChartJS,
@@ -15,8 +15,6 @@ const props = defineProps<{
   votes: VoteListEntry[]
   loading?: boolean
 }>()
-
-const showList = ref(false)
 
 // Prefers reduced motion
 const prefersReducedMotion = ref(false)
@@ -128,7 +126,6 @@ const chartOptions = computed(() => ({
       <div class="skeleton-chart">
         <div class="skeleton-circle" />
       </div>
-      <div v-for="n in 2" :key="n" class="skeleton-row" />
     </div>
 
     <!-- Empty state -->
@@ -137,33 +134,9 @@ const chartOptions = computed(() => ({
     </div>
 
     <!-- Chart -->
-    <template v-else>
-      <div class="chart-wrapper">
-        <Doughnut :data="chartData" :options="chartOptions" />
-      </div>
-
-      <!-- Toggle text list -->
-      <button
-        class="toggle-list-btn"
-        @click="showList = !showList"
-      >
-        <span v-if="!showList">查看投票明细 ({{ totalVotes }} 人)</span>
-        <span v-else>收起明细</span>
-        <span class="toggle-arrow" :class="{ expanded: showList }">▸</span>
-      </button>
-
-      <div v-if="showList" class="vote-list">
-        <div
-          v-for="vote in votes"
-          :key="vote.user_id"
-          class="vote-item"
-        >
-          <span class="vote-user">{{ vote.username }}</span>
-          <span class="vote-arrow">→</span>
-          <span class="vote-horse">{{ vote.horse_name }}</span>
-        </div>
-      </div>
-    </template>
+    <div v-else class="chart-wrapper">
+      <Doughnut :data="chartData" :options="chartOptions" />
+    </div>
   </div>
 </template>
 
@@ -199,13 +172,6 @@ const chartOptions = computed(() => ({
   animation: skeleton-shimmer 1.5s infinite ease-in-out;
 }
 
-.skeleton-row {
-  height: 36px;
-  background: var(--border-hairline, #D4DCD0);
-  border-radius: var(--rounded-sm, 6px);
-  animation: skeleton-shimmer 1.5s infinite ease-in-out;
-}
-
 .empty-state {
   font-size: var(--text-body, 16px);
   color: var(--color-ink-secondary, #4A5A4A);
@@ -214,92 +180,6 @@ const chartOptions = computed(() => ({
 
 .chart-wrapper {
   max-width: 360px;
-  margin: 0 auto var(--spacing-3, 12px);
-}
-
-.toggle-list-btn {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  width: 100%;
-  padding: 10px var(--spacing-3, 12px);
-  background: var(--color-surface-base, #F8FAF7);
-  border: 1px solid var(--border-hairline, #D4DCD0);
-  border-radius: var(--rounded-sm, 6px);
-  font-size: var(--text-body-sm, 14px);
-  color: var(--color-ink-secondary, #4A5A4A);
-  cursor: pointer;
-  transition: background 0.15s;
-  min-height: 44px;
-  text-align: left;
-}
-
-.toggle-list-btn:hover {
-  background: var(--color-surface-hover, #F0F7F2);
-}
-
-.toggle-arrow {
-  margin-left: auto;
-  transition: transform 0.15s;
-  font-size: 12px;
-}
-
-.toggle-arrow.expanded {
-  transform: rotate(90deg);
-}
-
-.vote-list {
-  list-style: none;
-  padding: 0;
-  margin: var(--spacing-2, 8px) 0 0;
-  display: flex;
-  flex-direction: column;
-  gap: var(--spacing-2, 8px);
-  border: 1px solid var(--border-hairline, #D4DCD0);
-  border-radius: var(--rounded-sm, 6px);
-  padding: var(--spacing-2, 8px);
-  background: var(--color-surface-raised, #FFFFFF);
-}
-
-.vote-item {
-  display: flex;
-  align-items: center;
-  gap: var(--spacing-2, 8px);
-  font-size: var(--text-body, 16px);
-  padding: var(--spacing-2, 8px) 0;
-  border-bottom: 1px solid var(--border-hairline, #D4DCD0);
-}
-
-.vote-item:last-child {
-  border-bottom: none;
-}
-
-.vote-user {
-  font-weight: 500;
-  color: var(--color-ink-primary, #1A2E1A);
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.vote-arrow {
-  color: var(--color-ink-disabled, #9CAA9C);
-  flex-shrink: 0;
-}
-
-.vote-horse {
-  color: var(--color-ink-primary, #1A2E1A);
-  font-weight: 500;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .toggle-list-btn {
-    transition: none;
-  }
-
-  .toggle-arrow {
-    transition: none;
-  }
+  margin: 0 auto;
 }
 </style>
