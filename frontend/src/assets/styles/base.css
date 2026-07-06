@@ -153,10 +153,10 @@ table {
    "yyyy/mm/dd" shown by browser in zh-CN locale
    ========================================= */
 
-input[type="date"].is-empty {
-  color: transparent;
+input[type="date"].is-empty::-webkit-datetime-edit {
+  color: transparent !important;
 }
 
-input[type="date"].is-empty:focus {
+input[type="date"].is-empty:focus::-webkit-datetime-edit {
   color: inherit;
 }
