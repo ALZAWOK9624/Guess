@@ -197,7 +197,6 @@ onUnmounted(() => {
 
 <style scoped>
 .invite-code-table {
-  --table-gap: var(--spacing-4, 16px);
 }
 
 .toolbar {
@@ -370,13 +369,8 @@ td {
   height: 40px;
   background: linear-gradient(90deg, var(--color-surface-base, #F8FAF7) 25%, var(--color-border-hairline, #D4DCD0) 50%, var(--color-surface-base, #F8FAF7) 75%);
   background-size: 200% 100%;
-  animation: shimmer 1.5s infinite;
+  animation: skeleton-shimmer 1.5s ease-in-out infinite;
   border-radius: var(--rounded-sm, 6px);
-}
-
-@keyframes shimmer {
-  0% { background-position: 200% 0; }
-  100% { background-position: -200% 0; }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -388,7 +382,7 @@ td {
 
 .empty-state {
   text-align: center;
-  padding: var(--spacing-12, 48px) var(--spacing-4, 16px);
+  padding: var(--spacing-8, 32px) var(--spacing-4, 16px);
   color: var(--color-ink-secondary, #4A5A4A);
   font-size: var(--text-body, 16px);
 }

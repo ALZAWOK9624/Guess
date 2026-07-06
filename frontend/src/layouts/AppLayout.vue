@@ -15,10 +15,8 @@ interface AdminNavItem {
 }
 
 const adminNavItems: AdminNavItem[] = [
-  { to: '/admin', label: '仪表盘' },
-  { to: '/admin/races/new', label: '创建比赛' },
   { to: '/admin/horses', label: '马匹管理' },
-  { to: '/admin/invite-codes', label: '邀请码' }
+  { to: '/admin/invite-codes', label: '用户管理' }
 ]
 
 function toggleAdminDropdown() {
@@ -117,14 +115,7 @@ function isAdminItemActive(item: AdminNavItem): boolean {
                   @click="closeAdminDropdown"
                 >
                   <svg class="dropdown-item-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <template v-if="item.to === '/admin'">
-                      <rect x="3" y="3" width="7" height="7" /><rect x="14" y="3" width="7" height="7" />
-                      <rect x="14" y="14" width="7" height="7" /><rect x="3" y="14" width="7" height="7" />
-                    </template>
-                    <template v-else-if="item.to === '/admin/races/new'">
-                      <circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="16" /><line x1="8" y1="12" x2="16" y2="12" />
-                    </template>
-                    <template v-else-if="item.to === '/admin/horses'">
+                    <template v-if="item.to === '/admin/horses'">
                       <path d="M18 4h-3a3 3 0 0 0-3 3v0a3 3 0 0 0 3 3h3a3 3 0 0 0 3-3v0a3 3 0 0 0-3-3z" />
                       <path d="M6 4h3a3 3 0 0 1 3 3v0a3 3 0 0 1-3 3H6a3 3 0 0 1-3-3v0a3 3 0 0 1 3-3z" />
                       <path d="M18 14h-3a3 3 0 0 0-3 3v0a3 3 0 0 0 3 3h3a3 3 0 0 0 3-3v0a3 3 0 0 0-3-3z" />
@@ -151,10 +142,13 @@ function isAdminItemActive(item: AdminNavItem): boolean {
       </div>
     </header>
 
-    <!-- Main Content -->
-    <main class="main-content">
-      <slot />
-    </main>
+    <!-- Scroll Container (desktop) -->
+    <div class="scroll-container">
+      <!-- Main Content -->
+      <main class="main-content">
+        <slot />
+      </main>
+    </div>
 
     <!-- Mobile Bottom Nav (<768px) -->
     <nav class="mobile-bottom-nav" aria-label="主导航">
@@ -207,14 +201,7 @@ function isAdminItemActive(item: AdminNavItem): boolean {
               @click="closeAdminDropdown"
             >
               <svg class="dropdown-item-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <template v-if="item.to === '/admin'">
-                  <rect x="3" y="3" width="7" height="7" /><rect x="14" y="3" width="7" height="7" />
-                  <rect x="14" y="14" width="7" height="7" /><rect x="3" y="14" width="7" height="7" />
-                </template>
-                <template v-else-if="item.to === '/admin/races/new'">
-                  <circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="16" /><line x1="8" y1="12" x2="16" y2="12" />
-                </template>
-                <template v-else-if="item.to === '/admin/horses'">
+                <template v-if="item.to === '/admin/horses'">
                   <path d="M18 4h-3a3 3 0 0 0-3 3v0a3 3 0 0 0 3 3h3a3 3 0 0 0 3-3v0a3 3 0 0 0-3-3z" />
                   <path d="M6 4h3a3 3 0 0 1 3 3v0a3 3 0 0 1-3 3H6a3 3 0 0 1-3-3v0a3 3 0 0 1 3-3z" />
                   <path d="M18 14h-3a3 3 0 0 0-3 3v0a3 3 0 0 0 3 3h3a3 3 0 0 0 3-3v0a3 3 0 0 0-3-3z" />
@@ -502,7 +489,6 @@ function isAdminItemActive(item: AdminNavItem): boolean {
 
 @media (min-width: 768px) {
   .main-content {
-    padding-top: var(--header-height);
     padding-bottom: 0;
     max-width: var(--max-width);
     margin: 0 auto;
@@ -568,6 +554,15 @@ function isAdminItemActive(item: AdminNavItem): boolean {
    ========================================= */
 
 @media (min-width: 768px) {
+  .scroll-container {
+    position: fixed;
+    top: var(--header-height);
+    left: 0;
+    right: 0;
+    bottom: 0;
+    overflow-y: auto;
+  }
+
   .desktop-header {
     display: block;
   }

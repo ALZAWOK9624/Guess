@@ -613,16 +613,17 @@ onUnmounted(() => {
 
 <style scoped>
 .horses-page {
-  padding: var(--spacing-16);
+  padding: var(--spacing-4, 16px);
   max-width: 1280px;
   margin: 0 auto;
 }
-.page-header { margin-bottom: var(--spacing-20); }
+.page-header { margin-bottom: var(--spacing-4, 16px); }
 .page-title {
   font-family: 'Barlow Condensed', system-ui, sans-serif;
-  font-size: 28px;
+  font-size: var(--text-heading, 24px);
   font-weight: 600;
-  color: var(--color-primary);
+  color: var(--color-primary, #1A5632);
+  margin: 0;
 }
 .toolbar {
   display: flex;
@@ -682,7 +683,7 @@ onUnmounted(() => {
   animation: skeleton-shimmer 1.5s ease-in-out infinite;
   border-radius: var(--rounded-sm);
 }
-.state-container { display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 30vh; text-align: center; gap: var(--spacing-16); padding: var(--spacing-32) var(--spacing-16); }
+.state-container { display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 30vh; text-align: center; gap: var(--spacing-4, 16px); padding: var(--spacing-8, 32px) var(--spacing-4, 16px); }
 .empty-text { color: var(--color-ink-secondary); font-size: var(--text-body); max-width: 400px; line-height: 1.6; }
 .error-text { color: var(--color-destructive); font-size: var(--text-body); }
 .refresh-btn { padding: 10px 24px; font-size: var(--text-body); font-weight: 600; color: #ffffff; background: var(--color-primary); border: none; border-radius: var(--rounded-md); cursor: pointer; min-height: 44px; transition: background 0.2s; }

@@ -82,17 +82,17 @@ _This file contains critical rules and patterns that AI agents must follow when 
 - Styles: **scoped CSS** + CSS custom properties (no UI library)
 - Layout components in `src/layouts/`, page components in `src/pages/`, reusable components in `src/components/`
 - Composable functions in `src/composables/` (`useAuth.ts`, `useVote.ts`, `useDragSort.ts`)
-- Admin routes prefixed `/admin/`, sharing `AppLayout` with all other pages. No separate layout — admin nav is in a dropdown menu.
+- Admin routes prefixed `/admin/`, sharing `AppLayout` with all other pages. No separate layout — admin nav is in a dropdown menu. Admin nav items: 马匹管理, 用户管理.
 - Auth guard implementation in `router/index.ts`: `beforeEach` with `useAuthStore()` guards admin routes (`isAdmin`), auth-required routes (`requiresAuth`), and guest-only pages (login/register/reset-password).
 - **RouteMeta must be extended** for custom meta fields used in guards: add `declare module 'vue-router' { interface RouteMeta { requiresAuth?: boolean; isAdmin?: boolean } }` in router/index.ts. This avoids `as Record<string, unknown>` type assertions.
 - Guest page name list (`guestPageNames: string[]`) extracted to module-level constant in router/index.ts — NOT defined inside beforeEach.
 - `@` path alias configured in both `vite.config.ts` and `tsconfig.app.json` — use `@/pages/`, `@/components/`, etc.
-- Responsive navigation via `AppLayout` (global wrapper in `App.vue`): desktop top nav (≥768px, green bg) and mobile bottom nav (<768px, with SVG icons + text). Admin users see a "管理" dropdown trigger in both navs. Admin pages share the same AppLayout — no separate layout wrapping.
+- Responsive navigation via `AppLayout` (global wrapper in `App.vue`): desktop top nav (≥768px, green bg, `position: fixed`) and mobile bottom nav (<768px, with SVG icons + text). On desktop, a `.scroll-container` (`position: fixed; top: var(--header-height); left: 0; right: 0; bottom: 0; overflow-y: auto`) handles scrolling below the fixed header, preventing scrollbar-induced horizontal layout shift. Admin users see a "管理" dropdown trigger in both navs. Admin pages share the same AppLayout — no separate layout wrapping.
 - `safe-area-inset-bottom` applied via `viewport-fit=cover` meta + CSS `env(safe-area-inset-bottom)` — always add to mobile fixed elements
 - `prefers-reduced-motion: reduce` respected globally in `base.css` — overrides all animations/transitions. 全局 `scroll-behavior: smooth` 也被覆盖为 `auto`。
 - `*:focus-visible` 全局统一样式在 `base.css` 中定义（2px 竞马绿 outline + 2px offset），所有可聚焦元素自动继承。组件内如需自定义 focus 样式，使用 scoped CSS 覆盖。
 - **ARIA combobox 模式**：搜索下拉组件（如 `HorseSearchSelect.vue`）必须遵循 combobox 无障碍模式：`role="combobox"` + `:aria-expanded="showDropdown"`（动态绑定，不能硬编码 `"false"`）+ `aria-controls` 指向 listbox + `role="listbox"` + `role="option"` + `aria-selected`。`aria-expanded` 必须响应式绑定到下拉展开状态。
-- Admin nav in `AppLayout`: desktop header nav-links and mobile bottom nav both have a "管理" dropdown trigger. Dropdown shows 仪表盘/创建比赛/马匹管理/邀请码. Closes on click-outside, Escape, and route change. Desktop dropdown drops downward; mobile dropdown rises upward from bottom bar.
+- Admin nav in `AppLayout`: desktop header nav-links and mobile bottom nav both have a "管理" dropdown trigger. Dropdown shows 马匹管理/用户管理 (原邀请码). Closes on click-outside, Escape, and route change. Desktop dropdown drops downward; mobile dropdown rises upward from bottom bar.
 
 **FastAPI:**
 - App entry: `app/main.py` with `lifespan` for DB engine lifecycle
@@ -211,7 +211,7 @@ _This file contains critical rules and patterns that AI agents must follow when 
 - Race status machine: `voting` → `locked` → `settled` (one direction). Only `voting` races are editable. `locked` races block voting. `settled` races are final (can only modify results).
 - Race grade enum: `G1`, `G2_JPN1`, `YOUNG_G1`, `CUSTOM`. Custom scoring uses JSON format: `{"positive_scores": [10,7,5,3,2,1], "penalty_rules": [{"position": -1, "points": -5}]}`.
 - Settled races cannot be deleted — only result modification with full rollback/recalculate. `voting` 和 `locked` 状态的比赛可以删除（含级联删除投票记录）。删除操作需要管理员权限和二次确认弹窗，使用 `ConfirmDeleteModal` 组件。
-- `DashboardPage.vue`（`/admin` 路由）为管理后台比赛列表主页，显示所有比赛及其 GradeBadge/StatusBadge/日期/参赛数，提供「编辑」（跳转 `/admin/races/:id/edit`）、「锁定」（仅 voting 状态金色边框按钮，调用 `POST /api/v1/races/{race_id}/lock` 后原地更新 status）、「结果录入」（仅 locked/settled 状态）、「删除」（仅非已结算比赛可见）操作按钮。锁定按钮使用 `lockingId` ref 防重复点击，锁定后按钮禁用显示"锁定中…"。使用 PageState 枚举模式管理 loading/empty/error/success 状态。
+- `DashboardPage.vue`（`/admin` 路由，已从导航中移除但仍保留路由）为管理后台比赛列表主页，显示所有比赛及其 GradeBadge/StatusBadge/日期/参赛数，提供「编辑」（跳转 `/admin/races/:id/edit`）、「锁定」（仅 voting 状态金色边框按钮，调用 `POST /api/v1/races/{race_id}/lock` 后原地更新 status）、「结果录入」（仅 locked/settled 状态）、「删除」（仅非已结算比赛可见）操作按钮。锁定按钮使用 `lockingId` ref 防重复点击，锁定后按钮禁用显示"锁定中…"。使用 PageState 枚举模式管理 loading/empty/error/success 状态。
 - DNF/scratched horses score 0 points and are excluded from deduction calculation denominators
 - Custom scoring rules apply only to the current race — not saved as templates
 - Password reset uses **invite_code** only (no username needed) — looks up the bound user via `invite_code.bound_username`. All failure cases return the same `INVITE_CODE_MISMATCH` error to prevent user enumeration. ResetPasswordPage is a single-step form (invite_code + new_password).
@@ -362,4 +362,4 @@ _This file contains critical rules and patterns that AI agents must follow when 
 - Review quarterly for outdated rules
 - Remove rules that become obvious over time
 
-Last Updated: 2026-07-06 (UI alignment fixes: auth pages spacing tokens, race header alignment, date placeholder hiding)
+Last Updated: 2026-07-06 (admin nav trimmed to 马匹管理/用户管理; scroll-container added for fixed header scrollbar prevention; UI style unification across admin pages)

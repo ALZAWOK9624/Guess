@@ -83,7 +83,7 @@ const routes: RouteRecordRaw[] = [
     path: '/admin/invite-codes',
     name: 'admin-invite-codes',
     component: () => import('@/pages/admin/InviteCodesPage.vue'),
-    meta: { requiresAuth: true, isAdmin: true, title: '邀请码管理' }
+    meta: { requiresAuth: true, isAdmin: true, title: '用户管理' }
   }
 ]
 
