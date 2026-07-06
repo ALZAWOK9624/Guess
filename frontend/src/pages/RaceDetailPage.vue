@@ -64,6 +64,17 @@ const isRaceVoting = computed(() => race.value?.status === 'voting')
 const isRaceLocked = computed(() => race.value?.status === 'locked')
 const isRaceSettled = computed(() => race.value?.status === 'settled')
 
+const horsePositions = computed<Record<string, number> | undefined>(() => {
+  if (!race.value || !isRaceSettled.value) return undefined
+  const map: Record<string, number> = {}
+  for (const h of race.value.horses) {
+    if (h.position && h.position >= 1 && h.position <= 3) {
+      map[h.snapshot_data.name ?? ''] = h.position
+    }
+  }
+  return map
+})
+
 const isAdmin = computed(() => authStore.isAdmin)
 
 const canVote = computed(() =>
@@ -873,6 +884,7 @@ onUnmounted(() => {
         v-if="resultMode !== 'ranking'"
         :votes="votes"
         :loading="votesLoading"
+        :horse-positions="horsePositions"
       />
     </template>
 

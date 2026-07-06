@@ -14,6 +14,8 @@ ChartJS.register(ArcElement, Tooltip, Legend)
 const props = defineProps<{
   votes: VoteListEntry[]
   loading?: boolean
+  /** horse_name → position (1=winner, 2=second, 3=third). Only applicable for settled races. */
+  horsePositions?: Record<string, number>
 }>()
 
 // Prefers reduced motion
@@ -35,6 +37,19 @@ onUnmounted(() => {
   }
 })
 
+// Medal config
+const MEDAL_ICONS: Record<number, string> = {
+  1: '🥇',
+  2: '🥈',
+  3: '🥉',
+}
+
+const MEDAL_BORDERS: Record<number, string> = {
+  1: '#B8960C',
+  2: '#A0A0A0',
+  3: '#CD7F32',
+}
+
 // Group votes by horse
 const totalVotes = computed(() => props.votes.length)
 
@@ -47,12 +62,16 @@ const horseGroups = computed(() => {
     groups[vote.horse_name].count++
     groups[vote.horse_name].voters.push(vote.username)
   }
-  return Object.entries(groups).map(([horseName, data]) => ({
-    horseName,
-    count: data.count,
-    percentage: totalVotes.value > 0 ? Math.round((data.count / totalVotes.value) * 100) : 0,
-    voters: data.voters,
-  }))
+  return Object.entries(groups).map(([horseName, data]) => {
+    const pos = props.horsePositions?.[horseName]
+    return {
+      horseName,
+      count: data.count,
+      percentage: totalVotes.value > 0 ? Math.round((data.count / totalVotes.value) * 100) : 0,
+      voters: data.voters,
+      position: (pos && pos >= 1 && pos <= 3) ? pos : null,
+    }
+  })
 })
 
 const COLORS = [
@@ -61,18 +80,26 @@ const COLORS = [
   '#DD6B20', '#4FD1C5', '#805AD5', '#E53E3E',
 ]
 
-const chartData = computed(() => ({
-  labels: horseGroups.value.map(g => g.horseName),
-  datasets: [
-    {
-      data: horseGroups.value.map(g => g.count),
-      backgroundColor: horseGroups.value.map((_, i) => COLORS[i % COLORS.length]),
-      borderWidth: 2,
-      borderColor: '#FFFFFF',
-      hoverOffset: 8,
-    },
-  ],
-}))
+const chartData = computed(() => {
+  const groups = horseGroups.value
+  return {
+    labels: groups.map(g =>
+      g.position ? `${MEDAL_ICONS[g.position]} ${g.horseName}` : g.horseName,
+    ),
+    datasets: [
+      {
+        data: groups.map(g => g.count),
+        backgroundColor: groups.map((_, i) => COLORS[i % COLORS.length]),
+        borderWidth: groups.map(g => (g.position ? 4 : 2)),
+        borderColor: groups.map(g =>
+          g.position ? MEDAL_BORDERS[g.position] : '#FFFFFF',
+        ),
+        hoverOffset: groups.map(g => (g.position ? 12 : 8)),
+        offset: groups.map(g => (g.position ? 8 : 0)),
+      },
+    ],
+  }
+})
 
 const chartOptions = computed(() => ({
   responsive: true,
