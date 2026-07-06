@@ -153,10 +153,11 @@ table {
    "yyyy/mm/dd" shown by browser in zh-CN locale
    ========================================= */
 
+/* Target Chrome's shadow DOM pseudo-element directly */
 input[type="date"].is-empty::-webkit-datetime-edit {
-  color: transparent !important;
+  visibility: hidden !important;
 }
 
 input[type="date"].is-empty:focus::-webkit-datetime-edit {
-  color: inherit;
+  visibility: visible !important;
 }
