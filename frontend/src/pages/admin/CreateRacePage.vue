@@ -9,7 +9,7 @@ const router = useRouter()
 
 // Form fields
 const raceName = ref('')
-const raceDate = ref(new Date().toISOString().split('T')[0])
+const raceDate = ref('')
 const raceGrade = ref<string>('G1')
 const selectedHorses = ref<Horse[]>([])
 const customPositiveScores = ref('')
@@ -180,6 +180,7 @@ async function handleSubmit() {
           v-model="raceDate"
           type="date"
           class="form-input"
+          required
           aria-required="true"
           :aria-invalid="!!errors.date"
         />

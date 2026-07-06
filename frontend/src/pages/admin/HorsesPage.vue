@@ -574,7 +574,7 @@ onUnmounted(() => {
                 </label>
                 <label class="form-label">
                   日期
-                  <input v-model="formPreviousResultDate" type="date" class="form-input" />
+                  <input v-model="formPreviousResultDate" type="date" class="form-input" required />
                 </label>
                 <label class="form-label">
                   名次
@@ -593,7 +593,7 @@ onUnmounted(() => {
                 </label>
                 <label class="form-label">
                   日期
-                  <input v-model="formBestWinDate" type="date" class="form-input" />
+                  <input v-model="formBestWinDate" type="date" class="form-input" required />
                 </label>
               </div>
             </div>

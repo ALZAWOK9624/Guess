@@ -147,3 +147,17 @@ table {
     scroll-behavior: auto !important;
   }
 }
+
+/* =========================================
+   Hide native date placeholder text
+   "yyyy/mm/dd" shown by browser in zh-CN locale
+   ========================================= */
+
+input[type="date"] {
+  color: transparent;
+}
+
+input[type="date"]:focus,
+input[type="date"]:valid {
+  color: inherit;
+}
