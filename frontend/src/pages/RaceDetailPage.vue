@@ -568,10 +568,8 @@ async function loadRace() {
   try {
     race.value = await getRace(raceId)
     pageState.value = 'success'
-    if (race.value.status === 'voting' || race.value.status === 'locked') {
-      await loadVotes(raceId)
-      checkUserVote()
-    }
+    await loadVotes(raceId)
+    checkUserVote()
   } catch (err: any) {
     pageState.value = 'error'
     const code = err?.response?.data?.detail?.code
@@ -872,7 +870,7 @@ onUnmounted(() => {
       <p v-if="voteError" class="vote-error">{{ voteError }}</p>
 
       <VotingDetail
-        v-if="(isRaceVoting || isRaceLocked) && resultMode !== 'ranking'"
+        v-if="resultMode !== 'ranking'"
         :votes="votes"
         :loading="votesLoading"
       />

@@ -1,0 +1,415 @@
+﻿git : warning: in the working copy of 'frontend/package.json', LF will be replaced by CRLF the next time Git touches it
+At line:1 char:247
++ ... ject\guess; git --no-pager diff 3436ffcd2e883bafadafb1cfb5fa53baa8c09 ...
++                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (warning: in the... Git touches it:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+warning: in the working copy of 'frontend/pnpm-lock.yaml', LF will be replaced by CRLF the next time Git touches it
+diff --git a/frontend/package.json b/frontend/package.json
+index deaed41..ffe2eb9 100644
+--- a/frontend/package.json
++++ b/frontend/package.json
+@@ -10,8 +10,10 @@
+   },
+   "dependencies": {
+     "axios": "^1.17.0",
++    "chart.js": "^4.5.1",
+     "pinia": "^2.3.1",
+     "vue": "^3.5.34",
++    "vue-chartjs": "^5.3.3",
+     "vue-router": "^4.6.4"
+   },
+   "devDependencies": {
+diff --git a/frontend/pnpm-lock.yaml b/frontend/pnpm-lock.yaml
+index 8dff0d2..01776ff 100644
+--- a/frontend/pnpm-lock.yaml
++++ b/frontend/pnpm-lock.yaml
+@@ -11,12 +11,18 @@ importers:
+       axios:
+         specifier: ^1.17.0
+         version: 1.18.1
++      chart.js:
++        specifier: ^4.5.1
++        version: 4.5.1
+       pinia:
+         specifier: ^2.3.1
+         version: 2.3.1(typescript@6.0.3)(vue@3.5.39(typescript@6.0.3))
+       vue:
+         specifier: ^3.5.34
+         version: 3.5.39(typescript@6.0.3)
++      vue-chartjs:
++        specifier: ^5.3.3
++        version: 5.3.3(chart.js@4.5.1)(vue@3.5.39(typescript@6.0.3))
+       vue-router:
+         specifier: ^4.6.4
+         version: 4.6.4(vue@3.5.39(typescript@6.0.3))
+@@ -71,6 +77,9 @@ packages:
+   '@jridgewell/sourcemap-codec@1.5.5':
+     resolution: {integrity: sha512-cYQ9310grqxueWbl+WuIUIaiUaDcj7WOq5fVhEljNVgRfOUhY9fy2zTvfoqWsnebh8Sl70VScFbICvJnLKB0Og==}
+ 
++  '@kurkle/color@0.3.4':
++    resolution: {integrity: sha512-M5UknZPHRu3DEDWoipU6sE8PdkZ6Z/S+v4dD+Ke8IaNlpdSQah50lz1KtcFBa2vsdOnwbbnxJwVM4wty6udA5w==}
++
+   '@napi-rs/wasm-runtime@1.1.6':
+     resolution: {integrity: sha512-ZLv/JdUfkvOy9eCnnBaGfiO+XimbjebAeO+MRQqD/B+FR1tnRN0tpKSJHRbE8sFfS6aqsXZ67TQjfwfsxULVbg==}
+     peerDependencies:
+@@ -263,6 +272,10 @@ packages:
+     resolution: {integrity: sha512-Sp1ablJ0ivDkSzjcaJdxEunN5/XvksFJ2sMBFfq6x0ryhQV/2b/KwFe21cMpmHtPOSij8K99/wSfoEuTObmuMQ==}
+     engines: {node: '>= 0.4'}
+ 
++  chart.js@4.5.1:
++    resolution: {integrity: sha512-GIjfiT9dbmHRiYi6Nl2yFCq7kkwdkp1W/lp2J99rX0yo9tgJGn3lKQATztIjb5tVtevcBtIdICNWqlq5+E8/Pw==}
++    engines: {pnpm: '>=8'}
++
+   combined-stream@1.0.8:
+     resolution: {integrity: sha512-FQN4MRfuJeHf7cBbBMJFXhKSDq+2kAArBlmRBvcvFE5BB1HZKXtSFASDhdlz9zOYwxh8lDdnvmMOe/+5cdoEdg==}
+     engines: {node: '>= 0.8'}
+@@ -569,6 +582,12 @@ packages:
+   vscode-uri@3.1.0:
+     resolution: {integrity: sha512-/BpdSx+yCQGnCvecbyXdxHDkuk55/G3xwnC0GqY4gmQ3j+A+g8kzzgB4Nk/SINjqn6+waqw3EgbVF2QKExkRxQ==}
+ 
++  vue-chartjs@5.3.3:
++    resolution: {integrity: sha512-jqxtL8KZ6YJ5NTv6XzrzLS7osyegOi28UGNZW0h9OkDL7Sh1396ht4Dorh04aKrl2LiSalQ84WtqiG0RIJb0tA==}
++    peerDependencies:
++      chart.js: ^4.1.1
++      vue: ^3.0.0-0 || ^2.7.0
++
+   vue-demi@0.14.10:
+     resolution: {integrity: sha512-nMZBOwuzabUO0nLgIcc6rycZEebF6eeUfaiQx9+WSk8e29IbLvPU9feI6tqW4kTo3hvoYAJkMh8n8D0fuISphg==}
+     engines: {node: '>=12'}
+@@ -632,6 +651,8 @@ snapshots:
+ 
+   '@jridgewell/sourcemap-codec@1.5.5': {}
+ 
++  '@kurkle/color@0.3.4': {}
++
+   '@napi-rs/wasm-runtime@1.1.6(@emnapi/core@1.11.1)(@emnapi/runtime@1.11.1)':
+     dependencies:
+       '@emnapi/core': 1.11.1
+@@ -815,6 +836,10 @@ snapshots:
+       es-errors: 1.3.0
+       function-bind: 1.1.2
+ 
++  chart.js@4.5.1:
++    dependencies:
++      '@kurkle/color': 0.3.4
++
+   combined-stream@1.0.8:
+     dependencies:
+       delayed-stream: 1.0.0
+@@ -1049,6 +1074,11 @@ snapshots:
+ 
+   vscode-uri@3.1.0: {}
+ 
++  vue-chartjs@5.3.3(chart.js@4.5.1)(vue@3.5.39(typescript@6.0.3)):
++    dependencies:
++      chart.js: 4.5.1
++      vue: 3.5.39(typescript@6.0.3)
++
+   vue-demi@0.14.10(vue@3.5.39(typescript@6.0.3)):
+     dependencies:
+       vue: 3.5.39(typescript@6.0.3)
+diff --git a/frontend/src/components/VotingDetail.vue b/frontend/src/components/VotingDetail.vue
+index c390396..b699a6e 100644
+--- a/frontend/src/components/VotingDetail.vue
++++ b/frontend/src/components/VotingDetail.vue
+@@ -1,10 +1,122 @@
+ <script setup lang="ts">
++import { ref, computed, onMounted, onUnmounted } from 'vue'
++import { Doughnut } from 'vue-chartjs'
++import {
++  Chart as ChartJS,
++  ArcElement,
++  Tooltip,
++  Legend,
++} from 'chart.js'
+ import type { VoteListEntry } from '@/types/vote'
+ 
+-defineProps<{
++ChartJS.register(ArcElement, Tooltip, Legend)
++
++const props = defineProps<{
+   votes: VoteListEntry[]
+   loading?: boolean
+ }>()
++
++const showList = ref(false)
++
++// Prefers reduced motion
++let prefersReducedMotion = false
++let motionMedia: MediaQueryList | null = null
++const reducedMotionHandler = (e: MediaQueryListEvent) => {
++  prefersReducedMotion = e.matches
++}
++
++onMounted(() => {
++  motionMedia = window.matchMedia('(prefers-reduced-motion: reduce)')
++  prefersReducedMotion = motionMedia.matches
++  motionMedia.addEventListener('change', reducedMotionHandler)
++})
++
++onUnmounted(() => {
++  if (motionMedia) {
++    motionMedia.removeEventListener('change', reducedMotionHandler)
++  }
++})
++
++// Group votes by horse
++const totalVotes = computed(() => props.votes.length)
++
++const horseGroups = computed(() => {
++  const groups: Record<string, { count: number; voters: string[] }> = {}
++  for (const vote of props.votes) {
++    if (!groups[vote.horse_name]) {
++      groups[vote.horse_name] = { count: 0, voters: [] }
++    }
++    groups[vote.horse_name].count++
++    groups[vote.horse_name].voters.push(vote.username)
++  }
++  return Object.entries(groups).map(([horseName, data]) => ({
++    horseName,
++    count: data.count,
++    percentage: totalVotes.value > 0 ? Math.round((data.count / totalVotes.value) * 100) : 0,
++    voters: data.voters,
++  }))
++})
++
++const COLORS = [
++  '#1A5632', '#B8960C', '#2B6CB0', '#C53030',
++  '#6B46C1', '#319795', '#D69E2E', '#38A169',
++  '#DD6B20', '#4FD1C5', '#805AD5', '#E53E3E',
++]
++
++const chartData = computed(() => ({
++  labels: horseGroups.value.map(g => g.horseName),
++  datasets: [
++    {
++      data: horseGroups.value.map(g => g.count),
++      backgroundColor: horseGroups.value.map((_, i) => COLORS[i % COLORS.length]),
++      borderWidth: 2,
++      borderColor: '#FFFFFF',
++      hoverOffset: 8,
++    },
++  ],
++}))
++
++const chartOptions = computed(() => ({
++  responsive: true,
++  maintainAspectRatio: true,
++  cutout: '55%',
++  plugins: {
++    legend: {
++      display: true,
++      position: 'bottom' as const,
++      labels: {
++        padding: 16,
++        usePointStyle: true,
++        font: { size: 13 },
++      },
++    },
++    tooltip: {
++      enabled: true,
++      backgroundColor: 'rgba(26, 44, 26, 0.92)',
++        titleFont: { size: 14, weight: 'bold' as const },
++        bodyFont: { size: 13 },
++      padding: 12,
++      cornerRadius: 8,
++      displayColors: true,
++      callbacks: {
++        label(ctx: any) {
++          const group = horseGroups.value[ctx.dataIndex]
++          if (!group) return ''
++          return ` ${group.count}/${totalVotes.value} 票 (${group.percentage}%)`
++        },
++        afterLabel(ctx: any) {
++          const group = horseGroups.value[ctx.dataIndex]
++          if (!group) return ''
++          const names = group.voters.join('、')
++          return `投票人: ${names}`
++        },
++      },
++    },
++  },
++  animation: prefersReducedMotion
++    ? false
++    : { animateRotate: true },
++}))
+ </script>
+ 
+ <template>
+@@ -13,7 +125,10 @@ defineProps<{
+ 
+     <!-- Loading state -->
+     <div v-if="loading" class="skeleton-list">
+-      <div v-for="n in 3" :key="n" class="skeleton-row" />
++      <div class="skeleton-chart">
++        <div class="skeleton-circle" />
++      </div>
++      <div v-for="n in 2" :key="n" class="skeleton-row" />
+     </div>
+ 
+     <!-- Empty state -->
+@@ -21,18 +136,34 @@ defineProps<{
+       暂无投票
+     </div>
+ 
+-    <!-- Vote list -->
+-    <ul v-else class="vote-list">
+-      <li
+-        v-for="vote in votes"
+-        :key="vote.user_id"
+-        class="vote-item"
++    <!-- Chart -->
++    <template v-else>
++      <div class="chart-wrapper">
++        <Doughnut :data="chartData" :options="chartOptions" />
++      </div>
++
++      <!-- Toggle text list -->
++      <button
++        class="toggle-list-btn"
++        @click="showList = !showList"
+       >
+-        <span class="vote-user">{{ vote.username }}</span>
+-        <span class="vote-arrow">→</span>
+-        <span class="vote-horse">{{ vote.horse_name }}</span>
+-      </li>
+-    </ul>
++        <span v-if="!showList">查看投票明细 ({{ totalVotes }} 人)</span>
++        <span v-else>收起明细</span>
++        <span class="toggle-arrow" :class="{ expanded: showList }">▸</span>
++      </button>
++
++      <div v-if="showList" class="vote-list">
++        <div
++          v-for="vote in votes"
++          :key="vote.user_id"
++          class="vote-item"
++        >
++          <span class="vote-user">{{ vote.username }}</span>
++          <span class="vote-arrow">→</span>
++          <span class="vote-horse">{{ vote.horse_name }}</span>
++        </div>
++      </div>
++    </template>
+   </div>
+ </template>
+ 
+@@ -54,6 +185,20 @@ defineProps<{
+   gap: 8px;
+ }
+ 
++.skeleton-chart {
++  display: flex;
++  justify-content: center;
++  padding: 20px 0;
++}
++
++.skeleton-circle {
++  width: 200px;
++  height: 200px;
++  border-radius: 50%;
++  background: var(--border-hairline, #D4DCD0);
++  animation: skeleton-shimmer 1.5s infinite ease-in-out;
++}
++
+ .skeleton-row {
+   height: 36px;
+   background: var(--border-hairline, #D4DCD0);
+@@ -67,13 +212,53 @@ defineProps<{
+   padding: var(--spacing-4, 16px) 0;
+ }
+ 
++.chart-wrapper {
++  max-width: 360px;
++  margin: 0 auto var(--spacing-3, 12px);
++}
++
++.toggle-list-btn {
++  display: flex;
++  align-items: center;
++  gap: 6px;
++  width: 100%;
++  padding: 10px var(--spacing-3, 12px);
++  background: var(--color-surface-base, #F8FAF7);
++  border: 1px solid var(--border-hairline, #D4DCD0);
++  border-radius: var(--rounded-sm, 6px);
++  font-size: var(--text-body-sm, 14px);
++  color: var(--color-ink-secondary, #4A5A4A);
++  cursor: pointer;
++  transition: background 0.15s;
++  min-height: 44px;
++  text-align: left;
++}
++
++.toggle-list-btn:hover {
++  background: var(--color-surface-hover, #F0F7F2);
++}
++
++.toggle-arrow {
++  margin-left: auto;
++  transition: transform 0.15s;
++  font-size: 12px;
++}
++
++.toggle-arrow.expanded {
++  transform: rotate(90deg);
++}
++
+ .vote-list {
+   list-style: none;
+   padding: 0;
+-  margin: 0;
++  margin: var(--spacing-2, 8px) 0 0;
+   display: flex;
+   flex-direction: column;
+   gap: var(--spacing-2, 8px);
++  border: 1px solid var(--border-hairline, #D4DCD0);
++  border-radius: var(--rounded-sm, 6px);
++  padding: var(--spacing-2, 8px);
++  background: var(--color-surface-raised, #FFFFFF);
+ }
+ 
+ .vote-item {
+@@ -107,4 +292,14 @@ defineProps<{
+   color: var(--color-ink-primary, #1A2E1A);
+   font-weight: 500;
+ }
++
++@media (prefers-reduced-motion: reduce) {
++  .toggle-list-btn {
++    transition: none;
++  }
++
++  .toggle-arrow {
++    transition: none;
++  }
++}
+ </style>
+diff --git a/frontend/src/pages/RaceDetailPage.vue b/frontend/src/pages/RaceDetailPage.vue
+index b227b60..4dc6d32 100644
+--- a/frontend/src/pages/RaceDetailPage.vue
++++ b/frontend/src/pages/RaceDetailPage.vue
+@@ -568,10 +568,8 @@ async function loadRace() {
+   try {
+     race.value = await getRace(raceId)
+     pageState.value = 'success'
+-    if (race.value.status === 'voting' || race.value.status === 'locked') {
+-      await loadVotes(raceId)
+-      checkUserVote()
+-    }
++    await loadVotes(raceId)
++    checkUserVote()
+   } catch (err: any) {
+     pageState.value = 'error'
+     const code = err?.response?.data?.detail?.code
+@@ -872,7 +870,7 @@ onUnmounted(() => {
+       <p v-if="voteError" class="vote-error">{{ voteError }}</p>
+ 
+       <VotingDetail
+-        v-if="(isRaceVoting || isRaceLocked) && resultMode !== 'ranking'"
++        v-if="resultMode !== 'ranking'"
+         :votes="votes"
+         :loading="votesLoading"
+       />
