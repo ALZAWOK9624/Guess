@@ -73,13 +73,17 @@ function isSelected(horse: Horse): boolean {
   return selectedHorses.value.some((h) => h.id === horse.id)
 }
 
-function toggleHorse(horse: Horse) {
-  const idx = selectedHorses.value.findIndex((h) => h.id === horse.id)
-  if (idx !== -1) {
+function selectHorse(horse: Horse) {
+  // Single-select: replace current selection with this horse
+  if (isSelected(horse)) {
+    // Already selected — deselect and close
     selectedHorses.value = selectedHorses.value.filter((h) => h.id !== horse.id)
   } else {
-    selectedHorses.value = [...selectedHorses.value, horse]
+    selectedHorses.value = [horse]
   }
+  // Close dropdown and clear search immediately
+  showDropdown.value = false
+  searchText.value = ''
 }
 
 function removeHorse(horse: Horse) {
@@ -148,7 +152,7 @@ function handleKeydown(e: KeyboardEvent) {
     focusedIndex.value = Math.max(focusedIndex.value - 1, 0)
   } else if (e.key === 'Enter' && focusedIndex.value >= 0) {
     e.preventDefault()
-    toggleHorse(results.value[focusedIndex.value])
+    selectHorse(results.value[focusedIndex.value])
   } else if (e.key === 'Escape') {
     showDropdown.value = false
   }
@@ -239,14 +243,13 @@ onBeforeUnmount(() => {
           v-for="(horse, idx) in results"
           :key="horse.id"
           class="dropdown-item"
-          :class="{ selected: isSelected(horse), focused: idx === focusedIndex }"
+          :class="{ focused: idx === focusedIndex }"
           role="option"
           :aria-selected="isSelected(horse)"
-          @mousedown.prevent="toggleHorse(horse)"
+          @mousedown.prevent="selectHorse(horse)"
         >
           <span class="horse-name">{{ horse.name }}</span>
           <span v-if="horse.origin" class="horse-meta">{{ horse.origin }}</span>
-          <span v-if="isSelected(horse)" class="check-mark" aria-hidden="true">✓</span>
         </li>
       </ul>
 
@@ -478,14 +481,6 @@ onBeforeUnmount(() => {
 
 .teleported-dropdown {
   z-index: 200;
-}
-
-.dropdown-item.selected {
-  background: #F0F7F2;
-}
-
-.dropdown-item.selected .horse-name {
-  font-weight: 600;
 }
 
 .horse-name {
