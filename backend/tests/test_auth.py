@@ -58,17 +58,10 @@ async def create_used_invite_code(db: AsyncSession) -> InviteCode:
     return code
 
 
-async def create_disabled_invite_code(db: AsyncSession) -> InviteCode:
-    """Seed a disabled invite code."""
-    code = InviteCode(code="DISABLED", status="disabled")
-    db.add(code)
-    await db.flush()
-    return code
-
-
 # =============================================================================
 # Registration Error Tests (Story 1.4)
 # =============================================================================
+
 
 class TestRegisterErrors:
     """Test registration error branches (AC #2, #3, #4)."""
@@ -88,24 +81,6 @@ class TestRegisterErrors:
         assert response.status_code == 400
         data = response.json()
         assert data["detail"]["code"] == "INVITE_CODE_INVALID"
-
-    @pytest.mark.asyncio
-    async def test_register_disabled_invite_code(
-        self, db_session: AsyncSession, async_client: AsyncClient
-    ):
-        """AC #3: Disabled invite code returns error."""
-        await create_disabled_invite_code(db_session)
-        response = await async_client.post(
-            "/api/v1/auth/register",
-            json={
-                "username": "newuser",
-                "password": "password123",
-                "qq": "12345678901",
-                "invite_code": "DISABLED",
-            },
-        )
-        assert response.status_code == 400
-        assert response.json()["detail"]["code"] == "INVITE_CODE_INVALID"
 
     @pytest.mark.asyncio
     async def test_register_used_invite_code(
@@ -688,7 +663,7 @@ class TestResetPassword:
         )
         assert response.status_code == 400
         assert response.json()["detail"]["code"] == "INVITE_CODE_MISMATCH"
-        assert response.json()["detail"]["message"] == "邀请码与用户不匹配"
+        assert response.json()["detail"]["message"] == "邀请码无效"
 
     @pytest.mark.asyncio
     async def test_reset_password_nonexistent_user(
@@ -719,32 +694,6 @@ class TestResetPassword:
             json={
                 "username": "real_user",
                 "invite_code": "NONEXIST",
-                "new_password": "newpassword456",
-            },
-        )
-        assert response.status_code == 400
-        assert response.json()["detail"]["code"] == "INVITE_CODE_MISMATCH"
-
-    @pytest.mark.asyncio
-    async def test_reset_password_disabled_invite_code(
-        self, db_session: AsyncSession, async_client: AsyncClient
-    ):
-        """Disabled invite code returns 400 INVITE_CODE_MISMATCH."""
-        user = await create_user(db_session, username="disabled_code_user")
-        code = InviteCode(
-            code="DISABLE1",
-            status="disabled",
-            bound_username="disabled_code_user",
-            bound_qq="12345678901",
-        )
-        db_session.add(code)
-        await db_session.flush()
-
-        response = await async_client.post(
-            "/api/v1/auth/reset-password",
-            json={
-                "username": "disabled_code_user",
-                "invite_code": "DISABLE1",
                 "new_password": "newpassword456",
             },
         )

@@ -97,7 +97,7 @@ onMounted(async () => {
       id: h.horse_id,
       name: h.snapshot_data.name,
       sex: h.snapshot_data.sex,
-      birth_year: h.snapshot_data.birth_year ?? h.snapshot_data.age ?? null,
+      birth_year: h.snapshot_data.birth_year ?? null,
       origin: h.snapshot_data.origin,
       hemisphere: h.snapshot_data.hemisphere ?? null,
       location: null,

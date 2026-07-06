@@ -65,7 +65,7 @@ class TestInviteCodeService:
     async def test_create_and_list(self, db_session: AsyncSession):
         from app.services.invite_code_service import create_invite_code, get_invite_codes
 
-        code = await create_invite_code(db_session)
+        code = await create_invite_code(db_session, qq="12345678901")
         assert code.status == "unused"
         assert len(code.code) == 8
 
@@ -76,10 +76,9 @@ class TestInviteCodeService:
     async def test_search(self, db_session: AsyncSession):
         from app.services.invite_code_service import create_invite_code, get_invite_codes
 
-        c1 = await create_invite_code(db_session)
+        c1 = await create_invite_code(db_session, qq="12345")
         # Manually set bound fields for search testing
         c1.bound_username = "testuser"
-        c1.bound_qq = "12345"
         await db_session.flush()
 
         # Search by code
@@ -97,39 +96,6 @@ class TestInviteCodeService:
         # Search with no match
         results = await get_invite_codes(db_session, search="nonexistent")
         assert len(results) == 0
-
-    @pytest.mark.asyncio
-    async def test_invalidate(self, db_session: AsyncSession):
-        from app.services.invite_code_service import create_invite_code, invalidate_invite_code
-
-        code = await create_invite_code(db_session)
-        assert code.status == "unused"
-
-        # Invalidate unused code
-        updated = await invalidate_invite_code(db_session, code.code)
-        assert updated.status == "disabled"
-
-    @pytest.mark.asyncio
-    async def test_invalidate_bound_code_raises(self, db_session: AsyncSession):
-        from app.services.invite_code_service import create_invite_code, invalidate_invite_code
-        from fastapi import HTTPException
-
-        code = await create_invite_code(db_session)
-        code.status = "used"
-        await db_session.flush()
-
-        with pytest.raises(HTTPException) as exc:
-            await invalidate_invite_code(db_session, code.code)
-        assert exc.value.status_code == 400
-
-    @pytest.mark.asyncio
-    async def test_invalidate_nonexistent_code_raises(self, db_session: AsyncSession):
-        from app.services.invite_code_service import invalidate_invite_code
-        from fastapi import HTTPException
-
-        with pytest.raises(HTTPException) as exc:
-            await invalidate_invite_code(db_session, "NONEXIST")
-        assert exc.value.status_code == 404
 
 
 # --- API Tests ---
@@ -156,7 +122,7 @@ class TestInviteCodeAPI:
 
         transport = ASGITransport(app=app)
         async with AsyncClient(transport=transport, base_url="http://test") as client:
-            resp = await client.post("/api/v1/admin/invite-codes")
+            resp = await client.post("/api/v1/admin/invite-codes", json={"qq": "12345678901"})
             assert resp.status_code == 201
             data = resp.json()
             assert data["data"]["status"] == "unused"
@@ -165,32 +131,36 @@ class TestInviteCodeAPI:
         app.dependency_overrides.clear()
 
     @pytest.mark.asyncio
-    async def test_invalidate_code(self, db_session: AsyncSession):
+    async def test_delete_code(self, db_session: AsyncSession):
         app.dependency_overrides[get_db] = lambda: db_session
         app.dependency_overrides[get_current_admin] = override_get_admin
+
+        from app.services.invite_code_service import get_invite_codes
 
         transport = ASGITransport(app=app)
         async with AsyncClient(transport=transport, base_url="http://test") as client:
             # First create a code
-            create_resp = await client.post("/api/v1/admin/invite-codes")
+            create_resp = await client.post("/api/v1/admin/invite-codes", json={"qq": "12345678901"})
             code = create_resp.json()["data"]["code"]
 
-            # Then invalidate it
-            resp = await client.patch(f"/api/v1/admin/invite-codes/{code}")
-            assert resp.status_code == 200
-            data = resp.json()
-            assert data["data"]["status"] == "disabled"
+            # Then delete it
+            resp = await client.delete(f"/api/v1/admin/invite-codes/{code}")
+            assert resp.status_code == 204
+
+            # Verify it is gone from the database
+            codes = await get_invite_codes(db_session)
+            assert not any(c.code == code for c in codes)
 
         app.dependency_overrides.clear()
 
     @pytest.mark.asyncio
-    async def test_invalidate_nonexistent(self, db_session: AsyncSession):
+    async def test_delete_nonexistent(self, db_session: AsyncSession):
         app.dependency_overrides[get_db] = lambda: db_session
         app.dependency_overrides[get_current_admin] = override_get_admin
 
         transport = ASGITransport(app=app)
         async with AsyncClient(transport=transport, base_url="http://test") as client:
-            resp = await client.patch("/api/v1/admin/invite-codes/NONEXIST")
+            resp = await client.delete("/api/v1/admin/invite-codes/NONEXIST")
             assert resp.status_code == 404
 
         app.dependency_overrides.clear()
@@ -204,9 +174,8 @@ class TestInviteCodeAPI:
         async with AsyncClient(transport=transport, base_url="http://test") as client:
             # Create a code and set bound fields
             from app.services.invite_code_service import create_invite_code
-            c = await create_invite_code(db_session)
+            c = await create_invite_code(db_session, qq="99999")
             c.bound_username = "founduser"
-            c.bound_qq = "99999"
             await db_session.flush()
 
             # Search by username

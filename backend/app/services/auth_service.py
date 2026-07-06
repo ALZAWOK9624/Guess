@@ -62,6 +62,14 @@ async def login(db: AsyncSession, request: LoginRequest) -> LoginResponse:
                     "message": "该邀请码尚未绑定用户",
                 },
             )
+        if invite_code.status == "disabled":
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail={
+                    "code": "INVALID_CREDENTIALS",
+                    "message": "用户名或密码错误",
+                },
+            )
         if invite_code.status == "used" and invite_code.bound_username:
             user_result = await db.execute(
                 select(User).where(User.username == invite_code.bound_username)
@@ -223,6 +231,15 @@ async def register(
             detail={
                 "code": "INVITE_CODE_USED",
                 "message": "邀请码已被使用",
+            },
+        )
+
+    if invite_code.status == "disabled":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "code": "INVITE_CODE_INVALID",
+                "message": "邀请码无效或已被使用",
             },
         )
 

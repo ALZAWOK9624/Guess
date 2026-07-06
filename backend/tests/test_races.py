@@ -29,7 +29,7 @@ async def override_get_admin():
 SAMPLE_HORSE = {
     "name": "Equinox",
     "sex": "牡",
-    "age": 4,
+    "birth_year": 2020,
     "origin": "日本",
     "sire": "Kitasan Black",
     "damsire": "Dance in the Dark",

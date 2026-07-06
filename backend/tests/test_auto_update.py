@@ -27,8 +27,8 @@ async def override_get_admin():
 
 # --- Test Data ---
 
-SAMPLE_HORSE = {"name": "Equinox", "sex": "牡", "age": 4, "origin": "日本"}
-SAMPLE_HORSE_2 = {"name": "Epiphaneia", "sex": "牡", "age": 3}
+SAMPLE_HORSE = {"name": "Equinox", "sex": "牡", "birth_year": 2020, "origin": "日本"}
+SAMPLE_HORSE_2 = {"name": "Epiphaneia", "sex": "牡", "birth_year": 2021}
 
 
 # --- Helpers ---
@@ -50,48 +50,48 @@ class TestAutoUpdateService:
         """Normal update: field not in manual protection → updated + log created."""
         from app.services.auto_update_service import apply_auto_updates
 
-        horse = await _create_horse(db_session, {"name": "TestHorse", "age": 4})
-        assert horse.age == 4
+        horse = await _create_horse(db_session, {"name": "TestHorse", "birth_year": 2020})
+        assert horse.birth_year == 2020
         assert horse.manually_updated_fields is None
 
         logs = await apply_auto_updates(
-            db_session, race_id=1, horse_updates={horse.id: {"age": 5, "sex": "牝"}}
+            db_session, race_id=1, horse_updates={horse.id: {"birth_year": 2022, "sex": "牝"}}
         )
 
         # Verify horse was updated
         await db_session.refresh(horse)
-        assert horse.age == 5
+        assert horse.birth_year == 2022
         assert horse.sex == "牝"
 
         # Verify logs created
         assert len(logs) == 2
         log_field_names = {l.field_name for l in logs}
-        assert log_field_names == {"age", "sex"}
+        assert log_field_names == {"birth_year", "sex"}
         for log in logs:
             assert log.horse_id == horse.id
             assert log.race_id == 1
             assert log.trigger_source == "settlement"
         # Verify old/new values
-        age_log = [l for l in logs if l.field_name == "age"][0]
-        assert age_log.old_value == "4"
-        assert age_log.new_value == "5"
+        birth_year_log = [l for l in logs if l.field_name == "birth_year"][0]
+        assert birth_year_log.old_value == "2020"
+        assert birth_year_log.new_value == "2022"
 
     @pytest.mark.asyncio
     async def test_apply_auto_updates_skips_manual(self, db_session: AsyncSession):
         """Protected field: in manually_updated_fields → skipped, no log."""
         from app.services.auto_update_service import apply_auto_updates
 
-        horse = await _create_horse(db_session, {"name": "SkipMe", "age": 3})
-        horse.manually_updated_fields = ["age"]
+        horse = await _create_horse(db_session, {"name": "SkipMe", "birth_year": 2021})
+        horse.manually_updated_fields = ["birth_year"]
         await db_session.flush()
 
         logs = await apply_auto_updates(
-            db_session, race_id=1, horse_updates={horse.id: {"age": 10, "sex": "牡"}}
+            db_session, race_id=1, horse_updates={horse.id: {"birth_year": 2025, "sex": "牡"}}
         )
 
-        # Verify age was NOT updated (protected), sex was updated (not protected)
+        # Verify birth_year was NOT updated (protected), sex was updated (not protected)
         await db_session.refresh(horse)
-        assert horse.age == 3  # Unchanged
+        assert horse.birth_year == 2021  # Unchanged
         assert horse.sex == "牡"  # Updated
 
         # Only sex should have a log
@@ -103,17 +103,17 @@ class TestAutoUpdateService:
         """Mixed: some fields protected, others not."""
         from app.services.auto_update_service import apply_auto_updates
 
-        horse = await _create_horse(db_session, {"name": "Mixed", "age": 5, "sex": "牡", "origin": "日本"})
-        horse.manually_updated_fields = ["age", "origin"]
+        horse = await _create_horse(db_session, {"name": "Mixed", "birth_year": 2022, "sex": "牡", "origin": "日本"})
+        horse.manually_updated_fields = ["birth_year", "origin"]
         await db_session.flush()
 
         logs = await apply_auto_updates(
             db_session, race_id=1,
-            horse_updates={horse.id: {"age": 99, "origin": "USA", "sex": "牝"}}
+            horse_updates={horse.id: {"birth_year": 2030, "origin": "USA", "sex": "牝"}}
         )
 
         await db_session.refresh(horse)
-        assert horse.age == 5   # Protected
+        assert horse.birth_year == 2022   # Protected
         assert horse.origin == "日本"  # Protected
         assert horse.sex == "牝"  # Updated
 
@@ -136,7 +136,7 @@ class TestAutoUpdateService:
 
         with pytest.raises(HTTPException) as exc:
             await apply_auto_updates(
-                db_session, race_id=1, horse_updates={9999: {"age": 5}}
+                db_session, race_id=1, horse_updates={9999: {"birth_year": 2022}}
             )
         assert exc.value.status_code == 404
 
@@ -145,7 +145,7 @@ class TestAutoUpdateService:
         """Setting a field to None should work and log correctly."""
         from app.services.auto_update_service import apply_auto_updates
 
-        horse = await _create_horse(db_session, {"name": "NullTest", "age": 4, "sex": "牡"})
+        horse = await _create_horse(db_session, {"name": "NullTest", "birth_year": 2020, "sex": "牡"})
 
         logs = await apply_auto_updates(
             db_session, race_id=1, horse_updates={horse.id: {"sex": None}}
@@ -174,9 +174,9 @@ class TestHorseManualEditTracking:
         assert horse.manually_updated_fields is None
 
         updated = await update_horse(
-            db_session, horse.id, HorseUpdate(age=5)
+            db_session, horse.id, HorseUpdate(birth_year=2022)
         )
-        assert updated.manually_updated_fields == ["age"]
+        assert updated.manually_updated_fields == ["birth_year"]
 
     @pytest.mark.asyncio
     async def test_update_tracks_multiple_fields(self, db_session: AsyncSession):
@@ -184,20 +184,20 @@ class TestHorseManualEditTracking:
 
         horse = await create_horse(db_session, HorseCreate(name="Multi"))
         updated = await update_horse(
-            db_session, horse.id, HorseUpdate(age=4, sex="牡", origin="日本")
+            db_session, horse.id, HorseUpdate(birth_year=2020, sex="牡", origin="日本")
         )
-        assert sorted(updated.manually_updated_fields) == sorted(["age", "sex", "origin"])
+        assert sorted(updated.manually_updated_fields) == sorted(["birth_year", "sex", "origin"])
 
     @pytest.mark.asyncio
     async def test_update_no_duplicate_marks(self, db_session: AsyncSession):
         from app.services.horse_service import create_horse, update_horse
 
         horse = await create_horse(db_session, HorseCreate(name="Dedup"))
-        await update_horse(db_session, horse.id, HorseUpdate(age=5))
-        updated = await update_horse(db_session, horse.id, HorseUpdate(age=6))
+        await update_horse(db_session, horse.id, HorseUpdate(birth_year=2022))
+        updated = await update_horse(db_session, horse.id, HorseUpdate(birth_year=2023))
 
         assert len(updated.manually_updated_fields) == 1
-        assert updated.manually_updated_fields == ["age"]
+        assert updated.manually_updated_fields == ["birth_year"]
 
     @pytest.mark.asyncio
     async def test_update_does_not_track_name_change(self, db_session: AsyncSession):
@@ -213,11 +213,11 @@ class TestHorseManualEditTracking:
         from app.services.horse_service import create_horse, update_horse
 
         horse = await create_horse(db_session, HorseCreate(name="Append"))
-        horse.manually_updated_fields = ["age"]
+        horse.manually_updated_fields = ["birth_year"]
         await db_session.flush()
 
         updated = await update_horse(db_session, horse.id, HorseUpdate(sex="牡"))
-        assert "age" in updated.manually_updated_fields
+        assert "birth_year" in updated.manually_updated_fields
         assert "sex" in updated.manually_updated_fields
         assert len(updated.manually_updated_fields) == 2
 
@@ -243,8 +243,8 @@ class TestResetAutoProtection:
     async def test_reset_clears_protection(self, db_session: AsyncSession):
         from app.services.horse_service import create_horse, reset_auto_protection
 
-        horse = await create_horse(db_session, HorseCreate(name="ResetMe", age=4))
-        horse.manually_updated_fields = ["age"]
+        horse = await create_horse(db_session, HorseCreate(name="ResetMe", birth_year=2020))
+        horse.manually_updated_fields = ["birth_year"]
         await db_session.flush()
 
         result = await reset_auto_protection(db_session, horse.id)
@@ -283,8 +283,8 @@ class TestResetAutoProtectionAPI:
         app.dependency_overrides[get_db] = lambda: db_session
         app.dependency_overrides[get_current_admin] = override_get_admin
 
-        horse = await create_horse(db_session, HorseCreate(name="APIReset", age=5))
-        horse.manually_updated_fields = ["age"]
+        horse = await create_horse(db_session, HorseCreate(name="APIReset", birth_year=2022))
+        horse.manually_updated_fields = ["birth_year"]
         await db_session.flush()
 
         transport = ASGITransport(app=app)
@@ -362,9 +362,9 @@ class TestHorseAutoUpdateLogModel:
         log = HorseAutoUpdateLog(
             horse_id=horse.id,
             race_id=42,
-            field_name="age",
-            old_value="4",
-            new_value="5",
+            field_name="birth_year",
+            old_value="2020",
+            new_value="2022",
             trigger_source="settlement",
         )
         db_session.add(log)
@@ -374,9 +374,9 @@ class TestHorseAutoUpdateLogModel:
         assert log.id is not None
         assert log.horse_id == horse.id
         assert log.race_id == 42
-        assert log.field_name == "age"
-        assert log.old_value == "4"
-        assert log.new_value == "5"
+        assert log.field_name == "birth_year"
+        assert log.old_value == "2020"
+        assert log.new_value == "2022"
         assert log.trigger_source == "settlement"
         assert log.created_at is not None
 

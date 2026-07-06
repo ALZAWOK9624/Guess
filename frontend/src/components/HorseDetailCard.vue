@@ -110,7 +110,7 @@ const safeData = computed(() => props.snapshotData ?? {
   best_win_date: null,
 })
 
-const rawBirthYear = computed(() => props.birthYear ?? props.snapshotData?.birth_year ?? props.snapshotData?.age ?? null)
+const rawBirthYear = computed(() => props.birthYear ?? props.snapshotData?.birth_year ?? null)
 const rawHemisphere = computed(() => props.hemisphere ?? props.snapshotData?.hemisphere ?? null)
 
 const displayAge = computed(() => {

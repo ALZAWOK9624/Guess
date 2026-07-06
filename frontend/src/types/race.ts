@@ -62,7 +62,6 @@ export interface HorseSnapshotData {
   name: string
   sex: string | null
   birth_year: number | null
-  age?: number | null  // legacy: old snapshots used age
   origin: string | null
   hemisphere: string | null
   location: string | null

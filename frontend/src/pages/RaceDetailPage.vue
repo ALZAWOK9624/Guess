@@ -49,7 +49,7 @@ const {
   errorMessage: voteError,
   toggleVote,
   loadVotes,
-} = useVote(null)
+} = useVote()
 
 function checkUserVote() {
   if (!authStore.isLoggedIn || !authStore.user) return
@@ -761,7 +761,7 @@ onUnmounted(() => {
               :snapshot-data="horse.snapshot_data"
               :horse-id="horse.horse_id"
               :jockey="horse.jockey"
-              :birth-year="horse.snapshot_data.birth_year ?? horse.snapshot_data.age"
+              :birth-year="horse.snapshot_data.birth_year"
               :hemisphere="horse.snapshot_data.hemisphere"
               :reference-date="race.date"
               :votable="cardsVotable"
@@ -812,7 +812,7 @@ onUnmounted(() => {
                 :snapshot-data="horse.snapshot_data"
                 :horse-id="horse.horse_id"
                 :jockey="horse.jockey"
-                :birth-year="horse.snapshot_data.birth_year ?? horse.snapshot_data.age"
+                :birth-year="horse.snapshot_data.birth_year"
                 :hemisphere="horse.snapshot_data.hemisphere"
                 :reference-date="race.date"
                 :gate="horse.gate"
@@ -848,7 +848,7 @@ onUnmounted(() => {
                 :snapshot-data="horse.snapshot_data"
                 :horse-id="horse.horse_id"
                 :jockey="horse.jockey"
-                :birth-year="horse.snapshot_data.birth_year ?? horse.snapshot_data.age"
+                :birth-year="horse.snapshot_data.birth_year"
                 :hemisphere="horse.snapshot_data.hemisphere"
                 :reference-date="race.date"
                 :gate="horse.gate"

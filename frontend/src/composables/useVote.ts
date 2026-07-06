@@ -4,29 +4,22 @@ import type { VoteListEntry, VoteResponse } from '@/types/vote'
 import type { RaceHorseSnapshot } from '@/types/race'
 
 interface UseVoteReturn {
-  selectedHorseId: Ref<number | null>
-  selectedHorse: Ref<RaceHorseSnapshot | null>
   votedHorseName: Ref<string | null>
   votedRaceHorseId: Ref<number | null>
   isSubmitting: Ref<boolean>
   votes: Ref<VoteListEntry[]>
   votesLoading: Ref<boolean>
-  votesError: Ref<string | null>
   errorMessage: Ref<string | null>
   toggleVote: (horse: RaceHorseSnapshot, raceId: number) => Promise<void>
   loadVotes: (raceId: number) => Promise<void>
-  reset: () => void
 }
 
-export function useVote(initialVotedHorseName: string | null = null): UseVoteReturn {
-  const selectedHorseId = ref<number | null>(null)
-  const selectedHorse = ref<RaceHorseSnapshot | null>(null)
-  const votedHorseName = ref<string | null>(initialVotedHorseName)
+export function useVote(): UseVoteReturn {
+  const votedHorseName = ref<string | null>(null)
   const votedRaceHorseId = ref<number | null>(null)
   const isSubmitting = ref(false)
   const votes = ref<VoteListEntry[]>([])
   const votesLoading = ref(false)
-  const votesError = ref<string | null>(null)
   const errorMessage = ref<string | null>(null)
   let unmounted = false
 
@@ -80,7 +73,7 @@ export function useVote(initialVotedHorseName: string | null = null): UseVoteRet
     // Refresh vote distribution (independent try/catch)
     try {
       if (!unmounted) await loadVotes(raceId)
-    } catch {
+    } catch (err) {
       // Non-critical
     }
   }
@@ -111,49 +104,31 @@ export function useVote(initialVotedHorseName: string | null = null): UseVoteRet
     // Refresh vote distribution
     try {
       if (!unmounted) await loadVotes(raceId)
-    } catch {
+    } catch (err) {
       // Non-critical
     }
   }
 
   async function loadVotes(raceId: number) {
     votesLoading.value = true
-    votesError.value = null
     try {
       const data = await getRaceVotes(raceId)
       votes.value = data
     } catch (err) {
       votes.value = []
-      votesError.value = '投票分布加载失败'
     } finally {
       votesLoading.value = false
     }
   }
 
-  function reset() {
-    selectedHorseId.value = null
-    selectedHorse.value = null
-    votedHorseName.value = null
-    votedRaceHorseId.value = null
-    isSubmitting.value = false
-    votes.value = []
-    votesLoading.value = false
-    votesError.value = null
-    errorMessage.value = null
-  }
-
   return {
-    selectedHorseId,
-    selectedHorse,
     votedHorseName,
     votedRaceHorseId,
     isSubmitting,
     votes,
     votesLoading,
-    votesError,
     errorMessage,
     toggleVote,
     loadVotes,
-    reset,
   }
 }

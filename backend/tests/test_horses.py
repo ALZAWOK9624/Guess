@@ -22,7 +22,7 @@ async def override_get_admin():
 SAMPLE_HORSE = {
     "name": "Equinox",
     "sex": "牡",
-    "age": 4,
+    "birth_year": 2020,
     "origin": "日本",
     "sire": "Kitasan Black",
     "damsire": "Dance in the Dark",
@@ -45,7 +45,7 @@ class TestHorseService:
         assert horse.id is not None
         assert horse.name == "Equinox"
         assert horse.sex == "牡"
-        assert horse.age == 4
+        assert horse.birth_year == 2020
         assert horse.origin == "日本"
 
         horses = await get_horses(db_session)
@@ -59,7 +59,7 @@ class TestHorseService:
         horse = await create_horse(db_session, data)
         assert horse.name == "TestHorse"
         assert horse.sex is None
-        assert horse.age is None
+        assert horse.birth_year is None
 
     @pytest.mark.asyncio
     async def test_create_duplicate_name(self, db_session: AsyncSession):
@@ -124,10 +124,10 @@ class TestHorseService:
 
         created = await create_horse(db_session, HorseCreate(name="Original"))
         updated = await update_horse(
-            db_session, created.id, HorseUpdate(name="Updated", age=5)
+            db_session, created.id, HorseUpdate(name="Updated", birth_year=2022)
         )
         assert updated.name == "Updated"
-        assert updated.age == 5
+        assert updated.birth_year == 2022
         assert updated.sex is None  # Unchanged
 
     @pytest.mark.asyncio
@@ -286,12 +286,12 @@ class TestHorseAPI:
             horse_id = create_resp.json()["data"]["id"]
 
             resp = await client.patch(
-                f"/api/v1/horses/{horse_id}", json={"name": "New", "age": 3}
+                f"/api/v1/horses/{horse_id}", json={"name": "New", "birth_year": 2021}
             )
             assert resp.status_code == 200
             data = resp.json()["data"]
             assert data["name"] == "New"
-            assert data["age"] == 3
+            assert data["birth_year"] == 2021
 
         app.dependency_overrides.clear()
 

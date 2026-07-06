@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
-import { useRouter, useRoute } from 'vue-router'
+import { useRouter, useRoute, type LocationQueryValue } from 'vue-router'
 import { useAuthStore } from '@/stores/authStore'
 
 type LoginMode = 'username' | 'qq' | 'invite_code'
@@ -23,9 +23,10 @@ const sessionExpiredMessage = computed(() =>
   normalizeQuery(route.query.session) === 'expired' ? '登录状态已过期，请重新登录' : ''
 )
 
-function normalizeQuery(value: string | string[] | null | undefined): string | undefined {
+function normalizeQuery(value: LocationQueryValue | LocationQueryValue[]): string | undefined {
   if (value === null || value === undefined) return undefined
-  return Array.isArray(value) ? value[0] : value
+  const first = Array.isArray(value) ? value[0] : value
+  return first ?? undefined
 }
 
 const tabs = [
