@@ -344,7 +344,7 @@ _This file contains critical rules and patterns that AI agents must follow when 
   - 南半球：8月1日起 `今年-出生年` 岁
 - 卡片接收 `birthYear`/`hemisphere`/`referenceDate` props（可选，不传则用当天日期）。
 - 比赛页面向 `HorseDetailCard` 传入 `race.date` 作为 `referenceDate`，确保显示比赛中实际年龄。
-- `RaceHorse.snapshot_data` 中 `age` 字段被 `birth_year` 替代，但保留对旧数据 `age` 的向后兼容读取：`snapshot_data.birth_year ?? snapshot_data.age`。
+- `RaceHorse.snapshot_data` 中 `age` 字段已被 `birth_year` 完全替代；前端不再兼容读取 `age`，所有快照统一使用 `birth_year`。
 
 **出生国/所属地 新增选择模式（Story 4.x）：**
 - 出生国（`origin`）下拉使用原生 `<select>`，底部选项 "+ 新增国家"，选中后切换为文本输入模式。
@@ -371,4 +371,4 @@ _This file contains critical rules and patterns that AI agents must follow when 
 - Review quarterly for outdated rules
 - Remove rules that become obvious over time
 
-Last Updated: 2026-07-06 (hidden race toggle with eye button; client-side filter for auth-based visibility; RACE_HIDDEN error code; migrations)
+Last Updated: 2026-07-06 (removed deprecated age fallback; disabled invite code status explicitly rejected; cleaned up useVote remnants; deleted AdminLayout.vue)
