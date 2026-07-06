@@ -605,8 +605,10 @@ onUnmounted(() => {
           <StatusBadge :status="race.status as any" />
         </div>
 
-        <p v-if="!(isAdmin && isRaceVoting)" class="race-date">{{ race.date }}</p>
-        <p class="race-meta">{{ race.horses.length }} 匹参赛 · {{ race.vote_count }} 人已投</p>
+        <div class="race-subinfo">
+          <p v-if="!(isAdmin && isRaceVoting)" class="race-date">{{ race.date }}</p>
+          <p class="race-meta">{{ race.horses.length }} 匹参赛 · {{ race.vote_count }} 人已投</p>
+        </div>
 
         <p v-if="headerSaveError" class="header-message error">{{ headerSaveError }}</p>
         <p v-if="headerSaveSuccess" class="header-message success">保存成功</p>
@@ -878,10 +880,15 @@ onUnmounted(() => {
   align-items: center;
 }
 
+.back-btn:hover {
+  opacity: 0.8;
+}
+
 .race-title-row {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   gap: var(--spacing-3, 12px);
+  row-gap: var(--spacing-2, 8px);
   margin-bottom: var(--spacing-2, 8px);
   flex-wrap: wrap;
 }
@@ -892,12 +899,20 @@ onUnmounted(() => {
   font-weight: 600;
   color: var(--color-ink-primary, #1A2E1A);
   margin: 0;
+  line-height: 1.25;
+}
+
+.race-subinfo {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-2, 8px);
+  align-items: baseline;
 }
 
 .race-date {
   font-size: var(--text-body, 16px);
   color: var(--color-ink-secondary, #4A5A4A);
-  margin: 0 0 var(--spacing-1, 4px);
+  margin: 0;
 }
 
 .race-meta {
