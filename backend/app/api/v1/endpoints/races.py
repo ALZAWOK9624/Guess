@@ -231,6 +231,17 @@ async def update_race_horse(
     return {"data": _build_horse_dict(race_horse)}
 
 
+@router.delete("/{race_id}/horses/{race_horse_id}", status_code=204)
+async def remove_race_horse(
+    race_id: int,
+    race_horse_id: int,
+    db: AsyncSession = Depends(get_db),
+    admin=Depends(get_current_admin),
+):
+    """Remove a single horse from a voting race. Admin only."""
+    await race_service.remove_horse_from_race(db, race_id, race_horse_id)
+
+
 @router.post("/{race_id}/horses/{race_horse_id}/refresh-snapshot")
 async def refresh_race_horse_snapshot_endpoint(
     race_id: int,

@@ -9,6 +9,7 @@ import AddHorseCard from '@/components/AddHorseCard.vue'
 import RaceHeaderEditor from '@/components/RaceHeaderEditor.vue'
 import VotingDetail from '@/components/VotingDetail.vue'
 import HorseSearchSelect from '@/components/HorseSearchSelect.vue'
+import ConfirmDeleteModal from '@/components/ConfirmDeleteModal.vue'
 
 import {
   getRace,
@@ -17,6 +18,7 @@ import {
   updateRaceHorse,
   updateGateOrder,
   lockRace,
+  removeRaceHorse,
 } from '@/api/races'
 import { submitResults } from '@/api/results'
 import { updateBestWin, refreshRaceHorseSnapshot } from '@/api/horses'
@@ -136,6 +138,60 @@ const showAddHorseModal = ref(false)
 const selectedAddHorse = ref<Horse[]>([])
 const addHorseError = ref('')
 const addHorseSaving = ref(false)
+
+// Delete horse via drag
+const deleteHover = ref(false)
+const deleteTarget = ref<{ raceHorseId: number; name: string } | null>(null)
+const showDeleteConfirm = ref(false)
+const deleting = ref(false)
+
+function handleGateDragItemDragStart(e: DragEvent, horse: RaceDetail['horses'][0]) {
+  if (!isAdmin.value || !isRaceVoting.value) return
+  e.dataTransfer?.setData(
+    'application/json',
+    JSON.stringify({
+      raceHorseId: horse.race_horse_id,
+      name: horse.snapshot_data.name ?? '未知',
+    }),
+  )
+}
+
+function handleDeleteDragEnter() {
+  deleteHover.value = true
+}
+
+function handleDeleteDragLeave() {
+  deleteHover.value = false
+}
+
+function handleDeleteDrop(e: DragEvent) {
+  e.preventDefault()
+  deleteHover.value = false
+  const raw = e.dataTransfer?.getData('application/json')
+  if (!raw) return
+  try {
+    const data = JSON.parse(raw)
+    deleteTarget.value = { raceHorseId: data.raceHorseId, name: data.name }
+    showDeleteConfirm.value = true
+  } catch {
+    // ignore invalid data
+  }
+}
+
+async function confirmDeleteHorse() {
+  if (!race.value || !deleteTarget.value || deleting.value) return
+  deleting.value = true
+  try {
+    await removeRaceHorse(raceId, deleteTarget.value.raceHorseId)
+    race.value = await getRace(raceId)
+    showDeleteConfirm.value = false
+    deleteTarget.value = null
+  } catch (err: any) {
+    alert(err?.response?.data?.detail?.message || '删除马匹失败')
+  } finally {
+    deleting.value = false
+  }
+}
 
 function openAddHorseModal() {
   if (!isAdmin.value || !isRaceVoting.value) return
@@ -633,6 +689,7 @@ onUnmounted(() => {
             :key="horse.race_horse_id"
             class="gate-drag-item"
             :class="{ 'drag-over-top': gateDragOverIndex === index && isGateDragging }"
+            @dragstart="(e: DragEvent) => handleGateDragItemDragStart(e, horse)"
             @touchstart="(e: TouchEvent) => handleGateTouchStart(e, index)"
             @touchmove="handleGateTouchMove"
             @touchend="handleGateTouchEnd"
@@ -659,10 +716,20 @@ onUnmounted(() => {
               @refresh="handleRefresh(horse)"
             />
           </div>
-          <AddHorseCard
-            v-if="isAdmin && isRaceVoting"
-            @click="openAddHorseModal"
-          />
+          <div v-if="isAdmin && isRaceVoting" class="add-delete-row">
+            <AddHorseCard @click="openAddHorseModal" />
+            <div
+              class="delete-zone"
+              :class="{ 'delete-hover': deleteHover }"
+              @dragenter.prevent="handleDeleteDragEnter"
+              @dragover.prevent="handleDeleteDragEnter"
+              @dragleave="handleDeleteDragLeave"
+              @drop="handleDeleteDrop"
+            >
+              <span class="delete-icon">✕</span>
+              <span class="delete-label">拖拽至此删除</span>
+            </div>
+          </div>
         </div>
 
         <!-- Result ranking mode -->
@@ -773,6 +840,17 @@ onUnmounted(() => {
         <p v-if="addHorseError" class="modal-error">{{ addHorseError }}</p>
       </div>
     </div>
+
+    <!-- Delete Horse Confirm Modal -->
+    <ConfirmDeleteModal
+      v-if="showDeleteConfirm && deleteTarget"
+      title="从比赛中移除"
+      :item-name="deleteTarget.name"
+      message="确定将「{name}」从本场比赛中移除？此操作不可撤销。"
+      :loading="deleting"
+      @confirm="confirmDeleteHorse"
+      @cancel="showDeleteConfirm = false"
+    />
   </div>
 </template>
 
@@ -985,6 +1063,78 @@ onUnmounted(() => {
   background: var(--color-primary, #1A5632);
   border-radius: 2px;
   z-index: 1;
+}
+
+/* Add / Delete row */
+.add-delete-row {
+  display: flex;
+  gap: var(--spacing-3, 12px);
+}
+
+.add-delete-row > .add-horse-card {
+  flex: 1;
+  min-width: 0;
+}
+
+.delete-zone {
+  flex-shrink: 0;
+  width: 100px;
+  min-height: 96px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--spacing-2, 8px);
+  background: var(--color-surface-raised, #FFFFFF);
+  border: 2px dashed var(--color-border-strong, #A8B8A4);
+  border-radius: var(--rounded-md, 10px);
+  padding: var(--spacing-2, 8px);
+  transition: border-color 0.15s, background-color 0.15s;
+  cursor: default;
+  user-select: none;
+}
+
+.delete-zone.delete-hover {
+  border-color: var(--color-destructive, #C53030);
+  background: #FFF5F5;
+}
+
+.delete-icon {
+  font-size: 24px;
+  font-weight: 300;
+  color: var(--color-ink-secondary, #4A5A4A);
+  line-height: 1;
+}
+
+.delete-zone.delete-hover .delete-icon {
+  color: var(--color-destructive, #C53030);
+}
+
+.delete-label {
+  font-size: var(--text-caption, 12px);
+  color: var(--color-ink-secondary, #4A5A4A);
+  font-weight: 600;
+  text-align: center;
+  line-height: 1.3;
+}
+
+.delete-zone.delete-hover .delete-label {
+  color: var(--color-destructive, #C53030);
+}
+
+@media (max-width: 767px) {
+  .delete-zone {
+    width: 72px;
+    min-height: 72px;
+  }
+
+  .delete-icon {
+    font-size: 20px;
+  }
+
+  .delete-label {
+    font-size: 10px;
+  }
 }
 
 .voted-horse-locked {

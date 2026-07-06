@@ -63,6 +63,13 @@ export async function updateRaceHorse(
   return res.data.data
 }
 
+export async function removeRaceHorse(
+  raceId: number,
+  raceHorseId: number,
+): Promise<void> {
+  await apiClient.delete(`/races/${raceId}/horses/${raceHorseId}`)
+}
+
 export async function updateGateOrder(
   raceId: number,
   data: GateOrderPayload,

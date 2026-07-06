@@ -101,7 +101,7 @@ _This file contains critical rules and patterns that AI agents must follow when 
 - Auth check: `get_current_user` returns `None` for guests (no token), raises `TOKEN_EXPIRED` for expired tokens, `INVALID_TOKEN` for invalid tokens, `NOT_AUTHENTICATED` for valid token but user not found in DB. Returns full `User` ORM object.
 - Admin check: `get_current_admin` depends on `get_current_user`, checks `user.is_admin` ORM property, raises 403 `FORBIDDEN` for non-admins
 - Auth endpoints: `POST /api/v1/auth/login` (returns access_token + refresh_token + user), `POST /api/v1/auth/refresh` (returns new access_token from valid refresh_token). Both unauthenticated.
-- Race endpoints (`endpoints/races.py`): `GET /api/v1/races` (public, list), `GET /api/v1/races/{id}` (public, detail with snapshots), `POST /api/v1/races` (admin, create), `PATCH /api/v1/races/{id}` (admin, edit only voting), `DELETE /api/v1/races/{id}` (admin, non-settled only), `POST /api/v1/races/{race_id}/horses/{race_horse_id}/refresh-snapshot` (admin, refresh snapshot from latest Horse data).
+- Race endpoints (`endpoints/races.py`): `GET /api/v1/races` (public, list), `GET /api/v1/races/{id}` (public, detail with snapshots), `POST /api/v1/races` (admin, create), `PATCH /api/v1/races/{id}` (admin, edit only voting), `DELETE /api/v1/races/{id}` (admin, non-settled only), `POST /api/v1/races/{race_id}/horses` (admin, add horse), `DELETE /api/v1/races/{race_id}/horses/{race_horse_id}` (admin, remove horse from race, only voting state, rejects if horse has votes), `POST /api/v1/races/{race_id}/horses/{race_horse_id}/refresh-snapshot` (admin, refresh snapshot from latest Horse data).
 - Endpoints: `app/api/v1/endpoints/` — one file per domain (auth, races, horses, votes, results, leaderboard, admin)
 - API router: `app/api/v1/__init__.py` creates the APIRouter and includes all endpoint routers; `main.py` calls `app.include_router(api_v1_router)`
 - Business logic: `app/services/` — one service per domain; uses `db.flush()` + `get_db` auto-commit pattern
@@ -359,4 +359,4 @@ _This file contains critical rules and patterns that AI agents must follow when 
 - Review quarterly for outdated rules
 - Remove rules that become obvious over time
 
-Last Updated: 2026-07-03 (fix previous_result auto-update to bypass manual edit protection)
+Last Updated: 2026-07-06 (add remove horse from race drag-and-drop feature + DELETE endpoint)
