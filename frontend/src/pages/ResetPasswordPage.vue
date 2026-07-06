@@ -170,7 +170,7 @@ async function handleSubmit() {
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: var(--spacing-24) var(--spacing-16);
+  padding: var(--spacing-6) var(--spacing-4);
   background: var(--color-surface-base);
 }
 
@@ -179,8 +179,8 @@ async function handleSubmit() {
   max-width: 400px;
   background: var(--color-surface-raised);
   border-radius: var(--rounded-lg);
-  padding: var(--spacing-32);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+  padding: var(--spacing-8);
+  box-shadow: var(--shadow-md);
 }
 
 .reset-title {
@@ -189,11 +189,11 @@ async function handleSubmit() {
   font-weight: 600;
   color: var(--color-primary);
   text-align: center;
-  margin-bottom: var(--spacing-24);
+  margin-bottom: var(--spacing-6);
 }
 
 .form-field {
-  margin-bottom: var(--spacing-20);
+  margin-bottom: var(--spacing-5);
 }
 
 .form-field label {
@@ -201,12 +201,12 @@ async function handleSubmit() {
   font-size: 14px;
   font-weight: 600;
   color: var(--color-ink-primary);
-  margin-bottom: var(--spacing-8);
+  margin-bottom: var(--spacing-2);
 }
 
 .form-field input {
   width: 100%;
-  padding: 12px var(--spacing-12);
+  padding: var(--spacing-3) var(--spacing-3);
   font-size: 16px;
   color: var(--color-ink-primary);
   background: var(--color-surface-base);
@@ -230,10 +230,10 @@ async function handleSubmit() {
 .error-banner {
   background: var(--color-destructive-light);
   color: var(--color-destructive);
-  padding: var(--spacing-12);
+  padding: var(--spacing-3);
   border-radius: var(--rounded-md);
   font-size: 14px;
-  margin-bottom: var(--spacing-16);
+  margin-bottom: var(--spacing-4);
   text-align: center;
 }
 
@@ -251,7 +251,7 @@ async function handleSubmit() {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: var(--spacing-8);
+  gap: var(--spacing-2);
   min-height: 44px;
 }
 
@@ -286,7 +286,7 @@ async function handleSubmit() {
   display: flex;
   flex-direction: column;
   align-items: center;
-  margin-top: var(--spacing-20);
+  margin-top: var(--spacing-5);
 }
 
 .reset-link {
@@ -295,10 +295,13 @@ async function handleSubmit() {
   font-weight: 600;
   text-decoration: none;
   text-align: center;
+  padding: var(--spacing-1) 0;
+  transition: opacity var(--transition-fast);
 }
 
 .reset-link:hover {
   text-decoration: underline;
+  opacity: 0.85;
 }
 
 @media (prefers-reduced-motion: reduce) {
