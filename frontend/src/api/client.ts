@@ -24,36 +24,64 @@ apiClient.interceptors.request.use((config: InternalAxiosRequestConfig) => {
   return config
 })
 
-// Response interceptor: handle 401 with token refresh
+// Response interceptor: handle 401 with token refresh / redirect to login
 apiClient.interceptors.response.use(
   (response) => response,
   async (error) => {
     const originalRequest = error.config
-    if (error.response?.status === 401 && !originalRequest._retry) {
-      originalRequest._retry = true
-      const stored = localStorage.getItem('auth')
-      if (stored) {
-        try {
-          const auth = JSON.parse(stored)
-          if (auth.refreshToken) {
-            const res = await axios.post('/api/v1/auth/refresh', {
-              refresh_token: auth.refreshToken,
-            })
-            const newToken = res.data.access_token
-            // Update localStorage
-            auth.accessToken = newToken
-            localStorage.setItem('auth', JSON.stringify(auth))
-            originalRequest.headers.Authorization = `Bearer ${newToken}`
-            return apiClient(originalRequest)
+    const guestPaths = ['/login', '/register', '/reset-password']
+
+    function redirectToLoginWithExpiredSession() {
+      if (guestPaths.includes(window.location.pathname)) {
+        return
+      }
+      const currentPath = window.location.pathname + window.location.search
+      window.location.href = `/login?session=expired&redirect=${encodeURIComponent(currentPath)}`
+    }
+
+    if (error.response?.status === 401) {
+      // Avoid loops on auth pages and leave the error to the caller there
+      if (guestPaths.includes(window.location.pathname)) {
+        return Promise.reject(error)
+      }
+
+      // Try silent refresh once if we have a refresh token
+      if (!originalRequest._retry) {
+        originalRequest._retry = true
+        const stored = localStorage.getItem('auth')
+        if (stored) {
+          try {
+            const auth = JSON.parse(stored)
+            if (auth.refreshToken) {
+              try {
+                const res = await axios.post('/api/v1/auth/refresh', {
+                  refresh_token: auth.refreshToken,
+                })
+                const newToken = res.data.access_token
+                // Update localStorage
+                auth.accessToken = newToken
+                localStorage.setItem('auth', JSON.stringify(auth))
+                originalRequest.headers.Authorization = `Bearer ${newToken}`
+                return apiClient(originalRequest)
+              } catch {
+                localStorage.removeItem('auth')
+                redirectToLoginWithExpiredSession()
+                // Halt this request so callers don't render a generic error before navigation
+                return new Promise(() => {})
+              }
+            }
+          } catch {
+            // ignore parse errors
           }
-        } catch {
-          localStorage.removeItem('auth')
-          // Redirect to login with current path as redirect target
-          const currentPath = window.location.pathname + window.location.search
-          window.location.href = `/login?redirect=${encodeURIComponent(currentPath)}`
         }
       }
+
+      // No refresh token, refresh failed, or retry also failed: force login
+      localStorage.removeItem('auth')
+      redirectToLoginWithExpiredSession()
+      return new Promise(() => {})
     }
+
     return Promise.reject(error)
   },
 )

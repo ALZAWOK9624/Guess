@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useAuthStore } from '@/stores/authStore'
 
@@ -17,14 +17,23 @@ const password = ref('')
 const loading = ref(false)
 const errorMessage = ref('')
 const successMessage = ref(
-  route.query.reset === 'success' ? '密码重置成功，请用新密码登录' : ''
+  normalizeQuery(route.query.reset) === 'success' ? '密码重置成功，请用新密码登录' : ''
 )
+const sessionExpiredMessage = computed(() =>
+  normalizeQuery(route.query.session) === 'expired' ? '登录状态已过期，请重新登录' : ''
+)
+
+function normalizeQuery(value: string | string[] | null | undefined): string | undefined {
+  if (value === null || value === undefined) return undefined
+  return Array.isArray(value) ? value[0] : value
+}
 
 const tabs = [
   { mode: 'username' as LoginMode, label: '用户名登录' },
   { mode: 'qq' as LoginMode, label: 'QQ登录' },
   { mode: 'invite_code' as LoginMode, label: '邀请码登录' },
 ]
+
 
 function switchMode(mode: LoginMode) {
   loginMode.value = mode
@@ -85,7 +94,7 @@ async function handleSubmit() {
       loginData.invite_code = inviteCode.value.trim().toUpperCase()
     }
     await authStore.login(loginData as any)
-    const redirect = (route.query.redirect as string) || '/'
+    const redirect = normalizeQuery(route.query.redirect) || '/'
     router.push(redirect)
   } catch (err: any) {
     if (err?.response?.status === 422) {
@@ -109,6 +118,11 @@ async function handleSubmit() {
       <h1 class="login-title">登录</h1>
 
       <form @submit.prevent="handleSubmit" novalidate>
+        <!-- Session expired -->
+        <div v-if="sessionExpiredMessage" class="error-banner" role="alert" aria-live="polite">
+          {{ sessionExpiredMessage }}
+        </div>
+
         <!-- Success banner -->
         <div v-if="successMessage" class="success-banner" role="status" aria-live="polite">
           {{ successMessage }}
