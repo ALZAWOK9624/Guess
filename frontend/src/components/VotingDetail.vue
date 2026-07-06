@@ -38,17 +38,8 @@ onUnmounted(() => {
 })
 
 // Medal config
-const MEDAL_ICONS: Record<number, string> = {
-  1: '🥇',
-  2: '🥈',
-  3: '🥉',
-}
-
-const MEDAL_BORDERS: Record<number, string> = {
-  1: '#B8960C',
-  2: '#A0A0A0',
-  3: '#CD7F32',
-}
+const CHAMPION_ICON = '🏆'
+const CHAMPION_BORDER = '#B8960C'
 
 // Group votes by horse
 const totalVotes = computed(() => props.votes.length)
@@ -69,7 +60,7 @@ const horseGroups = computed(() => {
       count: data.count,
       percentage: totalVotes.value > 0 ? Math.round((data.count / totalVotes.value) * 100) : 0,
       voters: data.voters,
-      position: (pos && pos >= 1 && pos <= 3) ? pos : null,
+      isChampion: pos === 1,
     }
   })
 })
@@ -84,18 +75,18 @@ const chartData = computed(() => {
   const groups = horseGroups.value
   return {
     labels: groups.map(g =>
-      g.position ? `${MEDAL_ICONS[g.position]} ${g.horseName}` : g.horseName,
+      g.isChampion ? `${CHAMPION_ICON} ${g.horseName}` : g.horseName,
     ),
     datasets: [
       {
         data: groups.map(g => g.count),
         backgroundColor: groups.map((_, i) => COLORS[i % COLORS.length]),
-        borderWidth: groups.map(g => (g.position ? 4 : 2)),
+        borderWidth: groups.map(g => (g.isChampion ? 4 : 2)),
         borderColor: groups.map(g =>
-          g.position ? MEDAL_BORDERS[g.position] : '#FFFFFF',
+          g.isChampion ? CHAMPION_BORDER : '#FFFFFF',
         ),
-        hoverOffset: groups.map(g => (g.position ? 12 : 8)),
-        offset: groups.map(g => (g.position ? 8 : 0)),
+        hoverOffset: groups.map(g => (g.isChampion ? 12 : 8)),
+        offset: groups.map(g => (g.isChampion ? 8 : 0)),
       },
     ],
   }

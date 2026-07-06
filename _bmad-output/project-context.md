@@ -285,7 +285,7 @@ _This file contains critical rules and patterns that AI agents must follow when 
 - 比赛详情页中的赛马卡片（HorseDetailCard）直接可点击投票——点击卡片 = 投票/取消/切换
 - 游客点击卡片 → 跳转登录页；管理员不可投票
 - 新增投票提示条（`vote-hint`）：引导用户操作
-- VotingDetail 组件在投票/锁定比赛时显示"用户名 → 马匹名"分布，刷新策略：仅在页面加载和投票成功后刷新，无轮询
+- VotingDetail 组件使用 Chart.js Doughnut 饼图展示投票分布，按马匹分组显示票数占比。悬停 tooltip 显示票数/百分比和投票人名单。已结算比赛通过 `horsePositions` prop 传入冠军信息，冠军马扇区显示金色边框 + 🏆 图标 + 弹出偏移。所有比赛状态（voting/locked/settled）均显示投票分布。刷新策略：仅在页面加载和投票成功后刷新，无轮询。依赖：`chart.js ^4.5.1` + `vue-chartjs ^5.3.3`。
 - HorseSelectCard 已被删除，无单选组需求——每张卡片独立可点击
 
 **HomePage 首场比赛列表投票状态模式：**
