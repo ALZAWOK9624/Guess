@@ -9,7 +9,7 @@ const router = useRouter()
 
 // Form fields
 const raceName = ref('')
-const raceDate = ref('')
+const raceDate = ref(new Date().toISOString().split('T')[0])
 const raceGrade = ref<string>('G1')
 const selectedHorses = ref<Horse[]>([])
 const customPositiveScores = ref('')
