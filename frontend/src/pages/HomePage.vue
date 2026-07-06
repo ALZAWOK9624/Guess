@@ -188,7 +188,7 @@ onMounted(loadData)
         </div>
         <div class="form-group">
           <label for="race-date">比赛日期</label>
-          <input id="race-date" v-model="createForm.date" type="date" required />
+          <input id="race-date" v-model="createForm.date" type="date" :class="{ 'is-empty': !createForm.date }" />
         </div>
         <div class="form-group">
           <label>比赛等级</label>

@@ -153,11 +153,10 @@ table {
    "yyyy/mm/dd" shown by browser in zh-CN locale
    ========================================= */
 
-input[type="date"] {
+input[type="date"].is-empty {
   color: transparent;
 }
 
-input[type="date"]:focus,
-input[type="date"]:valid {
+input[type="date"].is-empty:focus {
   color: inherit;
 }

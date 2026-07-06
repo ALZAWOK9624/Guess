@@ -84,7 +84,7 @@ watch(
           v-model="editDate"
           type="date"
           class="edit-input date-input"
-          required
+          :class="{ 'is-empty': !editDate }"
           @keydown="handleDateKeydown"
           @blur="submitEdit"
         />

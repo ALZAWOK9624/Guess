@@ -265,7 +265,7 @@ async function handleDelete() {
 
       <div class="form-group">
         <label class="form-label" for="race-date">日期</label>
-        <input id="race-date" v-model="raceDate" type="date" class="form-input" required />
+        <input id="race-date" v-model="raceDate" type="date" class="form-input" :class="{ 'is-empty': !raceDate }" />
       </div>
 
       <div class="form-group">

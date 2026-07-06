@@ -180,7 +180,7 @@ async function handleSubmit() {
           v-model="raceDate"
           type="date"
           class="form-input"
-          required
+          :class="{ 'is-empty': !raceDate }"
           aria-required="true"
           :aria-invalid="!!errors.date"
         />
