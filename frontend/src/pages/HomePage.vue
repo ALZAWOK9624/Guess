@@ -1,11 +1,11 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/authStore'
 import RaceCard from '@/components/RaceCard.vue'
 import GradeBadge from '@/components/GradeBadge.vue'
 import StatusBadge from '@/components/StatusBadge.vue'
-import { getRaces, createRace } from '@/api/races'
+import { getRaces, createRace, toggleRaceHidden } from '@/api/races'
 import type { RaceListItem } from '@/types/race'
 import type { Grade } from '@/types/race'
 
@@ -17,6 +17,13 @@ const pageState = ref<PageState>('loading')
 const races = ref<RaceListItem[]>([])
 const errorMessage = ref('加载失败，请刷新重试')
 const refreshing = ref(false)
+
+// Client-side filter: non-admin users should not see hidden races
+// This ensures immediate effect when logging out without a re-fetch
+const visibleRaces = computed(() => {
+  if (authStore.isAdmin) return races.value
+  return races.value.filter(r => !r.is_hidden)
+})
 
 // Create race modal
 const showCreateModal = ref(false)
@@ -34,6 +41,23 @@ const gradeOptions: { value: Grade; label: string }[] = [
   { value: 'YOUNG_G1', label: '2岁G1' },
   { value: 'CUSTOM', label: '自定义' },
 ]
+
+// Toggle hidden state
+const togglingHiddenId = ref<number | null>(null)
+
+async function handleToggleHidden(raceId: number) {
+  if (togglingHiddenId.value !== null) return
+  togglingHiddenId.value = raceId
+  try {
+    const result = await toggleRaceHidden(raceId)
+    const race = races.value.find(r => r.id === raceId)
+    if (race) race.is_hidden = result.is_hidden
+  } catch {
+    // silently fail
+  } finally {
+    togglingHiddenId.value = null
+  }
+}
 
 async function loadData() {
   pageState.value = 'loading'
@@ -134,9 +158,10 @@ onMounted(loadData)
     <template v-else>
       <div class="race-list">
         <div
-          v-for="race in races"
+          v-for="race in visibleRaces"
           :key="race.id"
           class="race-card-wrapper"
+          :class="{ 'race-hidden': race.is_hidden }"
           @click="goToRaceDetail(race.id)"
         >
           <div class="race-card">
@@ -151,6 +176,28 @@ onMounted(loadData)
               >
                 {{ race.has_voted ? '已投票' : '未投票' }}
               </span>
+              <button
+                v-if="authStore.isAdmin"
+                class="eye-btn"
+                :class="{ 'eye-hidden': race.is_hidden }"
+                :disabled="togglingHiddenId === race.id"
+                :title="race.is_hidden ? '已隐藏，点击取消隐藏' : '点击隐藏比赛'"
+                :aria-label="race.is_hidden ? '取消隐藏' : '隐藏'"
+                @click.stop="handleToggleHidden(race.id)"
+              >
+                <span v-if="togglingHiddenId === race.id" class="eye-spinner"></span>
+                <svg v-else width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <template v-if="race.is_hidden">
+                    <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/>
+                    <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/>
+                    <line x1="1" y1="1" x2="23" y2="23"/>
+                  </template>
+                  <template v-else>
+                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                    <circle cx="12" cy="12" r="3"/>
+                  </template>
+                </svg>
+              </button>
             </div>
             <div class="card-body">
               <span class="race-date">{{ race.date }}</span>
@@ -290,6 +337,61 @@ onMounted(loadData)
   color: var(--color-primary, #1A5632);
   background: #EDF5EF;
   border-color: var(--color-primary, #1A5632);
+}
+
+/* Eye toggle button */
+.eye-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border: 1px solid var(--color-border-hairline, #D4DCD0);
+  border-radius: var(--rounded-sm, 6px);
+  background: var(--color-surface-raised, #FFFFFF);
+  color: var(--color-ink-secondary, #4A5A4A);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: color 0.15s, border-color 0.15s, background-color 0.15s;
+  padding: 0;
+}
+
+.eye-btn:hover:not(:disabled) {
+  border-color: var(--color-primary, #1A5632);
+  color: var(--color-primary, #1A5632);
+}
+
+.eye-btn.eye-hidden {
+  color: var(--color-destructive, #C53030);
+  border-color: var(--color-destructive, #C53030);
+  background: #FFF5F5;
+}
+
+.eye-btn.eye-hidden:hover:not(:disabled) {
+  background: #FED7D7;
+}
+
+.eye-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.eye-spinner {
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  border: 2px solid var(--color-border-hairline, #D4DCD0);
+  border-top-color: var(--color-primary, #1A5632);
+  border-radius: 50%;
+  animation: eye-spin 0.6s linear infinite;
+}
+
+@keyframes eye-spin {
+  to { transform: rotate(360deg); }
+}
+
+.race-hidden .race-card {
+  opacity: 0.5;
 }
 
 .card-body {

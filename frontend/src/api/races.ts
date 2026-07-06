@@ -87,3 +87,10 @@ export async function lockRace(raceId: number): Promise<{ id: number; name: stri
   )
   return res.data.data
 }
+
+export async function toggleRaceHidden(raceId: number): Promise<{ id: number; is_hidden: boolean }> {
+  const res = await apiClient.patch<{ data: { id: number; is_hidden: boolean } }>(
+    `/races/${raceId}/toggle-hidden`,
+  )
+  return res.data.data
+}

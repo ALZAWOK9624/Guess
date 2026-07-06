@@ -6,7 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_admin, get_optional_user
 from app.core.database import get_db
-from app.models.race import RaceStatus
+from app.models.race import Race, RaceStatus
 from app.models.user import User
 from app.schemas.race import (
     AddRaceHorseRequest,
@@ -29,9 +29,13 @@ async def list_races(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_optional_user),
 ):
-    """Get all races. Supports optional ?status=xxx filter. Public endpoint."""
+    """Get all races. Supports optional ?status=xxx filter. Public endpoint.
+
+    Hidden races are only visible to admin users.
+    """
     from app.models.vote import Vote
-    races = await race_service.get_races(db, status)
+    include_hidden = current_user is not None and current_user.is_admin
+    races = await race_service.get_races(db, status, include_hidden=include_hidden)
     items = []
     race_ids = [race.id for race in races] if current_user else None
     voted_race_ids: set[int] = set()
@@ -51,6 +55,7 @@ async def list_races(
             grade=race.grade.value,
             status=race.status.value,
             custom_scoring=CustomScoring(**race.custom_scoring) if race.custom_scoring else None,
+            is_hidden=race.is_hidden,
             horse_count=len(race.race_horses),
             vote_count=vc,
             has_voted=race.id in voted_race_ids,
@@ -85,14 +90,28 @@ def _sort_horses_by_gate(race_horses: list) -> list:
 async def get_race(
     race_id: int,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_optional_user),
 ):
-    """Get a single race by ID with horse snapshots. Public endpoint."""
+    """Get a single race by ID with horse snapshots. Public endpoint.
+
+    Hidden races are only visible to admin users. Non-admin users
+    get a 404 for hidden races.
+    """
     race = await race_service.get_race(db, race_id)
     if race is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail={"code": "NOT_FOUND", "message": "比赛不存在"},
         )
+
+    # Hide hidden races from non-admin users
+    is_admin = current_user is not None and current_user.is_admin
+    if race.is_hidden and not is_admin:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={"code": "RACE_HIDDEN", "message": "当前比赛已隐藏"},
+        )
+
     vc = await race_service.get_race_vote_count(db, race.id)
 
     # Load grouped votes for settled races
@@ -107,6 +126,7 @@ async def get_race(
         grade=race.grade.value,
         status=race.status.value,
         custom_scoring=CustomScoring(**race.custom_scoring) if race.custom_scoring else None,
+        is_hidden=race.is_hidden,
         horses=[_build_horse_dict(rh) for rh in _sort_horses_by_gate(race.race_horses)],
         horse_votes={"horses": horse_votes_data} if horse_votes_data is not None else None,
         vote_count=vc,
@@ -133,6 +153,7 @@ async def create_race(
         grade=race.grade.value,
         status=race.status.value,
         custom_scoring=CustomScoring(**race.custom_scoring) if race.custom_scoring else None,
+        is_hidden=race.is_hidden,
         horses=[_build_horse_dict(rh) for rh in _sort_horses_by_gate(race.race_horses)],
         vote_count=vc,
         created_at=race.created_at,
@@ -159,6 +180,7 @@ async def update_race(
         grade=race.grade.value,
         status=race.status.value,
         custom_scoring=CustomScoring(**race.custom_scoring) if race.custom_scoring else None,
+        is_hidden=race.is_hidden,
         horses=[_build_horse_dict(rh) for rh in _sort_horses_by_gate(race.race_horses)],
         vote_count=vc,
         created_at=race.created_at,
@@ -208,6 +230,7 @@ async def update_gate_order(
         grade=race.grade.value,
         status=race.status.value,
         custom_scoring=CustomScoring(**race.custom_scoring) if race.custom_scoring else None,
+        is_hidden=race.is_hidden,
         horses=[_build_horse_dict(rh) for rh in _sort_horses_by_gate(race.race_horses)],
         vote_count=vc,
         created_at=race.created_at,
@@ -252,3 +275,16 @@ async def refresh_race_horse_snapshot_endpoint(
     """Refresh a race horse's snapshot data from the latest Horse data. Admin only."""
     race_horse = await race_service.refresh_race_horse_snapshot(db, race_id, race_horse_id)
     return {"data": _build_horse_dict(race_horse)}
+
+
+@router.patch("/{race_id}/toggle-hidden")
+async def toggle_race_hidden_endpoint(
+    race_id: int,
+    db: AsyncSession = Depends(get_db),
+    admin=Depends(get_current_admin),
+):
+    """Toggle the is_hidden flag for a race. Admin only.
+    Hidden races are invisible to non-admin users on both the list and detail page.
+    """
+    race = await race_service.toggle_race_hidden(db, race_id)
+    return {"data": {"id": race.id, "is_hidden": race.is_hidden}}

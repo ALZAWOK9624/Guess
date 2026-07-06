@@ -146,6 +146,7 @@ class RaceListResponse(BaseModel):
     grade: str
     status: str
     custom_scoring: CustomScoring | None = None
+    is_hidden: bool = False
     horse_count: int
     vote_count: int
     has_voted: bool = False
@@ -161,6 +162,7 @@ class RaceDetailResponse(BaseModel):
     grade: str
     status: str
     custom_scoring: CustomScoring | None = None
+    is_hidden: bool = False
     horses: list[RaceHorseResponse]
     horse_votes: dict | None = None  # populated for settled races
     vote_count: int

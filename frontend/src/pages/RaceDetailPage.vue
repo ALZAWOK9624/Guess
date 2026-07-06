@@ -19,6 +19,7 @@ import {
   updateGateOrder,
   lockRace,
   removeRaceHorse,
+  toggleRaceHidden,
 } from '@/api/races'
 import { submitResults } from '@/api/results'
 import { updateBestWin, refreshRaceHorseSnapshot } from '@/api/horses'
@@ -514,6 +515,22 @@ async function handleConfirmResult() {
   }
 }
 
+// Toggle hidden
+const togglingHidden = ref(false)
+
+async function handleToggleHidden() {
+  if (!race.value || togglingHidden.value) return
+  togglingHidden.value = true
+  try {
+    const result = await toggleRaceHidden(race.value.id)
+    race.value.is_hidden = result.is_hidden
+  } catch {
+    // silently fail
+  } finally {
+    togglingHidden.value = false
+  }
+}
+
 // Best win update
 const updatingBestWin = ref(false)
 const bestWinUpdateError = ref('')
@@ -547,6 +564,7 @@ async function handleUpdateBestWin() {
 
 async function loadRace() {
   pageState.value = 'loading'
+  errorMessage.value = '加载失败，请刷新重试'
   try {
     race.value = await getRace(raceId)
     pageState.value = 'success'
@@ -554,8 +572,12 @@ async function loadRace() {
       await loadVotes(raceId)
       checkUserVote()
     }
-  } catch {
+  } catch (err: any) {
     pageState.value = 'error'
+    const code = err?.response?.data?.detail?.code
+    if (code === 'RACE_HIDDEN') {
+      errorMessage.value = '当前比赛已隐藏'
+    }
   }
 }
 
@@ -577,10 +599,18 @@ onUnmounted(() => {
     <div v-else-if="pageState === 'error'" class="state-container">
       <p class="error-text">{{ errorMessage }}</p>
       <button
+        v-if="errorMessage !== '当前比赛已隐藏'"
         class="refresh-btn"
         @click="router.go(0)"
       >
         刷新重试
+      </button>
+      <button
+        v-if="errorMessage === '当前比赛已隐藏'"
+        class="refresh-btn"
+        @click="router.push('/')"
+      >
+        返回首页
       </button>
     </div>
 
@@ -603,6 +633,28 @@ onUnmounted(() => {
             <h1 class="race-name">{{ race.name }}</h1>
           </template>
           <StatusBadge :status="race.status as any" />
+          <button
+            v-if="isAdmin"
+            class="eye-btn"
+            :class="{ 'eye-hidden': race.is_hidden }"
+            :disabled="togglingHidden"
+            :title="race.is_hidden ? '已隐藏，点击取消隐藏' : '点击隐藏比赛'"
+            :aria-label="race.is_hidden ? '取消隐藏' : '隐藏'"
+            @click="handleToggleHidden"
+          >
+            <span v-if="togglingHidden" class="eye-spinner"></span>
+            <svg v-else width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <template v-if="race.is_hidden">
+                <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/>
+                <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/>
+                <line x1="1" y1="1" x2="23" y2="23"/>
+              </template>
+              <template v-else>
+                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                <circle cx="12" cy="12" r="3"/>
+              </template>
+            </svg>
+          </button>
         </div>
 
         <div class="race-subinfo">
@@ -900,6 +952,57 @@ onUnmounted(() => {
   color: var(--color-ink-primary, #1A2E1A);
   margin: 0;
   line-height: 1.25;
+}
+
+/* Eye toggle button */
+.eye-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border: 1px solid var(--color-border-hairline, #D4DCD0);
+  border-radius: var(--rounded-sm, 6px);
+  background: var(--color-surface-raised, #FFFFFF);
+  color: var(--color-ink-secondary, #4A5A4A);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: color 0.15s, border-color 0.15s, background-color 0.15s;
+  padding: 0;
+}
+
+.eye-btn:hover:not(:disabled) {
+  border-color: var(--color-primary, #1A5632);
+  color: var(--color-primary, #1A5632);
+}
+
+.eye-btn.eye-hidden {
+  color: var(--color-destructive, #C53030);
+  border-color: var(--color-destructive, #C53030);
+  background: #FFF5F5;
+}
+
+.eye-btn.eye-hidden:hover:not(:disabled) {
+  background: #FED7D7;
+}
+
+.eye-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.eye-spinner {
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  border: 2px solid var(--color-border-hairline, #D4DCD0);
+  border-top-color: var(--color-primary, #1A5632);
+  border-radius: 50%;
+  animation: eye-spin 0.6s linear infinite;
+}
+
+@keyframes eye-spin {
+  to { transform: rotate(360deg); }
 }
 
 .race-subinfo {

@@ -14,17 +14,22 @@ from app.schemas.race import CustomScoring, RaceCreate, RaceUpdate
 
 
 async def get_races(
-    db: AsyncSession, status_filter: str | None = None
+    db: AsyncSession, status_filter: str | None = None,
+    include_hidden: bool = False,
 ) -> list[Race]:
     """Get all races, optionally filtered by status.
 
     Returns races ordered by date descending with horse_count and vote_count.
+    When include_hidden=False, hidden races are excluded.
     """
     stmt = (
         select(Race)
         .options(selectinload(Race.race_horses))
         .order_by(Race.date.desc(), Race.created_at.desc())
     )
+
+    if not include_hidden:
+        stmt = stmt.where(Race.is_hidden == False)
 
     if status_filter:
         try:
@@ -45,8 +50,14 @@ async def get_races(
     return races
 
 
-async def get_race(db: AsyncSession, race_id: int) -> Race | None:
-    """Get a single race by ID with horses eagerly loaded."""
+async def get_race(
+    db: AsyncSession, race_id: int, include_hidden: bool = False,
+) -> Race | None:
+    """Get a single race by ID with horses eagerly loaded.
+
+    When include_hidden=False, hidden races are treated as not found
+    for non-admin users (the endpoint layer should handle this check).
+    """
     stmt = (
         select(Race)
         .options(selectinload(Race.race_horses))
@@ -655,6 +666,21 @@ async def delete_race(db: AsyncSession, race_id: int) -> None:
 
     await db.delete(race)
     await db.flush()
+
+
+async def toggle_race_hidden(db: AsyncSession, race_id: int) -> Race:
+    """Toggle the is_hidden flag for a race. Admin only."""
+    race = await get_race(db, race_id)
+    if race is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={"code": "NOT_FOUND", "message": "比赛不存在"},
+        )
+
+    race.is_hidden = not race.is_hidden
+    await db.flush()
+    await db.refresh(race, ["race_horses"])
+    return race
 
 
 # ===== Auto-Update Hook (Story 2.5) =====

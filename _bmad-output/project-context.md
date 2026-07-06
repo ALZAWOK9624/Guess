@@ -312,6 +312,14 @@ _This file contains critical rules and patterns that AI agents must follow when 
 - **review 通过后的 story 状态转换**：code-review 发现被全部修复后，story 状态从 `review` → `done`。同时 sprint-status.yaml 同步更新。此流程在 code-review 工作流的 Step 6 中自动执行。
 - **catch 规范**：所有 `catch` 块必须使用 `catch (err)`（非裸 `catch`），以便区分错误类型。即使在仅设置 error 状态的简单场景中也需遵守此规范。
 
+**隐藏比赛模式：**
+- **Race 模型新增 `is_hidden` 列**：默认为 `False`，布尔类型。迁移通过 Alembic 新增列并设置 `server_default=false`。该字段仅影响可见性，不影响投票、积分、结算等业务逻辑。
+- **Service 层 `include_hidden` 参数模式**：`get_races()` 和 `get_race()` 新增 `include_hidden: bool = False` 参数。调用方（端点层）根据当前用户是否为管理员传递该参数。非管理员且 `include_hidden=False` 时，`is_hidden=True` 的比赛从查询结果中排除。
+- **端点 `PATCH /{race_id}/toggle-hidden`**：管理员专用端点，切换 `is_hidden` 标志。Service 层 `toggle_race_hidden()` 执行 `race.is_hidden = not race.is_hidden` 后 `flush()` + `refresh()`。
+- **错误码模式**：非管理员访问隐藏比赛详情时返回 `404` 但错误码为 `RACE_HIDDEN`（区别于通用的 `NOT_FOUND`），便于前端显示"当前比赛已隐藏"。
+- **前端客户端过滤模式**：`HomePage.vue` 使用 `visibleRaces` 计算属性在客户端过滤隐藏比赛：`authStore.isAdmin` 时显示全部，否则过滤 `is_hidden=true` 的比赛。此模式确保退出登录时隐藏比赛立即消失（无需重新请求）。
+- **前端眼睛按钮模式**：管理员在每个比赛卡片和详情页标题栏看到眼睛 SVG 按钮，点击切换隐藏状态。隐藏状态下按钮为红色边框+横线眼睛图标，卡片半透明显示。使用 `@click.stop` 阻止卡片点击冒泡。
+
 **已结算结果展示模式（Story 3.6）：**
 - **RaceResultView 组件模式**：`RaceResultView.vue` 用于在比赛详情页展示已结算比赛的完整排名、投票和积分。接收 `horses: RaceHorseResult[]` props（按 position 排序后的数组）。纯展示组件，无交互——与 VotingDetail（用于 voting/locked 状态）分离，不可混用。
 - **horse_votes 端点扩展模式**：`GET /api/v1/races/{race_id}` 在已结算状态下扩展返回 `horse_votes` 字段：`{"horses": [{"race_horse_id": id, "horse_id": id, "snapshot_data": {...}, "position": 1, "votes": [{"username": "user", "points": 10}]}]}`。条件判断使用 `race.status == RaceStatus.SETTLED`（枚举比较，非字符串比较）。空列表判断使用 `is not None` 而非布尔真假（避免空列表 `[]` 被当作 falsy）。
@@ -363,4 +371,4 @@ _This file contains critical rules and patterns that AI agents must follow when 
 - Review quarterly for outdated rules
 - Remove rules that become obvious over time
 
-Last Updated: 2026-07-06 (admin session expiry popup; 401 interceptor redirect; JWT parsing utility; admin nav trimmed to 马匹管理/用户管理; scroll-container added for fixed header scrollbar prevention; UI style unification across admin pages)
+Last Updated: 2026-07-06 (hidden race toggle with eye button; client-side filter for auth-based visibility; RACE_HIDDEN error code; migrations)

@@ -3,7 +3,7 @@
 import enum
 from datetime import date, datetime
 
-from sqlalchemy import Date, DateTime, Enum, ForeignKey, Integer, JSON, String, func
+from sqlalchemy import Boolean, Date, DateTime, Enum, ForeignKey, Integer, JSON, String, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models import Base
@@ -37,6 +37,7 @@ class Race(Base):
         default=RaceStatus.VOTING,
     )
     custom_scoring: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    is_hidden: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     creator_id: Mapped[int] = mapped_column(
         Integer, ForeignKey("users.id"), nullable=False
     )

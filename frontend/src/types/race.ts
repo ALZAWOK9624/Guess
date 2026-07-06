@@ -6,6 +6,7 @@ export interface RaceListItem {
   date: string
   grade: Grade
   status: RaceStatus
+  is_hidden: boolean
   horse_count: number
   vote_count: number
   has_voted: boolean
@@ -19,6 +20,7 @@ export interface RaceDetail {
   date: string
   grade: Grade
   status: RaceStatus
+  is_hidden: boolean
   custom_scoring: CustomScoring | null
   horses: RaceHorseSnapshot[]
   horse_votes?: RaceDetailHorseVotes | null  // only for settled races
