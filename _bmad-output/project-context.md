@@ -1,12 +1,12 @@
 ---
 project_name: 'guess'
 user_name: 'tkd'
-date: '2026-07-03'
-story: 'unified-admin-race-page'
+date: '2026-07-06'
+story: 'ui-alignment-and-date-placeholder-fixes'
 sections_completed:
   ['technology_stack', 'language_rules', 'framework_rules', 'testing_rules', 'code_quality', 'workflow', 'critical_rules']
 status: 'complete'
-rule_count: 95
+rule_count: 98
 optimized_for_llm: true
 ---
 
@@ -188,7 +188,7 @@ _This file contains critical rules and patterns that AI agents must follow when 
 - Do NOT implement OAuth/3rd-party login — username + password + invite code only
 - Do NOT implement dark mode — v1 is light mode only
 - Admin routes are top-level routes (no child layout) — they share `AppLayout` with all other pages. The nav bar has a "管理" dropdown for admin sub-navigation.
-- Do NOT use `!important` globally except in utility classes (`.hidden`, `.mobile-only`, `.desktop-only`) and reduced-motion override
+- Do NOT use `!important` globally except in utility classes (`.hidden`, `.mobile-only`, `.desktop-only`), reduced-motion override, and date-input `::-webkit-datetime-edit` shadow DOM hiding (needed to override browser default styles)
 - **Do NOT import `useAuthStore` in `client.ts`** — circular dependency (authStore → api/auth.ts → client.ts). Auth token source of truth is **localStorage**, read by request interceptor. Store's `accessToken` ref is synced via `persistAuth()`/`clearAuth()`/`restoreSession()`.
 - Do NOT use bare `catch` blocks on async functions — always use `catch (err)` to enable error differentiation. Future stories should follow the async/await + structured error handling pattern.
 - Do NOT duplicate `@keyframes skeleton-shimmer` in component scoped styles — use the global animation from `base.css` instead.
@@ -259,6 +259,9 @@ _This file contains critical rules and patterns that AI agents must follow when 
 - 管理后台 CRUD 页面使用 `<Teleport to="body">` 模态框进行创建/编辑操作，搜索框使用 300ms 防抖（`watch(search, debouncedSearch)` + `setTimeout`）。
 - **PATCH 编辑模式的关键模式**：`handleSave` 在编辑时必须按字段逐一比较当前值与原始值的差异，**仅发送变更的字段**，而非发送所有字段为 `null`。否则后端 `exclude_unset=True` 无法区分"用户未修改"和"用户将某字段清空为 null"——发送 `null` 会覆盖数据库中的已有值。参考实现：`frontend/src/pages/admin/HorsesPage.vue` 中的 `handleSave`。
 - 新建数据后不推荐 `unshift`，应 `push` 后按显示顺序 `sort()` 避免与后端排序不一致导致的视觉跳跃。
+- **HorseSearchSelect 点击即选模式**：搜索下拉选中马匹后立即关闭下拉框并清空搜索词（`showDropdown = false` + `searchText = ''`），而非在下拉框中打钩多选。点击行为为**追加模式**（`selectedHorses = [...selectedHorses, horse]`），已选马匹不会重复添加。通过上方 tag 展示已选列表，配合父组件的"添加"按钮一次性提交。
+- **Date input 原生占位文字隐藏模式**：`<input type="date">` 在中文 locale 下浏览器显示 "yyyy/mm/dd" 原生占位文字。解决方案：在 `base.css` 中全局定义 `input[type="date"].is-empty::-webkit-datetime-edit { visibility: hidden !important; }` + `input[type="date"].is-empty:focus::-webkit-datetime-edit { visibility: visible !important; }`，每个 date input 添加 `:class="{ 'is-empty': !modelVar }"` 让 Vue 响应式追踪空值状态。空值未聚焦时隐藏，聚焦或已有值时正常显示。
+- **CSS 变量使用规范**：`variables.css` 中定义的 spacing 变量名称为 `--spacing-{N}`（N×4px，如 `--spacing-1`=4px、`--spacing-2`=8px、`--spacing-3`=12px、`--spacing-4`=16px、`--spacing-5`=20px、`--spacing-6`=24px、`--spacing-8`=32px、`--spacing-10`=40px、`--spacing-12`=48px、`--spacing-16`=64px）。**不存在** `--spacing-20`、`--spacing-24`、`--spacing-32` 等变量，使用这些不存在的变量会导致整个 CSS 声明失效。页面排版错乱时优先检查是否引用了不存在的 spacing 变量。
 
 **VoteButton 状态机（Story 3.3）已迁移为卡片点击投票模式：**
 - `VoteButton.vue` 已被移除，改为 `HorseDetailCard.vue` 直接支持点击投票
@@ -359,4 +362,4 @@ _This file contains critical rules and patterns that AI agents must follow when 
 - Review quarterly for outdated rules
 - Remove rules that become obvious over time
 
-Last Updated: 2026-07-06 (add remove horse from race drag-and-drop feature + DELETE endpoint)
+Last Updated: 2026-07-06 (UI alignment fixes: auth pages spacing tokens, race header alignment, date placeholder hiding)
