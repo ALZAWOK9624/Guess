@@ -74,12 +74,9 @@ function isSelected(horse: Horse): boolean {
 }
 
 function selectHorse(horse: Horse) {
-  // Single-select: replace current selection with this horse
-  if (isSelected(horse)) {
-    // Already selected — deselect and close
-    selectedHorses.value = selectedHorses.value.filter((h) => h.id !== horse.id)
-  } else {
-    selectedHorses.value = [horse]
+  // Only add if not already selected (no duplicates)
+  if (!isSelected(horse)) {
+    selectedHorses.value = [...selectedHorses.value, horse]
   }
   // Close dropdown and clear search immediately
   showDropdown.value = false
