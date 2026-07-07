@@ -109,6 +109,27 @@ def _get_penalty_score(
     return 0
 
 
+def derive_scoring_grade(age_range: str, race_grade: str) -> str:
+    """Derive the scoring grade from race tags.
+
+    Maps the new 5-tag system to the original 4 scoring modes.
+
+    Args:
+        age_range: Age range tag ("2岁", "2+岁", "3岁", "3+岁", "4+岁", "其他").
+        race_grade: Race grade tag ("G1", "G2", "G3", "JPN1", "JPN2", "其他", "自定义").
+
+    Returns:
+        One of "G1", "G2_JPN1", "YOUNG_G1", "CUSTOM".
+    """
+    if race_grade == "自定义":
+        return "CUSTOM"
+    if age_range == "2岁" and race_grade == "G1":
+        return "YOUNG_G1"
+    if race_grade not in ("G1", "自定义"):
+        return "G2_JPN1"
+    return "G1"
+
+
 def calculate_score(
     grade: str,
     total_horses: int,

@@ -7,7 +7,7 @@ from httpx import AsyncClient
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.race import GradeEnum, Race, RaceHorse, RaceStatus
+from app.models.race import Race, RaceHorse, RaceStatus
 from app.models.user import User
 from app.models.vote import Vote
 from app.schemas.result import ResultEntry, ResultPosition
@@ -30,7 +30,8 @@ async def leaderboard_data(db_session: AsyncSession) -> dict:
 
     # Race 1: G1, 4 horses
     race1 = Race(
-        name="Race 1", date=date(2026, 6, 1), grade=GradeEnum.G1,
+        name="Race 1", date=date(2026, 6, 1),
+        age_range="其他", sex_restriction="无", race_grade="G1", country="日本", distance="1200m",
         status=RaceStatus.LOCKED, creator_id=admin.id,
     )
     db_session.add(race1)
@@ -64,7 +65,8 @@ async def leaderboard_data(db_session: AsyncSession) -> dict:
 
     # Race 2: G1, 3 horses
     race2 = Race(
-        name="Race 2", date=date(2026, 6, 8), grade=GradeEnum.G1,
+        name="Race 2", date=date(2026, 6, 8),
+        age_range="其他", sex_restriction="无", race_grade="G1", country="日本", distance="1200m",
         status=RaceStatus.LOCKED, creator_id=admin.id,
     )
     db_session.add(race2)
@@ -182,7 +184,8 @@ async def test_leaderboard_tie_breaking(db_session: AsyncSession):
 
     # Race 1: G1, 4 horses — both users vote
     race1 = Race(
-        name="Race 1", date=date(2026, 6, 15), grade=GradeEnum.G1,
+        name="Race 1", date=date(2026, 6, 15),
+        age_range="其他", sex_restriction="无", race_grade="G1", country="日本", distance="1200m",
         status=RaceStatus.LOCKED, creator_id=admin.id,
     )
     db_session.add(race1)
@@ -218,7 +221,8 @@ async def test_leaderboard_tie_breaking(db_session: AsyncSession):
     # Race 2: G1, 3 horses — only user_b votes, gets 2nd position (+5)
     # Result: user_a=10pts(1 race avg=10), user_b=10pts(2 races avg=5)
     race2 = Race(
-        name="Race 2", date=date(2026, 6, 16), grade=GradeEnum.G1,
+        name="Race 2", date=date(2026, 6, 16),
+        age_range="其他", sex_restriction="无", race_grade="G1", country="日本", distance="1200m",
         status=RaceStatus.LOCKED, creator_id=admin.id,
     )
     db_session.add(race2)
@@ -268,7 +272,8 @@ async def test_leaderboard_dnf_handling(db_session: AsyncSession):
     await db_session.flush()
 
     race = Race(
-        name="DNF Race", date=date(2026, 6, 15), grade=GradeEnum.G1,
+        name="DNF Race", date=date(2026, 6, 15),
+        age_range="其他", sex_restriction="无", race_grade="G1", country="日本", distance="1200m",
         status=RaceStatus.LOCKED, creator_id=admin.id,
     )
     db_session.add(race)

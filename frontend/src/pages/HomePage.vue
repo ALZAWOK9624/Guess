@@ -3,13 +3,11 @@ import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/authStore'
 import RaceCard from '@/components/RaceCard.vue'
-import GradeBadge from '@/components/GradeBadge.vue'
 import StatusBadge from '@/components/StatusBadge.vue'
 import { getRaces, createRace, toggleRaceHidden } from '@/api/races'
 import type { RaceListItem } from '@/types/race'
-import type { Grade } from '@/types/race'
 
-const showCustomFields = computed(() => createForm.value.grade === 'CUSTOM')
+const showCustomFields = computed(() => createForm.value.race_grade === '自定义')
 
 type PageState = 'loading' | 'empty' | 'error' | 'success'
 
@@ -32,19 +30,21 @@ const showCreateModal = ref(false)
 const createForm = ref({
   name: '',
   date: '',
-  grade: 'G1' as Grade,
+  age_range: '2岁',
+  sex_restriction: '无',
+  race_grade: 'G1',
+  country: '日本',
+  distance: '',
   positiveScores: '',
   penaltyRules: '',
 })
 const creating = ref(false)
 const createError = ref('')
 
-const gradeOptions: { value: Grade; label: string }[] = [
-  { value: 'G1', label: 'G1' },
-  { value: 'G2_JPN1', label: 'G2·JPN1' },
-  { value: 'YOUNG_G1', label: '2岁G1' },
-  { value: 'CUSTOM', label: '自定义' },
-]
+const ageRangeOptions = ['2岁', '2+岁', '3岁', '3+岁', '4+岁', '其他']
+const sexRestrictionOptions = ['无', '牝限', '牡限']
+const raceGradeOptions = ['G1', 'G2', 'G3', 'JPN1', 'JPN2', '其他', '自定义']
+const countryOptions = ['日本', '英国', '美国', '澳大利亚', '中国香港', '法国', '阿联酋', '爱尔兰', '沙特', '南非', '德国', '加拿大', '新西兰', '韩国', '阿根廷', '乌拉圭', '巴西', '智利', '秘鲁', '其他']
 
 // Toggle hidden state
 const togglingHiddenId = ref<number | null>(null)
@@ -91,7 +91,7 @@ function goToRaceDetail(raceId: number) {
 }
 
 function openCreateModal() {
-  createForm.value = { name: '', date: '', grade: 'G1', positiveScores: '', penaltyRules: '' }
+  createForm.value = { name: '', date: '', age_range: '2岁', sex_restriction: '无', race_grade: 'G1', country: '日本', distance: '', positiveScores: '', penaltyRules: '' }
   createError.value = ''
   showCreateModal.value = true
 }
@@ -101,17 +101,21 @@ function closeCreateModal() {
 }
 
 async function handleCreateRace() {
-  if (!createForm.value.name.trim() || !createForm.value.date || creating.value) return
+  if (!createForm.value.name.trim() || !createForm.value.date || !createForm.value.distance.trim() || creating.value) return
   creating.value = true
   createError.value = ''
   try {
-    const customScoring = createForm.value.grade === 'CUSTOM'
+    const customScoring = createForm.value.race_grade === '自定义'
       ? parseCustomScoring()
       : undefined
     const data = await createRace({
       name: createForm.value.name.trim(),
       date: createForm.value.date,
-      grade: createForm.value.grade,
+      age_range: createForm.value.age_range,
+      sex_restriction: createForm.value.sex_restriction,
+      race_grade: createForm.value.race_grade,
+      country: createForm.value.country,
+      distance: createForm.value.distance.trim(),
       horse_ids: [],
       custom_scoring: customScoring,
     })
@@ -191,38 +195,46 @@ onMounted(loadData)
         >
           <div class="race-card">
             <div class="card-header">
-              <GradeBadge :grade="race.grade as any" />
               <h2 class="race-name">{{ race.name }}</h2>
-              <StatusBadge :status="race.status as any" />
-              <span
-                v-if="race.status === 'voting' && authStore.isLoggedIn && !authStore.isAdmin"
-                class="vote-status"
-                :class="{ voted: race.has_voted }"
-              >
-                {{ race.has_voted ? '已投票' : '未投票' }}
-              </span>
-              <button
-                v-if="authStore.isAdmin"
-                class="eye-btn"
-                :class="{ 'eye-hidden': race.is_hidden }"
-                :disabled="togglingHiddenId === race.id"
-                :title="race.is_hidden ? '已隐藏，点击取消隐藏' : '点击隐藏比赛'"
-                :aria-label="race.is_hidden ? '取消隐藏' : '隐藏'"
-                @click.stop="handleToggleHidden(race.id)"
-              >
-                <span v-if="togglingHiddenId === race.id" class="eye-spinner"></span>
-                <svg v-else width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                  <template v-if="race.is_hidden">
-                    <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/>
-                    <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/>
-                    <line x1="1" y1="1" x2="23" y2="23"/>
-                  </template>
-                  <template v-else>
-                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
-                    <circle cx="12" cy="12" r="3"/>
-                  </template>
-                </svg>
-              </button>
+              <div class="card-header-right">
+                <div class="race-tags-row">
+                  <span class="tag-item">{{ race.race_grade }}</span>
+                  <span class="tag-item">{{ race.age_range }}</span>
+                  <span class="tag-item">{{ race.sex_restriction }}</span>
+                  <span class="tag-item">{{ race.country }}</span>
+                  <span class="tag-item">{{ race.distance }}</span>
+                </div>
+                <StatusBadge :status="race.status as any" />
+                <span
+                  v-if="race.status === 'voting' && authStore.isLoggedIn && !authStore.isAdmin"
+                  class="vote-status"
+                  :class="{ voted: race.has_voted }"
+                >
+                  {{ race.has_voted ? '已投票' : '未投票' }}
+                </span>
+                <button
+                  v-if="authStore.isAdmin"
+                  class="eye-btn"
+                  :class="{ 'eye-hidden': race.is_hidden }"
+                  :disabled="togglingHiddenId === race.id"
+                  :title="race.is_hidden ? '已隐藏，点击取消隐藏' : '点击隐藏比赛'"
+                  :aria-label="race.is_hidden ? '取消隐藏' : '隐藏'"
+                  @click.stop="handleToggleHidden(race.id)"
+                >
+                  <span v-if="togglingHiddenId === race.id" class="eye-spinner"></span>
+                  <svg v-else width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <template v-if="race.is_hidden">
+                      <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/>
+                      <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/>
+                      <line x1="1" y1="1" x2="23" y2="23"/>
+                    </template>
+                    <template v-else>
+                      <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                      <circle cx="12" cy="12" r="3"/>
+                    </template>
+                  </svg>
+                </button>
+              </div>
             </div>
             <div class="card-body">
               <span class="race-date">{{ race.date }}</span>
@@ -263,22 +275,64 @@ onMounted(loadData)
           <input id="race-date" v-model="createForm.date" type="date" :class="{ 'is-empty': !createForm.date }" />
         </div>
         <div class="form-group">
-          <label>比赛等级</label>
-          <div class="grade-options">
+          <label>年龄范围</label>
+          <div class="tag-options">
             <label
-              v-for="option in gradeOptions"
-              :key="option.value"
-              class="grade-option"
-              :class="{ active: createForm.grade === option.value }"
+              v-for="opt in ageRangeOptions"
+              :key="opt"
+              class="tag-option"
+              :class="{ active: createForm.age_range === opt }"
             >
-              <input
-                v-model="createForm.grade"
-                type="radio"
-                :value="option.value"
-              />
-              <span>{{ option.label }}</span>
+              <input v-model="createForm.age_range" type="radio" :value="opt" />
+              <span>{{ opt }}</span>
             </label>
           </div>
+        </div>
+        <div class="form-group">
+          <label>性别限定</label>
+          <div class="tag-options">
+            <label
+              v-for="opt in sexRestrictionOptions"
+              :key="opt"
+              class="tag-option"
+              :class="{ active: createForm.sex_restriction === opt }"
+            >
+              <input v-model="createForm.sex_restriction" type="radio" :value="opt" />
+              <span>{{ opt }}</span>
+            </label>
+          </div>
+        </div>
+        <div class="form-group">
+          <label>比赛等级</label>
+          <div class="tag-options">
+            <label
+              v-for="opt in raceGradeOptions"
+              :key="opt"
+              class="tag-option"
+              :class="{ active: createForm.race_grade === opt }"
+            >
+              <input v-model="createForm.race_grade" type="radio" :value="opt" />
+              <span>{{ opt }}</span>
+            </label>
+          </div>
+        </div>
+        <div class="form-group">
+          <label>国家或地区</label>
+          <div class="tag-options tag-grid">
+            <label
+              v-for="opt in countryOptions"
+              :key="opt"
+              class="tag-option"
+              :class="{ active: createForm.country === opt }"
+            >
+              <input v-model="createForm.country" type="radio" :value="opt" />
+              <span>{{ opt }}</span>
+            </label>
+          </div>
+        </div>
+        <div class="form-group">
+          <label for="race-distance">长度</label>
+          <input id="race-distance" v-model="createForm.distance" type="text" placeholder="例：1200m" />
         </div>
         <!-- Custom scoring fields -->
         <div v-if="showCustomFields" class="custom-scoring-fields">
@@ -310,7 +364,7 @@ onMounted(loadData)
         <div class="modal-actions">
           <button
             class="modal-btn modal-confirm"
-            :disabled="creating || !createForm.name.trim() || !createForm.date || (showCustomFields && !createForm.positiveScores.trim())"
+            :disabled="creating || !createForm.name.trim() || !createForm.date || !createForm.distance.trim() || (showCustomFields && !createForm.positiveScores.trim())"
             @click="handleCreateRace"
           >
             {{ creating ? '创建中…' : '创建' }}
@@ -356,9 +410,18 @@ onMounted(loadData)
 
 .card-header {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: var(--spacing-3, 12px);
   margin-bottom: var(--spacing-3, 12px);
+}
+
+.card-header-right {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-left: auto;
+  flex-shrink: 0;
 }
 
 .race-name {
@@ -443,6 +506,25 @@ onMounted(loadData)
 
 .race-hidden .race-card {
   opacity: 0.5;
+}
+
+.race-tags-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.tag-item {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 6px;
+  border-radius: var(--rounded-sm, 6px);
+  font-size: 11px;
+  font-weight: 600;
+  font-family: 'Barlow Condensed', 'system-ui', sans-serif;
+  background: var(--color-surface-base, #F8FAF7);
+  color: var(--color-ink-secondary, #4A5A4A);
+  border: 1px solid var(--color-border-hairline, #D4DCD0);
 }
 
 .card-body {
@@ -588,16 +670,21 @@ onMounted(loadData)
   outline-offset: 2px;
 }
 
-.grade-options {
+.tag-options {
   display: flex;
   flex-wrap: wrap;
   gap: var(--spacing-2, 8px);
 }
 
-.grade-option {
+.tag-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
+}
+
+.tag-option {
   flex: 1;
-  min-width: 80px;
-  padding: 10px 12px;
+  min-width: 60px;
+  padding: 8px 10px;
   border: 1px solid var(--color-border-strong, #A8B8A4);
   border-radius: var(--rounded-sm, 6px);
   text-align: center;
@@ -608,14 +695,14 @@ onMounted(loadData)
   transition: border-color 0.15s, background-color 0.15s;
 }
 
-.grade-option.active {
+.tag-option.active {
   border-color: var(--color-primary, #1A5632);
   background: #F0F7F2;
   color: var(--color-primary, #1A5632);
   font-weight: 600;
 }
 
-.grade-option input {
+.tag-option input {
   position: absolute;
   opacity: 0;
   width: 1px;

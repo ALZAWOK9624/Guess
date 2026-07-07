@@ -1,10 +1,14 @@
-/** Race types. */
+/** Race types — 5-tag system. */
 
 export interface RaceListItem {
   id: number
   name: string
   date: string
-  grade: Grade
+  age_range: string
+  sex_restriction: string
+  race_grade: string
+  country: string
+  distance: string
   status: RaceStatus
   is_hidden: boolean
   horse_count: number
@@ -18,7 +22,11 @@ export interface RaceDetail {
   id: number
   name: string
   date: string
-  grade: Grade
+  age_range: string
+  sex_restriction: string
+  race_grade: string
+  country: string
+  distance: string
   status: RaceStatus
   is_hidden: boolean
   custom_scoring: CustomScoring | null
@@ -90,7 +98,11 @@ export type RaceStatus = 'voting' | 'locked' | 'settled'
 export interface RaceCreatePayload {
   name: string
   date: string
-  grade: Grade
+  age_range: string
+  sex_restriction: string
+  race_grade: string
+  country: string
+  distance: string
   horse_ids?: number[] | null
   horse_weights?: Record<string, string> | null
   horse_jockeys?: Record<string, string> | null
@@ -100,7 +112,11 @@ export interface RaceCreatePayload {
 export interface RaceUpdatePayload {
   name?: string
   date?: string
-  grade?: Grade
+  age_range?: string
+  sex_restriction?: string
+  race_grade?: string
+  country?: string
+  distance?: string
   horse_ids?: number[] | null
   horse_weights?: Record<string, string> | null
   horse_jockeys?: Record<string, string> | null

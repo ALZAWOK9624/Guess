@@ -13,6 +13,37 @@ from app.models.horse import Horse
 from app.models.race import RaceStatus
 from app.schemas.horse import HorseCreate
 
+# Default tag values for tests
+_DEFAULT_TAGS = {
+    "age_range": "其他",
+    "sex_restriction": "无",
+    "race_grade": "G1",
+    "country": "日本",
+    "distance": "1200m",
+}
+
+
+def _make_race_kwargs(**overrides) -> dict:
+    """Build RaceCreate kwargs with default tag values."""
+    kwargs = dict(_DEFAULT_TAGS)
+    kwargs.update(overrides)
+    return kwargs
+
+
+def _make_race_json(name: str, date_str: str, **overrides) -> dict:
+    """Build race JSON payload with default tag values."""
+    payload = {
+        "name": name,
+        "date": date_str,
+        "age_range": "其他",
+        "sex_restriction": "无",
+        "race_grade": "G1",
+        "country": "日本",
+        "distance": "1200m",
+    }
+    payload.update(overrides)
+    return payload
+
 
 # --- Override dependencies for admin access ---
 
@@ -67,14 +98,18 @@ class TestRaceService:
         data = RaceCreate(
             name="日本德比",
             date=date(2026, 6, 15),
-            grade="G1",
+            **_make_race_kwargs(),
             horse_ids=[h1.id, h2.id],
         )
         race = await create_race(db_session, data, creator_id=1)
 
         assert race.id is not None
         assert race.name == "日本德比"
-        assert race.grade.value == "G1"
+        assert race.race_grade == "G1"
+        assert race.age_range == "其他"
+        assert race.sex_restriction == "无"
+        assert race.country == "日本"
+        assert race.distance == "1200m"
         assert race.status.value == "voting"
         assert len(race.race_horses) == 2
 
@@ -98,7 +133,7 @@ class TestRaceService:
         data = RaceCreate(
             name="自定义测试",
             date=date(2026, 6, 20),
-            grade="CUSTOM",
+            **_make_race_kwargs(race_grade="自定义"),
             horse_ids=[h1.id, h2.id],
             custom_scoring=CustomScoring(
                 positive_scores=[10, 7, 5, 3, 2, 1],
@@ -115,7 +150,6 @@ class TestRaceService:
 
     @pytest.mark.asyncio
     async def test_create_race_insufficient_horses(self, db_session: AsyncSession):
-        # This validation is handled by Pydantic schema, tested via API
         from app.schemas.race import RaceCreate
         from pydantic import ValidationError
 
@@ -125,7 +159,7 @@ class TestRaceService:
             RaceCreate(
                 name="单人比赛",
                 date=date(2026, 6, 15),
-                grade="G1",
+                **_make_race_kwargs(),
                 horse_ids=[h1.id],
             )
 
@@ -141,11 +175,11 @@ class TestRaceService:
         h3 = await _create_horse(db_session, SAMPLE_HORSE_3)
 
         await create_race(db_session, RaceCreate(
-            name="Race1", date=date(2026, 6, 15), grade="G1",
+            name="Race1", date=date(2026, 6, 15), **_make_race_kwargs(),
             horse_ids=[h1.id, h2.id],
         ), creator_id=1)
         await create_race(db_session, RaceCreate(
-            name="Race2", date=date(2026, 6, 20), grade="G2_JPN1",
+            name="Race2", date=date(2026, 6, 20), **_make_race_kwargs(race_grade="G2"),
             horse_ids=[h2.id, h3.id],
         ), creator_id=1)
 
@@ -167,7 +201,7 @@ class TestRaceService:
         h2 = await _create_horse(db_session, SAMPLE_HORSE_2)
 
         created = await create_race(db_session, RaceCreate(
-            name="FindMe", date=date(2026, 6, 15), grade="G1",
+            name="FindMe", date=date(2026, 6, 15), **_make_race_kwargs(),
             horse_ids=[h1.id, h2.id],
         ), creator_id=1)
 
@@ -190,7 +224,7 @@ class TestRaceService:
         h2 = await _create_horse(db_session, SAMPLE_HORSE_2)
 
         created = await create_race(db_session, RaceCreate(
-            name="Original", date=date(2026, 6, 15), grade="G1",
+            name="Original", date=date(2026, 6, 15), **_make_race_kwargs(),
             horse_ids=[h1.id, h2.id],
         ), creator_id=1)
 
@@ -209,7 +243,7 @@ class TestRaceService:
         h2 = await _create_horse(db_session, SAMPLE_HORSE_2)
 
         created = await create_race(db_session, RaceCreate(
-            name="DeleteMe", date=date(2026, 6, 15), grade="G1",
+            name="DeleteMe", date=date(2026, 6, 15), **_make_race_kwargs(),
             horse_ids=[h1.id, h2.id],
         ), creator_id=1)
 
@@ -237,7 +271,7 @@ class TestRaceService:
         h2 = await _create_horse(db_session, SAMPLE_HORSE_2)
 
         created = await create_race(db_session, RaceCreate(
-            name="SettledRace", date=date(2026, 6, 15), grade="G1",
+            name="SettledRace", date=date(2026, 6, 15), **_make_race_kwargs(),
             horse_ids=[h1.id, h2.id],
         ), creator_id=1)
 
@@ -276,7 +310,7 @@ class TestRaceAPI:
         h1 = await _create_horse(db_session, SAMPLE_HORSE)
         h2 = await _create_horse(db_session, SAMPLE_HORSE_2)
         await create_race(db_session, RaceCreate(
-            name="API Race", date=date(2026, 6, 15), grade="G1",
+            name="API Race", date=date(2026, 6, 15), **_make_race_kwargs(),
             horse_ids=[h1.id, h2.id],
         ), creator_id=1)
 
@@ -302,16 +336,18 @@ class TestRaceAPI:
 
         transport = ASGITransport(app=app)
         async with AsyncClient(transport=transport, base_url="http://test") as client:
-            resp = await client.post("/api/v1/races", json={
-                "name": "API日本德比",
-                "date": "2026-06-15",
-                "grade": "G1",
-                "horse_ids": [h1.id, h2.id],
-            })
+            resp = await client.post("/api/v1/races", json=_make_race_json(
+                "API日本德比", "2026-06-15",
+                horse_ids=[h1.id, h2.id],
+            ))
             assert resp.status_code == 201
             data = resp.json()
             assert data["data"]["name"] == "API日本德比"
-            assert data["data"]["grade"] == "G1"
+            assert data["data"]["race_grade"] == "G1"
+            assert data["data"]["age_range"] == "其他"
+            assert data["data"]["sex_restriction"] == "无"
+            assert data["data"]["country"] == "日本"
+            assert data["data"]["distance"] == "1200m"
             assert data["data"]["status"] == "voting"
             assert len(data["data"]["horses"]) == 2
 
@@ -327,16 +363,15 @@ class TestRaceAPI:
 
         transport = ASGITransport(app=app)
         async with AsyncClient(transport=transport, base_url="http://test") as client:
-            resp = await client.post("/api/v1/races", json={
-                "name": "自定义API测试",
-                "date": "2026-06-20",
-                "grade": "CUSTOM",
-                "horse_ids": [h1.id, h2.id],
-                "custom_scoring": {
+            resp = await client.post("/api/v1/races", json=_make_race_json(
+                "自定义API测试", "2026-06-20",
+                race_grade="自定义",
+                horse_ids=[h1.id, h2.id],
+                custom_scoring={
                     "positive_scores": [10, 7, 5, 3, 2, 1],
                     "penalty_rules": [{"position": -1, "points": -5}],
                 },
-            })
+            ))
             assert resp.status_code == 201
             data = resp.json()
             assert data["data"]["custom_scoring"] is not None
@@ -357,22 +392,17 @@ class TestRaceAPI:
 
         transport = ASGITransport(app=app)
         async with AsyncClient(transport=transport, base_url="http://test") as client:
-            # Create
-            create_resp = await client.post("/api/v1/races", json={
-                "name": "DetailTest",
-                "date": "2026-06-15",
-                "grade": "G1",
-                "horse_ids": [h1.id, h2.id],
-            })
+            create_resp = await client.post("/api/v1/races", json=_make_race_json(
+                "DetailTest", "2026-06-15",
+                horse_ids=[h1.id, h2.id],
+            ))
             race_id = create_resp.json()["data"]["id"]
 
-            # Get detail
             resp = await client.get(f"/api/v1/races/{race_id}")
             assert resp.status_code == 200
             data = resp.json()["data"]
             assert data["name"] == "DetailTest"
             assert len(data["horses"]) == 2
-            # Verify snapshot data
             horse_names = [h["snapshot_data"]["name"] for h in data["horses"]]
             assert "Equinox" in horse_names
 
@@ -391,15 +421,12 @@ class TestRaceAPI:
 
         transport = ASGITransport(app=app)
         async with AsyncClient(transport=transport, base_url="http://test") as client:
-            create_resp = await client.post("/api/v1/races", json={
-                "name": "OldName",
-                "date": "2026-06-15",
-                "grade": "G1",
-                "horse_ids": [h1.id, h2.id],
-            })
+            create_resp = await client.post("/api/v1/races", json=_make_race_json(
+                "OldName", "2026-06-15",
+                horse_ids=[h1.id, h2.id],
+            ))
             race_id = create_resp.json()["data"]["id"]
 
-            # Update
             resp = await client.patch(f"/api/v1/races/{race_id}", json={
                 "name": "NewName",
             })
@@ -421,19 +448,15 @@ class TestRaceAPI:
 
         transport = ASGITransport(app=app)
         async with AsyncClient(transport=transport, base_url="http://test") as client:
-            create_resp = await client.post("/api/v1/races", json={
-                "name": "DeleteAPITest",
-                "date": "2026-06-15",
-                "grade": "G1",
-                "horse_ids": [h1.id, h2.id],
-            })
+            create_resp = await client.post("/api/v1/races", json=_make_race_json(
+                "DeleteAPITest", "2026-06-15",
+                horse_ids=[h1.id, h2.id],
+            ))
             race_id = create_resp.json()["data"]["id"]
 
-            # Delete
             resp = await client.delete(f"/api/v1/races/{race_id}")
             assert resp.status_code == 204
 
-            # Verify deleted
             get_resp = await client.get(f"/api/v1/races/{race_id}")
             assert get_resp.status_code == 404
 
@@ -464,7 +487,7 @@ class TestRaceAPI:
         h2 = await _create_horse(db_session, SAMPLE_HORSE_2)
 
         created = await create_race(db_session, RaceCreate(
-            name="SettledDelete", date=date(2026, 6, 15), grade="G1",
+            name="SettledDelete", date=date(2026, 6, 15), **_make_race_kwargs(),
             horse_ids=[h1.id, h2.id],
         ), creator_id=1)
         created.status = RaceStatus.SETTLED
@@ -492,7 +515,7 @@ class TestRaceAPI:
         h2 = await _create_horse(db_session, SAMPLE_HORSE_2)
 
         created = await create_race(db_session, RaceCreate(
-            name="LockedDelete", date=date(2026, 6, 15), grade="G1",
+            name="LockedDelete", date=date(2026, 6, 15), **_make_race_kwargs(),
             horse_ids=[h1.id, h2.id],
         ), creator_id=1)
         created.status = RaceStatus.LOCKED
@@ -506,7 +529,6 @@ class TestRaceAPI:
             resp = await client.delete(f"/api/v1/races/{created.id}")
             assert resp.status_code == 204
 
-            # Verify deleted
             get_resp = await client.get(f"/api/v1/races/{created.id}")
             assert get_resp.status_code == 404
 
@@ -522,13 +544,11 @@ class TestRaceAPI:
         h2 = await _create_horse(db_session, SAMPLE_HORSE_2)
 
         created = await create_race(db_session, RaceCreate(
-            name="NoAuthDelete", date=date(2026, 6, 15), grade="G1",
+            name="NoAuthDelete", date=date(2026, 6, 15), **_make_race_kwargs(),
             horse_ids=[h1.id, h2.id],
         ), creator_id=1)
 
         app.dependency_overrides[get_db] = lambda: db_session
-        # No admin override → unauthenticated
-
         transport = ASGITransport(app=app)
         async with AsyncClient(transport=transport, base_url="http://test") as client:
             resp = await client.delete(f"/api/v1/races/{created.id}")
@@ -536,16 +556,13 @@ class TestRaceAPI:
 
         app.dependency_overrides.clear()
         app.dependency_overrides[get_db] = lambda: db_session
-        # No admin override → no auth token
 
         transport = ASGITransport(app=app)
         async with AsyncClient(transport=transport, base_url="http://test") as client:
-            resp = await client.post("/api/v1/races", json={
-                "name": "NoAuth",
-                "date": "2026-06-15",
-                "grade": "G1",
-                "horse_ids": [1, 2],
-            })
+            resp = await client.post("/api/v1/races", json=_make_race_json(
+                "NoAuth", "2026-06-15",
+                horse_ids=[1, 2],
+            ))
             assert resp.status_code == 401
 
         app.dependency_overrides.clear()
@@ -558,30 +575,30 @@ class TestRaceAPI:
         transport = ASGITransport(app=app)
         async with AsyncClient(transport=transport, base_url="http://test") as client:
             # Empty name
-            resp = await client.post("/api/v1/races", json={
-                "name": "",
-                "date": "2026-06-15",
-                "grade": "G1",
-                "horse_ids": [1, 2],
-            })
+            resp = await client.post("/api/v1/races", json=_make_race_json(
+                "", "2026-06-15",
+                horse_ids=[1, 2],
+            ))
             assert resp.status_code == 422
 
-            # Invalid grade
+            # Invalid race_grade
             resp = await client.post("/api/v1/races", json={
                 "name": "Test",
                 "date": "2026-06-15",
-                "grade": "INVALID",
+                "age_range": "其他",
+                "sex_restriction": "无",
+                "race_grade": "INVALID",
+                "country": "日本",
+                "distance": "1200m",
                 "horse_ids": [1, 2],
             })
             assert resp.status_code == 422
 
             # Single horse
-            resp = await client.post("/api/v1/races", json={
-                "name": "Test",
-                "date": "2026-06-15",
-                "grade": "G1",
-                "horse_ids": [1],
-            })
+            resp = await client.post("/api/v1/races", json=_make_race_json(
+                "Test", "2026-06-15",
+                horse_ids=[1],
+            ))
             assert resp.status_code == 422
 
         app.dependency_overrides.clear()
@@ -602,12 +619,11 @@ class TestRaceSettledResults:
         h2 = await _create_horse(db_session, SAMPLE_HORSE_2)
 
         race = await create_race(db_session, RaceCreate(
-            name="SettledTest", date=date(2026, 6, 15), grade="G1",
+            name="SettledTest", date=date(2026, 6, 15), **_make_race_kwargs(),
             horse_ids=[h1.id, h2.id],
         ), creator_id=1)
         race_id = race.id
 
-        # Set positions
         race_horses = race.race_horses
         rh1 = race_horses[0]
         rh2 = race_horses[1]
@@ -616,7 +632,6 @@ class TestRaceSettledResults:
         race.status = RaceStatus.SETTLED
         await db_session.flush()
 
-        # Create users and votes with points
         user1 = User(username="user_a", password_hash="x", qq="111", invite_code="aaaa")
         user2 = User(username="user_b", password_hash="x", qq="222", invite_code="bbbb")
         db_session.add_all([user1, user2])
@@ -631,10 +646,8 @@ class TestRaceSettledResults:
         result = await get_race_results_grouped_by_horse(db_session, race_id)
 
         assert len(result) == 2
-        # First horse (position=1) should be first
         assert result[0]["position"] == 1
         assert result[1]["position"] == 2
-        # Check votes
         assert len(result[0]["votes"]) == 1
         assert result[0]["votes"][0]["username"] == "user_a"
         assert result[0]["votes"][0]["points"] == 10
@@ -657,7 +670,7 @@ class TestRaceSettledResults:
         h2 = await _create_horse(db_session, SAMPLE_HORSE_2)
 
         race = await create_race(db_session, RaceCreate(
-            name="DNFTest", date=date(2026, 6, 20), grade="G1",
+            name="DNFTest", date=date(2026, 6, 20), **_make_race_kwargs(),
             horse_ids=[h1.id, h2.id],
         ), creator_id=1)
         race_id = race.id
@@ -682,7 +695,6 @@ class TestRaceSettledResults:
         result = await get_race_results_grouped_by_horse(db_session, race_id)
 
         assert len(result) == 2
-        # DNF (position=0) should be last
         assert result[0]["position"] == 1
         assert result[1]["position"] == 0
         assert result[1]["votes"][0]["points"] == 0
@@ -700,7 +712,7 @@ class TestRaceSettledResults:
         h2 = await _create_horse(db_session, SAMPLE_HORSE_2)
 
         race = await create_race(db_session, RaceCreate(
-            name="NoVotesHorse", date=date(2026, 6, 25), grade="G1",
+            name="NoVotesHorse", date=date(2026, 6, 25), **_make_race_kwargs(),
             horse_ids=[h1.id, h2.id],
         ), creator_id=1)
         race_id = race.id
@@ -735,7 +747,7 @@ class TestRaceSettledResults:
         h2 = await _create_horse(db_session, SAMPLE_HORSE_2)
 
         race = await create_race(db_session, RaceCreate(
-            name="MultiVote", date=date(2026, 7, 1), grade="G1",
+            name="MultiVote", date=date(2026, 7, 1), **_make_race_kwargs(),
             horse_ids=[h1.id, h2.id],
         ), creator_id=1)
         race_id = race.id
@@ -785,7 +797,7 @@ class TestRaceSettledResults:
         h2 = await _create_horse(db_session, SAMPLE_HORSE_2)
 
         race = await create_race(db_session, RaceCreate(
-            name="APISettled", date=date(2026, 7, 5), grade="G1",
+            name="APISettled", date=date(2026, 7, 5), **_make_race_kwargs(),
             horse_ids=[h1.id, h2.id],
         ), creator_id=1)
         race_id = race.id
@@ -813,7 +825,6 @@ class TestRaceSettledResults:
             assert "horse_votes" in data
             assert "horses" in data["horse_votes"]
             assert len(data["horse_votes"]["horses"]) == 2
-            # First horse has a vote, second has none
             assert len(data["horse_votes"]["horses"][0]["votes"]) == 1
             assert data["horse_votes"]["horses"][0]["votes"][0]["username"] == "tester"
             assert data["horse_votes"]["horses"][0]["votes"][0]["points"] == 10
@@ -830,7 +841,7 @@ class TestRaceSettledResults:
         h2 = await _create_horse(db_session, SAMPLE_HORSE_2)
 
         race = await create_race(db_session, RaceCreate(
-            name="VotingNoVotes", date=date(2026, 7, 10), grade="G1",
+            name="VotingNoVotes", date=date(2026, 7, 10), **_make_race_kwargs(),
             horse_ids=[h1.id, h2.id],
         ), creator_id=1)
         race_id = race.id
@@ -859,7 +870,7 @@ class TestRaceHorseManagement:
 
         race = await create_race(
             db_session,
-            RaceCreate(name="EmptyRace", date=date(2026, 8, 1), grade="G1"),
+            RaceCreate(name="EmptyRace", date=date(2026, 8, 1), **_make_race_kwargs()),
             creator_id=1,
         )
 
@@ -881,7 +892,7 @@ class TestRaceHorseManagement:
 
         race = await create_race(
             db_session,
-            RaceCreate(name="AddHorse", date=date(2026, 8, 1), grade="G1", horse_ids=[h1.id, h2.id]),
+            RaceCreate(name="AddHorse", date=date(2026, 8, 1), **_make_race_kwargs(), horse_ids=[h1.id, h2.id]),
             creator_id=1,
         )
         race_id = race.id
@@ -906,7 +917,7 @@ class TestRaceHorseManagement:
 
         race = await create_race(
             db_session,
-            RaceCreate(name="DupHorse", date=date(2026, 8, 1), grade="G1", horse_ids=[h1.id, h2.id]),
+            RaceCreate(name="DupHorse", date=date(2026, 8, 1), **_make_race_kwargs(), horse_ids=[h1.id, h2.id]),
             creator_id=1,
         )
 
@@ -931,7 +942,7 @@ class TestRaceHorseManagement:
 
         race = await create_race(
             db_session,
-            RaceCreate(name="LockedRace", date=date(2026, 8, 1), grade="G1", horse_ids=[h1.id, h2.id]),
+            RaceCreate(name="LockedRace", date=date(2026, 8, 1), **_make_race_kwargs(), horse_ids=[h1.id, h2.id]),
             creator_id=1,
         )
         race.status = RaceStatus.LOCKED
@@ -955,7 +966,7 @@ class TestRaceHorseManagement:
 
         race = await create_race(
             db_session,
-            RaceCreate(name="UpdateHorse", date=date(2026, 8, 1), grade="G1", horse_ids=[h1.id, h2.id]),
+            RaceCreate(name="UpdateHorse", date=date(2026, 8, 1), **_make_race_kwargs(), horse_ids=[h1.id, h2.id]),
             creator_id=1,
         )
         rh = race.race_horses[0]
@@ -980,12 +991,11 @@ class TestRaceHorseManagement:
 
         race = await create_race(
             db_session,
-            RaceCreate(name="GateOrder", date=date(2026, 8, 1), grade="G1", horse_ids=[h1.id, h2.id, h3.id]),
+            RaceCreate(name="GateOrder", date=date(2026, 8, 1), **_make_race_kwargs(), horse_ids=[h1.id, h2.id, h3.id]),
             creator_id=1,
         )
         rh_ids = [rh.id for rh in race.race_horses]
 
-        # Reverse the order
         new_order = list(reversed(rh_ids))
         updated = await update_gate_order(db_session, race.id, new_order)
 
@@ -1008,7 +1018,7 @@ class TestRaceHorseManagement:
 
         race = await create_race(
             db_session,
-            RaceCreate(name="GateOrderBad", date=date(2026, 8, 1), grade="G1", horse_ids=[h1.id, h2.id]),
+            RaceCreate(name="GateOrderBad", date=date(2026, 8, 1), **_make_race_kwargs(), horse_ids=[h1.id, h2.id]),
             creator_id=1,
         )
         rh_ids = [rh.id for rh in race.race_horses]
@@ -1032,7 +1042,7 @@ class TestRaceHorseManagement:
 
         race = await create_race(
             db_session,
-            RaceCreate(name="APIAddHorse", date=date(2026, 8, 1), grade="G1", horse_ids=[h1.id, h2.id]),
+            RaceCreate(name="APIAddHorse", date=date(2026, 8, 1), **_make_race_kwargs(), horse_ids=[h1.id, h2.id]),
             creator_id=1,
         )
 
@@ -1067,7 +1077,7 @@ class TestRaceHorseManagement:
 
         race = await create_race(
             db_session,
-            RaceCreate(name="APIGate", date=date(2026, 8, 1), grade="G1", horse_ids=[h1.id, h2.id]),
+            RaceCreate(name="APIGate", date=date(2026, 8, 1), **_make_race_kwargs(), horse_ids=[h1.id, h2.id]),
             creator_id=1,
         )
         rh_ids = [rh.id for rh in race.race_horses]
@@ -1088,4 +1098,3 @@ class TestRaceHorseManagement:
 
         app.dependency_overrides.clear()
         await db_session.rollback()
-

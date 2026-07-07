@@ -9,7 +9,7 @@ from app.models.horse import Horse
 from app.models.race import Race, RaceHorse, RaceStatus
 from app.models.vote import Vote
 from app.schemas.result import ResultEntry, ResultPosition, UserScoreItem
-from app.services.scoring_engine import calculate_score
+from app.services.scoring_engine import calculate_score, derive_scoring_grade
 
 
 async def submit_results(
@@ -101,7 +101,7 @@ async def submit_results(
             vote.points = 0
         elif vote_rh.position is not None and vote_rh.position > 0:
             points = calculate_score(
-                grade=race.grade.value,
+                grade=derive_scoring_grade(race.age_range, race.race_grade),
                 total_horses=active_count,
                 position=vote_rh.position,
                 custom_scoring=race.custom_scoring,

@@ -35,7 +35,11 @@ class CustomScoring(BaseModel):
 class RaceCreate(BaseModel):
     name: str
     date: date_type
-    grade: str  # "G1" | "G2_JPN1" | "YOUNG_G1" | "CUSTOM"
+    age_range: str
+    sex_restriction: str
+    race_grade: str
+    country: str
+    distance: str
     horse_ids: list[int] | None = None
     horse_weights: dict[int, str] | None = None  # horse_id → weight
     horse_jockeys: dict[int, str] | None = None  # horse_id → jockey
@@ -48,13 +52,44 @@ class RaceCreate(BaseModel):
             raise ValueError("比赛名称长度需在 1-200 个字符之间")
         return v.strip()
 
-    @field_validator("grade")
+    @field_validator("age_range")
     @classmethod
-    def validate_grade(cls, v: str) -> str:
-        allowed = {"G1", "G2_JPN1", "YOUNG_G1", "CUSTOM"}
+    def validate_age_range(cls, v: str) -> str:
+        allowed = {"2岁", "2+岁", "3岁", "3+岁", "4+岁", "其他"}
         if v not in allowed:
-            raise ValueError(f"无效的比赛等级，允许的值: {', '.join(sorted(allowed))}")
+            raise ValueError(f"无效的年龄范围，允许的值: {', '.join(allowed)}")
         return v
+
+    @field_validator("sex_restriction")
+    @classmethod
+    def validate_sex_restriction(cls, v: str) -> str:
+        allowed = {"无", "牝限", "牡限"}
+        if v not in allowed:
+            raise ValueError(f"无效的性别限定，允许的值: {', '.join(allowed)}")
+        return v
+
+    @field_validator("race_grade")
+    @classmethod
+    def validate_race_grade(cls, v: str) -> str:
+        allowed = {"G1", "G2", "G3", "JPN1", "JPN2", "其他", "自定义"}
+        if v not in allowed:
+            raise ValueError(f"无效的比赛等级，允许的值: {', '.join(allowed)}")
+        return v
+
+    @field_validator("country")
+    @classmethod
+    def validate_country(cls, v: str) -> str:
+        allowed = {"日本", "英国", "美国", "澳大利亚", "中国香港", "法国", "阿联酋", "爱尔兰", "沙特", "南非", "德国", "加拿大", "新西兰", "韩国", "阿根廷", "乌拉圭", "巴西", "智利", "秘鲁", "其他"}
+        if v not in allowed:
+            raise ValueError(f"无效的国家或地区，允许的值: {', '.join(allowed)}")
+        return v
+
+    @field_validator("distance")
+    @classmethod
+    def validate_distance(cls, v: str) -> str:
+        if len(v) < 1 or len(v) > 50:
+            raise ValueError("长度需在 1-50 个字符之间")
+        return v.strip()
 
     @field_validator("horse_ids")
     @classmethod
@@ -70,7 +105,11 @@ class RaceCreate(BaseModel):
 class RaceUpdate(BaseModel):
     name: str | None = None
     date: date_type | None = None
-    grade: str | None = None
+    age_range: str | None = None
+    sex_restriction: str | None = None
+    race_grade: str | None = None
+    country: str | None = None
+    distance: str | None = None
     horse_ids: list[int] | None = None
     horse_weights: dict[int, str] | None = None  # race_horse_id → weight
     horse_jockeys: dict[int, str] | None = None  # race_horse_id → jockey
@@ -85,13 +124,49 @@ class RaceUpdate(BaseModel):
             return v.strip()
         return v
 
-    @field_validator("grade")
+    @field_validator("age_range")
     @classmethod
-    def validate_grade(cls, v: str | None) -> str | None:
+    def validate_age_range(cls, v: str | None) -> str | None:
         if v is not None:
-            allowed = {"G1", "G2_JPN1", "YOUNG_G1", "CUSTOM"}
+            allowed = {"2岁", "2+岁", "3岁", "3+岁", "4+岁", "其他"}
             if v not in allowed:
-                raise ValueError(f"无效的比赛等级，允许的值: {', '.join(sorted(allowed))}")
+                raise ValueError(f"无效的年龄范围，允许的值: {', '.join(allowed)}")
+        return v
+
+    @field_validator("sex_restriction")
+    @classmethod
+    def validate_sex_restriction(cls, v: str | None) -> str | None:
+        if v is not None:
+            allowed = {"无", "牝限", "牡限"}
+            if v not in allowed:
+                raise ValueError(f"无效的性别限定，允许的值: {', '.join(allowed)}")
+        return v
+
+    @field_validator("race_grade")
+    @classmethod
+    def validate_race_grade(cls, v: str | None) -> str | None:
+        if v is not None:
+            allowed = {"G1", "G2", "G3", "JPN1", "JPN2", "其他", "自定义"}
+            if v not in allowed:
+                raise ValueError(f"无效的比赛等级，允许的值: {', '.join(allowed)}")
+        return v
+
+    @field_validator("country")
+    @classmethod
+    def validate_country(cls, v: str | None) -> str | None:
+        if v is not None:
+            allowed = {"日本", "英国", "美国", "澳大利亚", "中国香港", "法国", "阿联酋", "爱尔兰", "沙特", "南非", "德国", "加拿大", "新西兰", "韩国", "阿根廷", "乌拉圭", "巴西", "智利", "秘鲁", "其他"}
+            if v not in allowed:
+                raise ValueError(f"无效的国家或地区，允许的值: {', '.join(allowed)}")
+        return v
+
+    @field_validator("distance")
+    @classmethod
+    def validate_distance(cls, v: str | None) -> str | None:
+        if v is not None:
+            if len(v) < 1 or len(v) > 50:
+                raise ValueError("长度需在 1-50 个字符之间")
+            return v.strip()
         return v
 
     @field_validator("horse_ids")
@@ -143,7 +218,11 @@ class RaceListResponse(BaseModel):
     id: int
     name: str
     date: date_type
-    grade: str
+    age_range: str
+    sex_restriction: str
+    race_grade: str
+    country: str
+    distance: str
     status: str
     custom_scoring: CustomScoring | None = None
     is_hidden: bool = False
@@ -159,7 +238,11 @@ class RaceDetailResponse(BaseModel):
     id: int
     name: str
     date: date_type
-    grade: str
+    age_range: str
+    sex_restriction: str
+    race_grade: str
+    country: str
+    distance: str
     status: str
     custom_scoring: CustomScoring | None = None
     is_hidden: bool = False

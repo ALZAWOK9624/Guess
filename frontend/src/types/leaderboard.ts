@@ -10,3 +10,14 @@ export interface LeaderboardEntry {
 export interface LeaderboardResponse {
   data: LeaderboardEntry[]
 }
+
+export interface LeaderboardFilters {
+  age_range?: string[]
+  sex_restriction?: string[]
+  race_grade?: string[]
+  country?: string[]
+  distance_min?: number
+  distance_max?: number
+  horse_count_min?: number
+  horse_count_max?: number
+}

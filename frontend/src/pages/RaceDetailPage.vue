@@ -2,7 +2,6 @@
 import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/authStore'
-import GradeBadge from '@/components/GradeBadge.vue'
 import StatusBadge from '@/components/StatusBadge.vue'
 import HorseDetailCard from '@/components/HorseDetailCard.vue'
 import AddHorseCard from '@/components/AddHorseCard.vue'
@@ -651,7 +650,6 @@ onUnmounted(() => {
         </button>
 
         <div class="race-title-row">
-          <GradeBadge :grade="race.grade as any" />
           <RaceHeaderEditor
             v-if="isAdmin && isRaceVoting"
             :name="race.name"
@@ -661,29 +659,38 @@ onUnmounted(() => {
           <template v-else>
             <h1 class="race-name">{{ race.name }}</h1>
           </template>
-          <StatusBadge :status="race.status as any" />
-          <button
-            v-if="isAdmin"
-            class="eye-btn"
-            :class="{ 'eye-hidden': race.is_hidden }"
-            :disabled="togglingHidden"
-            :title="race.is_hidden ? '已隐藏，点击取消隐藏' : '点击隐藏比赛'"
-            :aria-label="race.is_hidden ? '取消隐藏' : '隐藏'"
-            @click="handleToggleHidden"
-          >
-            <span v-if="togglingHidden" class="eye-spinner"></span>
-            <svg v-else width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <template v-if="race.is_hidden">
-                <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/>
-                <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/>
-                <line x1="1" y1="1" x2="23" y2="23"/>
-              </template>
-              <template v-else>
-                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
-                <circle cx="12" cy="12" r="3"/>
-              </template>
-            </svg>
-          </button>
+          <div class="title-row-right">
+            <div class="race-tags">
+              <span class="race-tag">{{ race.race_grade }}</span>
+              <span class="race-tag">{{ race.age_range }}</span>
+              <span class="race-tag">{{ race.sex_restriction }}</span>
+              <span class="race-tag">{{ race.country }}</span>
+              <span class="race-tag">{{ race.distance }}</span>
+            </div>
+            <StatusBadge :status="race.status as any" />
+            <button
+              v-if="isAdmin"
+              class="eye-btn"
+              :class="{ 'eye-hidden': race.is_hidden }"
+              :disabled="togglingHidden"
+              :title="race.is_hidden ? '已隐藏，点击取消隐藏' : '点击隐藏比赛'"
+              :aria-label="race.is_hidden ? '取消隐藏' : '隐藏'"
+              @click="handleToggleHidden"
+            >
+              <span v-if="togglingHidden" class="eye-spinner"></span>
+              <svg v-else width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <template v-if="race.is_hidden">
+                  <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/>
+                  <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/>
+                  <line x1="1" y1="1" x2="23" y2="23"/>
+                </template>
+                <template v-else>
+                  <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                  <circle cx="12" cy="12" r="3"/>
+                </template>
+              </svg>
+            </button>
+          </div>
         </div>
 
         <div class="race-subinfo">
@@ -986,11 +993,20 @@ onUnmounted(() => {
 
 .race-title-row {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: var(--spacing-3, 12px);
   row-gap: var(--spacing-2, 8px);
   margin-bottom: var(--spacing-2, 8px);
   flex-wrap: wrap;
+}
+
+.title-row-right {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-left: auto;
+  flex-shrink: 0;
 }
 
 .race-name {
@@ -1095,6 +1111,25 @@ onUnmounted(() => {
   font-size: var(--text-body-sm, 14px);
   color: var(--color-ink-secondary, #4A5A4A);
   margin: 0;
+}
+
+.race-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.race-tag {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: var(--rounded-sm, 6px);
+  font-size: 11px;
+  font-weight: 600;
+  font-family: 'Barlow Condensed', 'system-ui', sans-serif;
+  background: var(--color-surface-base, #F8FAF7);
+  color: var(--color-ink-secondary, #4A5A4A);
+  border: 1px solid var(--color-border-hairline, #D4DCD0);
 }
 
 .header-message {

@@ -5,7 +5,7 @@ import HorseSearchSelect from '@/components/HorseSearchSelect.vue'
 import ConfirmDeleteModal from '@/components/ConfirmDeleteModal.vue'
 import { getRace, updateRace, deleteRace } from '@/api/races'
 import type { Horse } from '@/types/horse'
-import type { RaceDetail, Grade } from '@/types/race'
+import type { RaceDetail } from '@/types/race'
 
 const route = useRoute()
 const router = useRouter()
@@ -14,7 +14,11 @@ const raceId = Number(route.params.id)
 // Form fields
 const raceName = ref('')
 const raceDate = ref('')
-const raceGrade = ref<string>('G1')
+const raceAgeRange = ref('2岁')
+const raceSexRestriction = ref('无')
+const raceGrade = ref('G1')
+const raceCountry = ref('日本')
+const raceDistance = ref('')
 const selectedHorses = ref<Horse[]>([])
 const customPositiveScores = ref('')
 const customPenaltyRules = ref('')
@@ -23,6 +27,11 @@ const isLoading = ref(true)
 const formError = ref('')
 const notEditable = ref(false)
 const notEditableMessage = ref('')
+
+const ageRangeOptions = ['2岁', '2+岁', '3岁', '3+岁', '4+岁', '其他']
+const sexRestrictionOptions = ['无', '牝限', '牡限']
+const raceGradeOptions = ['G1', 'G2', 'G3', 'JPN1', 'JPN2', '其他', '自定义']
+const countryOptions = ['日本', '英国', '美国', '澳大利亚', '中国香港', '法国', '阿联酋', '爱尔兰', '沙特', '南非', '德国', '加拿大', '新西兰', '韩国', '阿根廷', '乌拉圭', '巴西', '智利', '秘鲁', '其他']
 
 // Per-horse jockey (keyed by race_horse_id for PATCH updates)
 const horseJockeys = ref<Record<number, string>>({})
@@ -34,24 +43,21 @@ const showDeleteModal = ref(false)
 const isDeleting = ref(false)
 const deleteError = ref('')
 
-const grades = [
-  { value: 'G1', label: 'G1' },
-  { value: 'G2_JPN1', label: 'G2·JPN1' },
-  { value: 'YOUNG_G1', label: '2岁G1' },
-  { value: 'CUSTOM', label: '自定义' },
-]
-
-const showCustomFields = computed(() => raceGrade.value === 'CUSTOM')
+const showCustomFields = computed(() => raceGrade.value === '自定义')
 
 // Store initial values for change detection
 const initialValues = ref<{
   name: string
   date: string
-  grade: string
+  age_range: string
+  sex_restriction: string
+  race_grade: string
+  country: string
+  distance: string
   horses: Horse[]
   jockeys: Record<number, string>
 }>({
-  name: '', date: '', grade: 'G1', horses: [],
+  name: '', date: '', age_range: '2岁', sex_restriction: '无', race_grade: 'G1', country: '日本', distance: '', horses: [],
   jockeys: {},
 })
 
@@ -59,6 +65,7 @@ const canSubmit = computed(() => {
   if (notEditable.value) return false
   if (!raceName.value.trim()) return false
   if (!raceDate.value) return false
+  if (!raceDistance.value.trim()) return false
   if (selectedHorses.value.length < 2) return false
   if (showCustomFields.value && !customPositiveScores.value.trim()) return false
   return true
@@ -89,7 +96,11 @@ onMounted(async () => {
 
     raceName.value = race.name
     raceDate.value = race.date
-    raceGrade.value = race.grade
+    raceAgeRange.value = race.age_range
+    raceSexRestriction.value = race.sex_restriction
+    raceGrade.value = race.race_grade
+    raceCountry.value = race.country
+    raceDistance.value = race.distance
 
     // Convert horse snapshots back to Horse type
     // The weight/jockey are now per-race, so we don't put them in the Horse objects
@@ -121,7 +132,11 @@ onMounted(async () => {
     initialValues.value = {
       name: race.name,
       date: race.date,
-      grade: race.grade,
+      age_range: race.age_range,
+      sex_restriction: race.sex_restriction,
+      race_grade: race.race_grade,
+      country: race.country,
+      distance: race.distance,
       horses: [...selectedHorses.value],
       jockeys: { ...horseJockeys.value },
     }
@@ -180,11 +195,23 @@ async function handleSubmit() {
     if (raceDate.value !== initialValues.value.date) {
       payload.date = raceDate.value
     }
-    if (raceGrade.value !== initialValues.value.grade) {
-      payload.grade = raceGrade.value as Grade
-      if (raceGrade.value === 'CUSTOM') {
+    if (raceAgeRange.value !== initialValues.value.age_range) {
+      payload.age_range = raceAgeRange.value
+    }
+    if (raceSexRestriction.value !== initialValues.value.sex_restriction) {
+      payload.sex_restriction = raceSexRestriction.value
+    }
+    if (raceGrade.value !== initialValues.value.race_grade) {
+      payload.race_grade = raceGrade.value
+      if (raceGrade.value === '自定义') {
         payload.custom_scoring = parseCustomScoring()
       }
+    }
+    if (raceCountry.value !== initialValues.value.country) {
+      payload.country = raceCountry.value
+    }
+    if (raceDistance.value !== initialValues.value.distance) {
+      payload.distance = raceDistance.value
     }
 
     const changedHorses = getChangedHorseIds()
@@ -202,7 +229,7 @@ async function handleSubmit() {
     }
     if (Object.keys(jockeyChanges).length > 0) payload.horse_jockeys = jockeyChanges
 
-    if (raceGrade.value !== 'CUSTOM' && 'custom_scoring' in payload) {
+    if (raceGrade.value !== '自定义' && 'custom_scoring' in payload) {
       delete payload.custom_scoring
     }
 
@@ -269,15 +296,33 @@ async function handleDelete() {
       </div>
 
       <div class="form-group">
-        <fieldset class="grade-fieldset">
-          <legend class="form-label">等级</legend>
-          <div class="grade-options" role="radiogroup">
-            <label v-for="g in grades" :key="g.value" class="grade-option" :class="{ active: raceGrade === g.value }">
-              <input v-model="raceGrade" type="radio" name="grade" :value="g.value" />
-              <span class="grade-label">{{ g.label }}</span>
-            </label>
-          </div>
-        </fieldset>
+        <label class="form-label">年龄范围</label>
+        <div class="tag-options">
+          <label v-for="opt in ageRangeOptions" :key="opt" class="tag-option" :class="{ active: raceAgeRange === opt }">
+            <input v-model="raceAgeRange" type="radio" name="age_range" :value="opt" />
+            <span>{{ opt }}</span>
+          </label>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">性别限定</label>
+        <div class="tag-options">
+          <label v-for="opt in sexRestrictionOptions" :key="opt" class="tag-option" :class="{ active: raceSexRestriction === opt }">
+            <input v-model="raceSexRestriction" type="radio" name="sex_restriction" :value="opt" />
+            <span>{{ opt }}</span>
+          </label>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">比赛等级</label>
+        <div class="tag-options">
+          <label v-for="opt in raceGradeOptions" :key="opt" class="tag-option" :class="{ active: raceGrade === opt }">
+            <input v-model="raceGrade" type="radio" name="race_grade" :value="opt" />
+            <span>{{ opt }}</span>
+          </label>
+        </div>
 
         <div v-if="showCustomFields" class="custom-scoring-fields">
           <div class="form-group">
@@ -291,6 +336,21 @@ async function handleDelete() {
           </div>
           <p class="custom-note">自定义规则仅作用于本场比赛，不会保存为模板。</p>
         </div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">国家或地区</label>
+        <div class="tag-options tag-grid">
+          <label v-for="opt in countryOptions" :key="opt" class="tag-option" :class="{ active: raceCountry === opt }">
+            <input v-model="raceCountry" type="radio" name="country" :value="opt" />
+            <span>{{ opt }}</span>
+          </label>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label" for="race-distance">长度</label>
+        <input id="race-distance" v-model="raceDistance" type="text" class="form-input" placeholder="例：1200m" />
       </div>
 
       <div class="form-group">
@@ -355,11 +415,11 @@ async function handleDelete() {
 .label-hint { font-weight: 400; color: var(--color-ink-secondary, #4A5A4A); }
 .form-input { padding: 10px 12px; border: 1px solid var(--color-border-strong, #A8B8A4); border-radius: var(--rounded-md, 10px); font-size: var(--text-body, 16px); color: var(--color-ink-primary, #1A2E1A); background: var(--color-surface-raised, #FFFFFF); min-height: 44px; }
 .form-input:focus { outline: 2px solid var(--color-primary, #1A5632); outline-offset: 2px; border-color: var(--color-primary, #1A5632); }
-.grade-fieldset { border: none; padding: 0; margin: 0; }
-.grade-options { display: flex; flex-wrap: wrap; gap: var(--spacing-3, 12px); }
-.grade-option { display: flex; align-items: center; gap: var(--spacing-2, 8px); padding: 8px 16px; border: 1px solid var(--color-border-strong, #A8B8A4); border-radius: var(--rounded-md, 10px); cursor: pointer; min-height: 44px; }
-.grade-option.active { border-color: var(--color-primary, #1A5632); background: var(--color-primary, #1A5632); color: #fff; }
-.grade-option input {
+.tag-options { display: flex; flex-wrap: wrap; gap: var(--spacing-2, 8px); }
+.tag-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(80px, 1fr)); }
+.tag-option { display: flex; align-items: center; gap: var(--spacing-2, 8px); padding: 8px 14px; border: 1px solid var(--color-border-strong, #A8B8A4); border-radius: var(--rounded-md, 10px); cursor: pointer; min-height: 40px; font-size: var(--text-body-sm, 14px); }
+.tag-option.active { border-color: var(--color-primary, #1A5632); background: #F0F7F2; color: var(--color-primary, #1A5632); font-weight: 600; }
+.tag-option input {
   position: absolute;
   opacity: 0;
   width: 1px;
@@ -385,192 +445,4 @@ async function handleDelete() {
 .horse-jockey-list { display: flex; flex-direction: column; gap: var(--spacing-2, 8px); }
 .horse-jockey-row { display: flex; align-items: center; gap: var(--spacing-3, 12px); padding: 8px 12px; background: var(--color-surface-base, #F8FAF7); border-radius: var(--rounded-md, 8px); }
 .horse-label { min-width: 100px; font-weight: 600; font-size: var(--text-body-sm, 14px); color: var(--color-ink-primary, #1A2E1A); }
-</style>
-
-<style scoped>
-.edit-race-page {
-  padding: var(--spacing-4, 16px);
-  max-width: 720px;
-  margin: 0 auto;
-}
-
-.page-title {
-  font-family: var(--font-display, 'Barlow Condensed', system-ui, sans-serif);
-  font-size: var(--text-heading, 24px);
-  font-weight: 600;
-  color: var(--color-primary, #1A5632);
-  margin-bottom: var(--spacing-6, 24px);
-}
-
-.loading-state,
-.not-editable-state {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: var(--spacing-4, 16px);
-  padding: var(--spacing-8, 32px);
-  text-align: center;
-}
-
-.not-editable-message {
-  font-size: var(--text-body, 16px);
-  color: var(--color-ink-secondary, #4A5A4A);
-}
-
-.race-form {
-  display: flex;
-  flex-direction: column;
-  gap: var(--spacing-5, 20px);
-}
-
-.form-group {
-  display: flex;
-  flex-direction: column;
-  gap: var(--spacing-2, 8px);
-}
-
-.form-label {
-  font-size: var(--text-body-sm, 14px);
-  font-weight: 600;
-  color: var(--color-ink-primary, #1A2E1A);
-}
-
-.label-hint {
-  font-weight: 400;
-  color: var(--color-ink-secondary, #4A5A4A);
-}
-
-.form-input {
-  padding: 10px 12px;
-  border: 1px solid var(--color-border-strong, #A8B8A4);
-  border-radius: var(--rounded-md, 10px);
-  font-size: var(--text-body, 16px);
-  color: var(--color-ink-primary, #1A2E1A);
-  background: var(--color-surface-raised, #FFFFFF);
-  min-height: 44px;
-}
-
-.form-input:focus {
-  outline: 2px solid var(--color-primary, #1A5632);
-  outline-offset: 2px;
-  border-color: var(--color-primary, #1A5632);
-}
-
-.grade-fieldset {
-  border: none;
-  padding: 0;
-  margin: 0;
-}
-
-.grade-options {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--spacing-3, 12px);
-}
-
-.grade-option {
-  display: flex;
-  align-items: center;
-  gap: var(--spacing-2, 8px);
-  padding: 8px 16px;
-  border: 1px solid var(--color-border-strong, #A8B8A4);
-  border-radius: var(--rounded-md, 10px);
-  cursor: pointer;
-  min-height: 44px;
-}
-
-.grade-option.active {
-  border-color: var(--color-primary, #1A5632);
-  background: var(--color-primary, #1A5632);
-  color: #fff;
-}
-
-.grade-option input {
-  position: absolute;
-  opacity: 0;
-  width: 0;
-  height: 0;
-}
-
-.custom-scoring-fields {
-  margin-top: var(--spacing-4, 16px);
-  padding: var(--spacing-4, 16px);
-  background: var(--color-surface-base, #F8FAF7);
-  border-radius: var(--rounded-md, 10px);
-  display: flex;
-  flex-direction: column;
-  gap: var(--spacing-4, 16px);
-}
-
-.field-hint {
-  font-size: var(--text-caption, 12px);
-  color: var(--color-ink-secondary, #4A5A4A);
-}
-
-.custom-note {
-  font-size: var(--text-caption, 12px);
-  color: var(--color-ink-disabled, #9CAA9C);
-  padding: 8px;
-  border: 1px dashed var(--color-border-hairline, #D4DCD0);
-  border-radius: var(--rounded-sm, 6px);
-}
-
-.form-error {
-  font-size: var(--text-body-sm, 14px);
-  color: var(--color-destructive, #C53030);
-  padding: 10px 12px;
-  background: var(--color-destructive-light, #FED7D7);
-  border-radius: var(--rounded-md, 10px);
-}
-
-.form-actions {
-  display: flex;
-  gap: var(--spacing-3, 12px);
-  justify-content: flex-end;
-  padding-top: var(--spacing-4, 16px);
-  border-top: 1px solid var(--color-border-hairline, #D4DCD0);
-}
-
-.btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  padding: 10px 24px;
-  border: none;
-  border-radius: var(--rounded-md, 10px);
-  font-size: var(--text-body, 16px);
-  font-weight: 600;
-  cursor: pointer;
-  min-height: 44px;
-}
-
-.btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.btn-primary {
-  background: var(--color-primary, #1A5632);
-  color: #FFFFFF;
-}
-
-.btn-primary:hover:not(:disabled) {
-  background: var(--color-primary-light, #2D7A4F);
-}
-
-.btn-cancel {
-  background: var(--color-surface-raised, #FFFFFF);
-  color: var(--color-ink-primary, #1A2E1A);
-  border: 1px solid var(--color-border-strong, #A8B8A4);
-}
-
-.btn-destructive {
-  background: var(--color-surface-raised, #FFFFFF);
-  color: var(--color-destructive, #C53030);
-  border: 1px solid var(--color-destructive, #C53030);
-}
-
-.btn-destructive:hover:not(:disabled) {
-  background: var(--color-destructive-light, #FED7D7);
-}
 </style>

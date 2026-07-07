@@ -9,7 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.models.horse import Horse
-from app.models.race import GradeEnum, Race, RaceHorse, RaceStatus
+from app.models.race import Race, RaceHorse, RaceStatus
 from app.schemas.race import CustomScoring, RaceCreate, RaceUpdate
 
 
@@ -162,23 +162,11 @@ async def create_race(
             },
         )
 
-    # Validate grade enum
-    try:
-        grade = GradeEnum(data.grade)
-    except ValueError:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail={
-                "code": "INVALID_GRADE",
-                "message": f"无效的比赛等级: {data.grade}",
-            },
-        )
-
-    # Validate custom scoring if grade is CUSTOM
-    if grade == GradeEnum.CUSTOM:
+    # Validate custom scoring if race_grade is 自定义
+    if data.race_grade == "自定义":
         validate_custom_scoring(data.custom_scoring, horse_count=len(horse_ids))
     elif data.custom_scoring is not None:
-        # Custom scoring provided for non-CUSTOM grade → ignore
+        # Custom scoring provided for non-自定义 grade → ignore
         pass
 
     # Create race record
@@ -188,7 +176,11 @@ async def create_race(
     race = Race(
         name=data.name,
         date=data.date,
-        grade=grade,
+        age_range=data.age_range,
+        sex_restriction=data.sex_restriction,
+        race_grade=data.race_grade,
+        country=data.country,
+        distance=data.distance,
         status=RaceStatus.VOTING,
         custom_scoring=custom_scoring_dict,
         creator_id=creator_id,
@@ -272,7 +264,8 @@ async def update_race(
 
     # Check if race has votes (vote_count > 0 → grade is locked)
     vote_count = await get_race_vote_count(db, race_id)
-    if vote_count > 0 and "grade" in update_data:
+    lockable_tags = {"age_range", "sex_restriction", "race_grade", "country", "distance"}
+    if vote_count > 0 and lockable_tags & update_data.keys():
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail={
@@ -286,19 +279,15 @@ async def update_race(
         race.name = update_data["name"]
     if "date" in update_data:
         race.date = update_data["date"]
-    if "grade" in update_data:
-        try:
-            new_grade = GradeEnum(update_data["grade"])
-        except ValueError:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail={
-                    "code": "INVALID_GRADE",
-                    "message": f"无效的比赛等级: {update_data['grade']}",
-                },
-            )
-        race.grade = new_grade
-        if new_grade == GradeEnum.CUSTOM:
+
+    # Update race tag fields
+    for tag_field in ("age_range", "sex_restriction", "race_grade", "country", "distance"):
+        if tag_field in update_data:
+            setattr(race, tag_field, update_data[tag_field])
+
+    # Handle custom scoring when race_grade changes to/from 自定义
+    if "race_grade" in update_data:
+        if update_data["race_grade"] == "自定义":
             if "custom_scoring" in update_data:
                 scoring = update_data["custom_scoring"]
                 validate_custom_scoring(CustomScoring(**scoring), horse_count=len(race.race_horses))

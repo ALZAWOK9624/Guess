@@ -1,12 +1,7 @@
 <script setup lang="ts">
 /**
- * GradeBadge — Race grade indicator badge.
- *
- * Grades:
- * - G1: Gold background
- * - G2_JPN1: Gray background
- * - YOUNG_G1: Light green background
- * - CUSTOM: Gray background with dashed border
+ * GradeBadge — Race grade indicator badge (flat style).
+ * All grades share the same muted gray appearance.
  */
 
 defineProps<{
@@ -15,9 +10,12 @@ defineProps<{
 
 const labelMap: Record<string, string> = {
   G1: 'G1',
-  G2_JPN1: 'G2·JPN1',
-  YOUNG_G1: '2岁G1',
-  CUSTOM: '自定义',
+  G2: 'G2',
+  G3: 'G3',
+  JPN1: 'JPN1',
+  JPN2: 'JPN2',
+  其他: '其他',
+  自定义: '自定义',
 }
 </script>
 
@@ -41,26 +39,11 @@ const labelMap: Record<string, string> = {
   font-family: 'Barlow Condensed', 'system-ui', sans-serif;
   line-height: 1.4;
   white-space: nowrap;
-}
-
-.grade-g1 {
-  background: var(--color-accent, #B8960C);
-  color: #FFFFFF;
-}
-
-.grade-g2_jpn1 {
   background: #6B7280;
   color: #FFFFFF;
 }
 
-.grade-young_g1 {
-  background: var(--color-primary-light, #2D7A4F);
-  color: #FFFFFF;
-}
-
-.grade-custom {
-  background: #6B7280;
-  color: #FFFFFF;
+.grade-自定义 {
   border: 1px dashed var(--color-border-strong, #A8B8A4);
 }
 </style>

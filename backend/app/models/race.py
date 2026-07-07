@@ -9,13 +9,6 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.models import Base
 
 
-class GradeEnum(str, enum.Enum):
-    G1 = "G1"
-    G2_JPN1 = "G2_JPN1"
-    YOUNG_G1 = "YOUNG_G1"
-    CUSTOM = "CUSTOM"
-
-
 class RaceStatus(str, enum.Enum):
     VOTING = "voting"
     LOCKED = "locked"
@@ -28,9 +21,12 @@ class Race(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     name: Mapped[str] = mapped_column(String(200), nullable=False)
     date: Mapped[date] = mapped_column(Date, nullable=False)
-    grade: Mapped[GradeEnum] = mapped_column(
-        Enum(GradeEnum, name="grade_enum"), nullable=False
-    )
+    # Race tag fields (replacing the old single grade field)
+    age_range: Mapped[str] = mapped_column(String(20), nullable=False)
+    sex_restriction: Mapped[str] = mapped_column(String(20), nullable=False)
+    race_grade: Mapped[str] = mapped_column(String(20), nullable=False)
+    country: Mapped[str] = mapped_column(String(50), nullable=False)
+    distance: Mapped[str] = mapped_column(String(50), nullable=False)
     status: Mapped[RaceStatus] = mapped_column(
         Enum(RaceStatus, name="race_status_enum"),
         nullable=False,

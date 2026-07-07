@@ -8,7 +8,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.change_log import ScoreChangeLog
-from app.models.race import GradeEnum, Race, RaceHorse, RaceStatus
+from app.models.race import Race, RaceHorse, RaceStatus
 from app.models.user import User
 from app.models.vote import Vote
 from app.schemas.result import ResultEntry, ResultPosition
@@ -27,7 +27,11 @@ async def seeded_race(db_session: AsyncSession) -> Race:
     race = Race(
         name="Test Race",
         date=date(2026, 6, 15),
-        grade=GradeEnum.G1,
+        age_range="其他",
+        sex_restriction="无",
+        race_grade="G1",
+        country="日本",
+        distance="1200m",
         status=RaceStatus.LOCKED,
         creator_id=admin.id,
     )
@@ -208,7 +212,11 @@ async def test_submit_results_voting_race_rejected(db_session: AsyncSession):
     race = Race(
         name="Voting Race",
         date=date(2026, 6, 15),
-        grade=GradeEnum.G1,
+        age_range="其他",
+        sex_restriction="无",
+        race_grade="G1",
+        country="日本",
+        distance="1200m",
         status=RaceStatus.VOTING,
         creator_id=admin.id,
     )
@@ -519,7 +527,8 @@ async def test_resettle_zero_votes(db_session: AsyncSession):
     await db_session.flush()
 
     race = Race(
-        name="Zero Vote Race", date=date(2026, 7, 1), grade=GradeEnum.G1,
+        name="Zero Vote Race", date=date(2026, 7, 1),
+        age_range="其他", sex_restriction="无", race_grade="G1", country="日本", distance="1200m",
         status=RaceStatus.LOCKED, creator_id=admin.id,
     )
     db_session.add(race)
