@@ -181,6 +181,7 @@ async def create_race(
         race_grade=data.race_grade,
         country=data.country,
         distance=data.distance,
+        surface=data.surface,
         status=RaceStatus.VOTING,
         custom_scoring=custom_scoring_dict,
         is_hidden=data.is_hidden,
@@ -265,7 +266,7 @@ async def update_race(
 
     # Check if race has votes (vote_count > 0 → grade is locked)
     vote_count = await get_race_vote_count(db, race_id)
-    lockable_tags = {"age_range", "sex_restriction", "race_grade", "country", "distance"}
+    lockable_tags = {"age_range", "sex_restriction", "race_grade", "country", "distance", "surface"}
     if vote_count > 0 and lockable_tags & update_data.keys():
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -282,7 +283,7 @@ async def update_race(
         race.date = update_data["date"]
 
     # Update race tag fields
-    for tag_field in ("age_range", "sex_restriction", "race_grade", "country", "distance"):
+    for tag_field in ("age_range", "sex_restriction", "race_grade", "country", "distance", "surface"):
         if tag_field in update_data:
             setattr(race, tag_field, update_data[tag_field])
 

@@ -35,6 +35,7 @@ const createForm = ref({
   race_grade: 'G1',
   country: '日本',
   distance: '',
+  surface: '草地',
   positiveScores: '',
   penaltyRules: '',
 })
@@ -45,6 +46,7 @@ const ageRangeOptions = ['2岁', '2+岁', '3岁', '3+岁', '4+岁', '其他']
 const sexRestrictionOptions = ['无', '牝限', '牡限']
 const raceGradeOptions = ['G1', 'G2', 'G3', 'JPN1', 'JPN2', '其他', '自定义']
 const countryOptions = ['日本', '英国', '美国', '澳大利亚', '中国香港', '法国', '阿联酋', '爱尔兰', '沙特', '南非', '德国', '加拿大', '新西兰', '韩国', '阿根廷', '乌拉圭', '巴西', '智利', '秘鲁', '其他']
+const surfaceOptions = ['草地', '泥地', '全天候', '其他']
 
 // Toggle hidden state
 const togglingHiddenId = ref<number | null>(null)
@@ -91,7 +93,7 @@ function goToRaceDetail(raceId: number) {
 }
 
 function openCreateModal() {
-  createForm.value = { name: '', date: '', age_range: '2岁', sex_restriction: '无', race_grade: 'G1', country: '日本', distance: '', positiveScores: '', penaltyRules: '' }
+  createForm.value = { name: '', date: '', age_range: '2岁', sex_restriction: '无', race_grade: 'G1', country: '日本', distance: '', surface: '草地', positiveScores: '', penaltyRules: '' }
   createError.value = ''
   showCreateModal.value = true
 }
@@ -116,6 +118,7 @@ async function handleCreateRace() {
       race_grade: createForm.value.race_grade,
       country: createForm.value.country,
       distance: createForm.value.distance.trim(),
+      surface: createForm.value.surface,
       horse_ids: [],
       custom_scoring: customScoring,
       is_hidden: true,
@@ -201,9 +204,10 @@ onMounted(loadData)
                 <div class="race-tags-row">
                   <span class="tag-item">{{ race.race_grade }}</span>
                   <span class="tag-item">{{ race.age_range }}</span>
-                  <span class="tag-item">{{ race.sex_restriction }}</span>
+                  <span v-if="race.sex_restriction !== '无'" class="tag-item">{{ race.sex_restriction }}</span>
                   <span class="tag-item">{{ race.country }}</span>
                   <span class="tag-item">{{ race.distance }}</span>
+                  <span class="tag-item">{{ race.surface }}</span>
                 </div>
                 <StatusBadge :status="race.status as any" />
                 <span
@@ -329,6 +333,20 @@ onMounted(loadData)
               :class="{ active: createForm.country === opt }"
             >
               <input v-model="createForm.country" type="radio" :value="opt" />
+              <span>{{ opt }}</span>
+            </label>
+          </div>
+        </div>
+        <div class="form-group">
+          <label>场地</label>
+          <div class="tag-options">
+            <label
+              v-for="opt in surfaceOptions"
+              :key="opt"
+              class="tag-option"
+              :class="{ active: createForm.surface === opt }"
+            >
+              <input v-model="createForm.surface" type="radio" :value="opt" />
               <span>{{ opt }}</span>
             </label>
           </div>

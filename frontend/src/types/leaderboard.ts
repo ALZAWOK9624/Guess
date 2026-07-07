@@ -16,6 +16,7 @@ export interface LeaderboardFilters {
   sex_restriction?: string[]
   race_grade?: string[]
   country?: string[]
+  surface?: string[]
   distance_min?: number
   distance_max?: number
   horse_count_min?: number

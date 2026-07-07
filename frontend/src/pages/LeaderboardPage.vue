@@ -20,6 +20,7 @@ const ageRangeOptions = ['2岁', '2+岁', '3岁', '3+岁', '4+岁', '其他']
 const sexRestrictionOptions = ['无', '牝限', '牡限']
 const raceGradeOptions = ['G1', 'G2', 'G3', 'JPN1', 'JPN2', '其他', '自定义']
 const countryOptions = ['日本', '英国', '美国', '澳大利亚', '中国香港', '法国', '阿联酋', '爱尔兰', '沙特', '南非', '德国', '加拿大', '新西兰', '韩国', '阿根廷', '乌拉圭', '巴西', '智利', '秘鲁', '其他']
+const surfaceOptions = ['草地', '泥地', '全天候', '其他']
 const distanceMin = ref<number | undefined>(undefined)
 const distanceMax = ref<number | undefined>(undefined)
 const horseCountMin = ref<number | undefined>(undefined)
@@ -34,7 +35,7 @@ function hasActiveFilters(): boolean {
   )
 }
 
-function toggleArrayField(field: 'age_range' | 'sex_restriction' | 'race_grade' | 'country', value: string) {
+function toggleArrayField(field: 'age_range' | 'sex_restriction' | 'race_grade' | 'country' | 'surface', value: string) {
   const arr = filters.value[field]
   if (arr?.includes(value)) {
     filters.value[field] = arr.filter(v => v !== value)
@@ -119,6 +120,12 @@ onMounted(loadData)
         <label class="filter-label">国家或地区</label>
         <div class="filter-tags filter-grid">
           <button v-for="opt in countryOptions" :key="opt" class="filter-tag" :class="{ active: filters.country?.includes(opt) }" @click="toggleArrayField('country', opt)">{{ opt }}</button>
+        </div>
+      </div>
+      <div class="filter-section">
+        <label class="filter-label">场地</label>
+        <div class="filter-tags">
+          <button v-for="opt in surfaceOptions" :key="opt" class="filter-tag" :class="{ active: filters.surface?.includes(opt) }" @click="toggleArrayField('surface', opt)">{{ opt }}</button>
         </div>
       </div>
       <div class="filter-section">

@@ -27,6 +27,7 @@ class Race(Base):
     race_grade: Mapped[str] = mapped_column(String(20), nullable=False)
     country: Mapped[str] = mapped_column(String(50), nullable=False)
     distance: Mapped[str] = mapped_column(String(50), nullable=False)
+    surface: Mapped[str] = mapped_column(String(20), nullable=False)
     status: Mapped[RaceStatus] = mapped_column(
         Enum(RaceStatus, name="race_status_enum"),
         nullable=False,

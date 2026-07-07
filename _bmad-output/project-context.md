@@ -209,7 +209,7 @@ _This file contains critical rules and patterns that AI agents must follow when 
 **Edge cases:**
 - Race horse data uses **snapshot** mechanism — horse attributes at creation time are frozen in `RaceHorse.snapshot_data` JSON. Race detail pages read from snapshot_data, NOT the live Horse table. Editing a race does NOT update existing snapshots; new horses added via edit get fresh snapshots at add time.
 - Race status machine: `voting` → `locked` → `settled` (one direction). Only `voting` races are editable. `locked` races block voting. `settled` races are final (can only modify results).
-- Race grade replaced with **5-tag system**: `age_range`（2岁/2+岁/3岁/3+岁/4+岁/其他）, `sex_restriction`（无/牝限/牡限）, `race_grade`（G1/G2/G3/JPN1/JPN2/其他/自定义）, `country`（日本/英国/美国/.../其他）, `distance`（自由输入字符串如"1200m"）。Custom scoring 只在使用 `race_grade="自定义"` 时生效，格式: `{"positive_scores": [10,7,5,3,2,1], "penalty_rules": [{"position": -1, "points": -5}]}`。旧 `GradeEnum` 已移除。
+- Race grade replaced with **6-tag system**: `age_range`（2岁/2+岁/3岁/3+岁/4+岁/其他）, `sex_restriction`（无/牝限/牡限）, `race_grade`（G1/G2/G3/JPN1/JPN2/其他/自定义）, `country`（日本/英国/美国/.../其他）, `distance`（自由输入字符串如"1200m"）, `surface`（草地/泥地/全天候/其他）。Custom scoring 只在使用 `race_grade="自定义"` 时生效，格式: `{"positive_scores": [10,7,5,3,2,1], "penalty_rules": [{"position": -1, "points": -5}]}`。旧 `GradeEnum` 已移除。`sex_restriction` 为"无"时前端不渲染对应 tag。
 - Settled races cannot be deleted — only result modification with full rollback/recalculate. `voting` 和 `locked` 状态的比赛可以删除（含级联删除投票记录）。删除操作需要管理员权限和二次确认弹窗，使用 `ConfirmDeleteModal` 组件。
 - `HomePage.vue` 底部悬浮按钮创建比赛（管理员可见），带有弹窗。管理后台通过首页管理入口旁的下拉菜单访问。
 - DNF/scratched horses score 0 points and are excluded from deduction calculation denominators
@@ -307,7 +307,7 @@ _This file contains critical rules and patterns that AI agents must follow when 
 
 **排行榜模式（Story 3.5）：**
 - **Leaderboard 聚合查询模式**：`leaderboard_service.get_leaderboard()` 使用 `OUTER JOIN votes ON (user.id = vote.user_id AND vote.points IS NOT NULL)` 确保所有用户（含 0 参与用户）出现。聚合列：`COALESCE(SUM(vote.points), 0)` 为 total_points、`COUNT(DISTINCT vote.race_id)` 为 races_participated、`ROUND(CAST(sum / divisor AS NUMERIC), 1)` 为 avg_points。**重要：PostgreSQL 的 `round(numeric, integer)` 要求第一个参数为 `NUMERIC` 类型，`double precision` 会导致 `function round(double precision, integer) does not exist` 错误。必须通过 `sa.cast(expression, Numeric)` 显式转换为 NUMERIC。** 排序：`total_points DESC, avg_points DESC`。Python 层对 NULL avg 做 `float(row.avg_points or 0.0)` 处理。
-- **Leaderboard 筛选模式**：支持按 5 个 tag 筛选（age_range/sex_restriction/race_grade/country 为多选，distance 为米数范围），以及 horse_count 范围筛选。查询通过 Vote→Race LEFT JOIN 实现，筛选条件作用于 Race 表。未命中筛选用户的用户仍以 0 分显示。
+- **Leaderboard 筛选模式**：支持按 6 个 tag 筛选（age_range/sex_restriction/race_grade/country/surface 为多选，distance 为米数范围），以及 horse_count 范围筛选。查询通过 Vote→Race LEFT JOIN 实现，筛选条件作用于 Race 表。未命中筛选用户的用户仍以 0 分显示。
 - **Leaderboard 公开端点模式**：`GET /api/v1/leaderboard` 无认证依赖（FR-23 要求公开访问），路由前缀 `/api/v1`。前端 `apiClient.get('/leaderboard')` 因 baseURL 为 `/api/v1` 正确匹配。
 - **LeaderboardRow 组件模式**：`LeaderboardRow.vue` 使用原生 `<tr>`/`<td>`（非 div+flex 模拟），接收 `entry: LeaderboardEntry`, `rank: number`, `isCurrentUser: boolean` props。rank 使用 Barlow Condensed 18px bold，前三名使用 `--color-accent` 金色（`color: var(--color-accent, #B8960C)`），其余用 `--color-ink-primary`。积分使用 Barlow Condensed 20px bold `--color-primary`。当前用户行使用 `background: #F0F7F2`。场次/场均使用 body-sm 14px `--color-ink-secondary`。row 使用 `aria-label="{rank}名 {username} {points}分"`。
 - **LeaderboardPage 模式**：`LeaderboardPage.vue` 使用 PageState 枚举（loading/empty/error/success）。success 态渲染原生 `<table>`（`<thead>`+`<th scope="col">`+`<tbody>`+`LeaderboardRow` as `<tr>`）。useDragSort composable 外的结构化表格数据优先使用原生 `<table>` 保证列对齐（与 DashboardPage、HorsesPage 一致）。empty 态条件：`data.length === 0 || data.every(e => e.races_participated === 0)`。
@@ -378,4 +378,4 @@ _This file contains critical rules and patterns that AI agents must follow when 
 - Review quarterly for outdated rules
 - Remove rules that become obvious over time
 
-Last Updated: 2026-07-07 (grade → 5-tag system; scoring derived from tags; leaderboard filters with multi-select tags & range inputs; GradeBadge removed; EditRacePage/HomerPage/RaceDetailPage updated with tag UI)
+Last Updated: 2026-07-07 (grade → 6-tag system with surface; sex_restriction="无" hidden; leaderboard filters with multi-select tags & range inputs; GradeBadge removed; EditRacePage/HomerPage/RaceDetailPage updated with tag UI)

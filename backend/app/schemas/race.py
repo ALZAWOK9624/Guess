@@ -40,6 +40,7 @@ class RaceCreate(BaseModel):
     race_grade: str
     country: str
     distance: str
+    surface: str
     horse_ids: list[int] | None = None
     horse_weights: dict[int, str] | None = None  # horse_id → weight
     horse_jockeys: dict[int, str] | None = None  # horse_id → jockey
@@ -92,6 +93,14 @@ class RaceCreate(BaseModel):
             raise ValueError("长度需在 1-50 个字符之间")
         return v.strip()
 
+    @field_validator("surface")
+    @classmethod
+    def validate_surface(cls, v: str) -> str:
+        allowed = {"草地", "泥地", "全天候", "其他"}
+        if v not in allowed:
+            raise ValueError(f"无效的场地类型，允许的值: {', '.join(allowed)}")
+        return v
+
     @field_validator("horse_ids")
     @classmethod
     def validate_horse_ids(cls, v: list[int] | None) -> list[int] | None:
@@ -111,6 +120,7 @@ class RaceUpdate(BaseModel):
     race_grade: str | None = None
     country: str | None = None
     distance: str | None = None
+    surface: str | None = None
     horse_ids: list[int] | None = None
     horse_weights: dict[int, str] | None = None  # race_horse_id → weight
     horse_jockeys: dict[int, str] | None = None  # race_horse_id → jockey
@@ -170,6 +180,15 @@ class RaceUpdate(BaseModel):
             return v.strip()
         return v
 
+    @field_validator("surface")
+    @classmethod
+    def validate_surface(cls, v: str | None) -> str | None:
+        if v is not None:
+            allowed = {"草地", "泥地", "全天候", "其他"}
+            if v not in allowed:
+                raise ValueError(f"无效的场地类型，允许的值: {', '.join(allowed)}")
+        return v
+
     @field_validator("horse_ids")
     @classmethod
     def validate_horse_ids(cls, v: list[int] | None) -> list[int] | None:
@@ -224,6 +243,7 @@ class RaceListResponse(BaseModel):
     race_grade: str
     country: str
     distance: str
+    surface: str
     status: str
     custom_scoring: CustomScoring | None = None
     is_hidden: bool = False
@@ -244,6 +264,7 @@ class RaceDetailResponse(BaseModel):
     race_grade: str
     country: str
     distance: str
+    surface: str
     status: str
     custom_scoring: CustomScoring | None = None
     is_hidden: bool = False

@@ -19,6 +19,7 @@ const raceSexRestriction = ref('无')
 const raceGrade = ref('G1')
 const raceCountry = ref('日本')
 const raceDistance = ref('')
+const raceSurface = ref('草地')
 const selectedHorses = ref<Horse[]>([])
 const customPositiveScores = ref('')
 const customPenaltyRules = ref('')
@@ -32,6 +33,7 @@ const ageRangeOptions = ['2岁', '2+岁', '3岁', '3+岁', '4+岁', '其他']
 const sexRestrictionOptions = ['无', '牝限', '牡限']
 const raceGradeOptions = ['G1', 'G2', 'G3', 'JPN1', 'JPN2', '其他', '自定义']
 const countryOptions = ['日本', '英国', '美国', '澳大利亚', '中国香港', '法国', '阿联酋', '爱尔兰', '沙特', '南非', '德国', '加拿大', '新西兰', '韩国', '阿根廷', '乌拉圭', '巴西', '智利', '秘鲁', '其他']
+const surfaceOptions = ['草地', '泥地', '全天候', '其他']
 
 // Per-horse jockey (keyed by race_horse_id for PATCH updates)
 const horseJockeys = ref<Record<number, string>>({})
@@ -54,10 +56,11 @@ const initialValues = ref<{
   race_grade: string
   country: string
   distance: string
+  surface: string
   horses: Horse[]
   jockeys: Record<number, string>
 }>({
-  name: '', date: '', age_range: '2岁', sex_restriction: '无', race_grade: 'G1', country: '日本', distance: '', horses: [],
+  name: '', date: '', age_range: '2岁', sex_restriction: '无', race_grade: 'G1', country: '日本', distance: '', surface: '草地', horses: [],
   jockeys: {},
 })
 
@@ -101,6 +104,7 @@ onMounted(async () => {
     raceGrade.value = race.race_grade
     raceCountry.value = race.country
     raceDistance.value = race.distance
+    raceSurface.value = race.surface
 
     // Convert horse snapshots back to Horse type
     // The weight/jockey are now per-race, so we don't put them in the Horse objects
@@ -137,6 +141,7 @@ onMounted(async () => {
       race_grade: race.race_grade,
       country: race.country,
       distance: race.distance,
+      surface: race.surface,
       horses: [...selectedHorses.value],
       jockeys: { ...horseJockeys.value },
     }
@@ -212,6 +217,9 @@ async function handleSubmit() {
     }
     if (raceDistance.value !== initialValues.value.distance) {
       payload.distance = raceDistance.value
+    }
+    if (raceSurface.value !== initialValues.value.surface) {
+      payload.surface = raceSurface.value
     }
 
     const changedHorses = getChangedHorseIds()
@@ -351,6 +359,16 @@ async function handleDelete() {
       <div class="form-group">
         <label class="form-label" for="race-distance">长度</label>
         <input id="race-distance" v-model="raceDistance" type="text" class="form-input" placeholder="例：1200m" />
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">场地</label>
+        <div class="tag-options">
+          <label v-for="opt in surfaceOptions" :key="opt" class="tag-option" :class="{ active: raceSurface === opt }">
+            <input v-model="raceSurface" type="radio" name="surface" :value="opt" />
+            <span>{{ opt }}</span>
+          </label>
+        </div>
       </div>
 
       <div class="form-group">

@@ -21,6 +21,7 @@ async def get_leaderboard(
     sex_restriction: list[str] | None = None,
     race_grade: list[str] | None = None,
     country: list[str] | None = None,
+    surface: list[str] | None = None,
     distance_min: int | None = None,
     distance_max: int | None = None,
     horse_count_min: int | None = None,
@@ -46,6 +47,8 @@ async def get_leaderboard(
         race_filters.append(Race.race_grade.in_(race_grade))
     if country:
         race_filters.append(Race.country.in_(country))
+    if surface:
+        race_filters.append(Race.surface.in_(surface))
 
     # Distance filter: parse numeric part from distance string
     if distance_min is not None or distance_max is not None:

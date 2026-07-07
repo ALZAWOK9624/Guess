@@ -9,6 +9,7 @@ export interface RaceListItem {
   race_grade: string
   country: string
   distance: string
+  surface: string
   status: RaceStatus
   is_hidden: boolean
   horse_count: number
@@ -27,6 +28,7 @@ export interface RaceDetail {
   race_grade: string
   country: string
   distance: string
+  surface: string
   status: RaceStatus
   is_hidden: boolean
   custom_scoring: CustomScoring | null
@@ -103,6 +105,7 @@ export interface RaceCreatePayload {
   race_grade: string
   country: string
   distance: string
+  surface: string
   horse_ids?: number[] | null
   horse_weights?: Record<string, string> | null
   horse_jockeys?: Record<string, string> | null
@@ -118,6 +121,7 @@ export interface RaceUpdatePayload {
   race_grade?: string
   country?: string
   distance?: string
+  surface?: string
   horse_ids?: number[] | null
   horse_weights?: Record<string, string> | null
   horse_jockeys?: Record<string, string> | null

@@ -681,9 +681,10 @@ onUnmounted(() => {
             <div class="race-tags">
               <span class="race-tag">{{ race.race_grade }}</span>
               <span class="race-tag">{{ race.age_range }}</span>
-              <span class="race-tag">{{ race.sex_restriction }}</span>
+              <span v-if="race.sex_restriction !== '无'" class="race-tag">{{ race.sex_restriction }}</span>
               <span class="race-tag">{{ race.country }}</span>
               <span class="race-tag">{{ race.distance }}</span>
+              <span class="race-tag">{{ race.surface }}</span>
             </div>
             <StatusBadge :status="race.status as any" />
             <button
