@@ -229,42 +229,44 @@ function handleConfirmKeydown(e: KeyboardEvent) {
           <col style="width:6%" />
           <col style="width:16.5%" />
         </colgroup>
-        <tr>
-          <td class="name-cell" rowspan="2">
-            <div class="horse-name">{{ safeData.name }}</div>
-            <div class="horse-suffix">{{ sexAgeStr }}</div>
-            <div v-if="votable && voted" class="vote-badge" aria-hidden="true">
-              <span class="vote-checkmark">✓</span>
-              <span class="vote-label">已投</span>
-            </div>
-            <div v-if="submitting && voted" class="vote-spinner" aria-hidden="true" />
-          </td>
-          <th class="cl-lbl">骑手</th>
-          <td class="cl-val" :class="{ editable: editable }" @dblclick.stop="startEdit()">
-            <input
-              v-if="editingField"
-              ref="jockeyInput"
-              v-model="editValue"
-              class="inline-input"
-              type="text"
-              @blur="submitEdit"
-              @keydown="handleEditKeydown"
-            />
-            <span v-else>{{ displayJockey || '-' }}</span>
-          </td>
-          <th class="cl-lbl">属地</th>
-          <td class="cl-val">{{ safeData.location || '-' }}</td>
-          <th class="cl-lbl">父</th>
-          <td class="cl-val" colspan="2">{{ safeData.sire || '-' }}</td>
-          <th class="cl-lbl">母父</th>
-          <td class="cl-val">{{ safeData.damsire || '-' }}</td>
-        </tr>
-        <tr>
-          <th class="cl-lbl">前走</th>
-          <td class="cl-val-wide" colspan="4">{{ formatPrevResult(safeData) }}</td>
-          <th class="cl-lbl">主胜</th>
-          <td class="cl-val-wide" colspan="3">{{ formatBestWin(safeData) }}</td>
-        </tr>
+        <tbody>
+          <tr>
+            <td class="name-cell" rowspan="2">
+              <div class="horse-name">{{ safeData.name }}</div>
+              <div class="horse-suffix">{{ sexAgeStr }}</div>
+              <div v-if="votable && voted" class="vote-badge" aria-hidden="true">
+                <span class="vote-checkmark">✓</span>
+                <span class="vote-label">已投</span>
+              </div>
+              <div v-if="submitting && voted" class="vote-spinner" aria-hidden="true" />
+            </td>
+            <th class="cl-lbl">骑手</th>
+            <td class="cl-val" :class="{ editable: editable }" @dblclick.stop="startEdit()">
+              <input
+                v-if="editingField"
+                ref="jockeyInput"
+                v-model="editValue"
+                class="inline-input"
+                type="text"
+                @blur="submitEdit"
+                @keydown="handleEditKeydown"
+              />
+              <span v-else>{{ displayJockey || '-' }}</span>
+            </td>
+            <th class="cl-lbl">属地</th>
+            <td class="cl-val">{{ safeData.location || '-' }}</td>
+            <th class="cl-lbl">父</th>
+            <td class="cl-val" colspan="2">{{ safeData.sire || '-' }}</td>
+            <th class="cl-lbl">母父</th>
+            <td class="cl-val">{{ safeData.damsire || '-' }}</td>
+          </tr>
+          <tr>
+            <th class="cl-lbl">前走</th>
+            <td class="cl-val-wide" colspan="4">{{ formatPrevResult(safeData) }}</td>
+            <th class="cl-lbl">主胜</th>
+            <td class="cl-val-wide" colspan="3">{{ formatBestWin(safeData) }}</td>
+          </tr>
+        </tbody>
       </table>
     </div>
 

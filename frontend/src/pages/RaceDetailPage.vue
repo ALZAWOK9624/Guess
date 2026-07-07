@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/authStore'
 import GradeBadge from '@/components/GradeBadge.vue'
@@ -105,6 +105,26 @@ function handleCardClick(horse: RaceDetail['horses'][0]) {
 // Header editing
 const headerSaveError = ref('')
 const headerSaveSuccess = ref(false)
+const dateEditing = ref(false)
+const editDate = ref('')
+const dateInputRef = ref<HTMLInputElement | null>(null)
+
+function startDateEdit() {
+  if (!isAdmin.value || !isRaceVoting.value || !race.value) return
+  editDate.value = race.value.date.slice(0, 10)
+  dateEditing.value = true
+  nextTick(() => dateInputRef.value?.focus())
+}
+
+function saveDate() {
+  if (!race.value || !editDate.value) return
+  dateEditing.value = false
+  handleHeaderSave({ name: race.value.name, date: editDate.value })
+}
+
+function cancelDateEdit() {
+  dateEditing.value = false
+}
 
 async function handleHeaderSave({ name, date }: { name: string; date: string }) {
   if (!race.value || !isAdmin.value || !isRaceVoting.value) return
@@ -667,7 +687,25 @@ onUnmounted(() => {
         </div>
 
         <div class="race-subinfo">
-          <p v-if="!(isAdmin && isRaceVoting)" class="race-date">{{ race.date }}</p>
+          <div class="date-row">
+            <template v-if="isAdmin && isRaceVoting && dateEditing">
+              <input
+                ref="dateInputRef"
+                v-model="editDate"
+                type="date"
+                class="date-input"
+                @blur="saveDate"
+                @keydown.enter.prevent="saveDate"
+                @keydown.escape.prevent="cancelDateEdit"
+              />
+            </template>
+            <p
+              v-else
+              class="race-date"
+              :class="{ 'date-editable': isAdmin && isRaceVoting }"
+              @dblclick="startDateEdit"
+            >{{ race.date }}</p>
+          </div>
           <p class="race-meta">{{ race.horses.length }} 匹参赛 · {{ race.vote_count }} 人已投</p>
         </div>
 
@@ -1026,6 +1064,31 @@ onUnmounted(() => {
   font-size: var(--text-body, 16px);
   color: var(--color-ink-secondary, #4A5A4A);
   margin: 0;
+}
+
+.date-editable {
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: var(--rounded-sm, 6px);
+  transition: background 0.15s;
+}
+
+.date-editable:hover {
+  background: var(--color-surface-base, #F8FAF7);
+}
+
+.date-input {
+  padding: 4px 8px;
+  border: 1px solid var(--color-border-strong, #A8B8A4);
+  border-radius: var(--rounded-sm, 6px);
+  font-size: var(--text-body, 16px);
+  color: var(--color-ink-primary, #1A2E1A);
+  background: var(--color-surface-raised, #FFFFFF);
+}
+
+.date-input:focus {
+  outline: 2px solid var(--color-primary, #1A5632);
+  outline-offset: 2px;
 }
 
 .race-meta {

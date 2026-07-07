@@ -50,22 +50,10 @@ const routes: RouteRecordRaw[] = [
   },
   // Admin routes — top-level, share AppLayout with all other pages
   {
-    path: '/admin',
-    name: 'admin-dashboard',
-    component: () => import('@/pages/admin/DashboardPage.vue'),
-    meta: { requiresAuth: true, isAdmin: true, title: '管理后台' }
-  },
-  {
     path: '/admin/horses',
     name: 'admin-horses',
     component: () => import('@/pages/admin/HorsesPage.vue'),
     meta: { requiresAuth: true, isAdmin: true, title: '马匹管理' }
-  },
-  {
-    path: '/admin/races/new',
-    name: 'admin-create-race',
-    component: () => import('@/pages/admin/CreateRacePage.vue'),
-    meta: { requiresAuth: true, isAdmin: true, title: '创建比赛' }
   },
   {
     path: '/admin/races/:id/edit',

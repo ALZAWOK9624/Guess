@@ -148,4 +148,9 @@ def calculate_score(
     # Calculate penalty (negative deduction)
     penalty = _get_penalty_score(grade, total_horses, position, custom_penalty)
 
+    # Same principle as G1: a position never gets both positive score and penalty.
+    # If both apply, positive score wins (penalty is waived).
+    if positive > 0 and penalty < 0:
+        return positive
+
     return positive + penalty

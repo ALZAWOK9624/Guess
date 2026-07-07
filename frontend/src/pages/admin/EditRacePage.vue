@@ -359,7 +359,15 @@ async function handleDelete() {
 .grade-options { display: flex; flex-wrap: wrap; gap: var(--spacing-3, 12px); }
 .grade-option { display: flex; align-items: center; gap: var(--spacing-2, 8px); padding: 8px 16px; border: 1px solid var(--color-border-strong, #A8B8A4); border-radius: var(--rounded-md, 10px); cursor: pointer; min-height: 44px; }
 .grade-option.active { border-color: var(--color-primary, #1A5632); background: var(--color-primary, #1A5632); color: #fff; }
-.grade-option input { position: absolute; opacity: 0; width: 0; height: 0; }
+.grade-option input {
+  position: absolute;
+  opacity: 0;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+}
 .custom-scoring-fields { margin-top: var(--spacing-4, 16px); padding: var(--spacing-4, 16px); background: var(--color-surface-base, #F8FAF7); border-radius: var(--rounded-md, 10px); display: flex; flex-direction: column; gap: var(--spacing-4, 16px); }
 .field-hint { font-size: var(--text-caption, 12px); color: var(--color-ink-secondary, #4A5A4A); }
 .custom-note { font-size: var(--text-caption, 12px); color: var(--color-ink-disabled, #9CAA9C); padding: 8px; border: 1px dashed var(--color-border-hairline, #D4DCD0); border-radius: var(--rounded-sm, 6px); }

@@ -9,6 +9,8 @@ import { getRaces, createRace, toggleRaceHidden } from '@/api/races'
 import type { RaceListItem } from '@/types/race'
 import type { Grade } from '@/types/race'
 
+const showCustomFields = computed(() => createForm.value.grade === 'CUSTOM')
+
 type PageState = 'loading' | 'empty' | 'error' | 'success'
 
 const authStore = useAuthStore()
@@ -31,6 +33,8 @@ const createForm = ref({
   name: '',
   date: '',
   grade: 'G1' as Grade,
+  positiveScores: '',
+  penaltyRules: '',
 })
 const creating = ref(false)
 const createError = ref('')
@@ -87,7 +91,7 @@ function goToRaceDetail(raceId: number) {
 }
 
 function openCreateModal() {
-  createForm.value = { name: '', date: '', grade: 'G1' }
+  createForm.value = { name: '', date: '', grade: 'G1', positiveScores: '', penaltyRules: '' }
   createError.value = ''
   showCreateModal.value = true
 }
@@ -101,11 +105,15 @@ async function handleCreateRace() {
   creating.value = true
   createError.value = ''
   try {
+    const customScoring = createForm.value.grade === 'CUSTOM'
+      ? parseCustomScoring()
+      : undefined
     const data = await createRace({
       name: createForm.value.name.trim(),
       date: createForm.value.date,
       grade: createForm.value.grade,
       horse_ids: [],
+      custom_scoring: customScoring,
     })
     closeCreateModal()
     router.push(`/races/${data.id}`)
@@ -114,6 +122,23 @@ async function handleCreateRace() {
   } finally {
     creating.value = false
   }
+}
+
+function parseCustomScoring() {
+  const scores = createForm.value.positiveScores
+    .split(',')
+    .map(s => parseInt(s.trim()))
+    .filter(n => !isNaN(n))
+  const penalties = createForm.value.penaltyRules
+    ? createForm.value.penaltyRules
+        .split(',')
+        .map(p => {
+          const [pos, pts] = p.split(':')
+          return { position: parseInt(pos.trim()), points: parseInt(pts.trim()) }
+        })
+        .filter(r => !isNaN(r.position) && !isNaN(r.points))
+    : []
+  return { positive_scores: scores, penalty_rules: penalties.length > 0 ? penalties : undefined }
 }
 
 onMounted(loadData)
@@ -255,11 +280,37 @@ onMounted(loadData)
             </label>
           </div>
         </div>
+        <!-- Custom scoring fields -->
+        <div v-if="showCustomFields" class="custom-scoring-fields">
+          <div class="form-group">
+            <label for="positive-scores">
+              正序积分列表 <span class="required">*</span>
+            </label>
+            <input
+              id="positive-scores"
+              v-model="createForm.positiveScores"
+              type="text"
+              placeholder="例：10,7,5,3,2,1"
+            />
+            <p class="field-hint">从第 1 名开始的积分，用逗号分隔</p>
+          </div>
+          <div class="form-group">
+            <label for="penalty-rules">扣分规则（选填）</label>
+            <input
+              id="penalty-rules"
+              v-model="createForm.penaltyRules"
+              type="text"
+              placeholder="例：-1:-5,-2:-2"
+            />
+            <p class="field-hint">格式：倒数位置:扣分，用逗号分隔</p>
+          </div>
+        </div>
+
         <p v-if="createError" class="modal-error">{{ createError }}</p>
         <div class="modal-actions">
           <button
             class="modal-btn modal-confirm"
-            :disabled="creating || !createForm.name.trim() || !createForm.date"
+            :disabled="creating || !createForm.name.trim() || !createForm.date || (showCustomFields && !createForm.positiveScores.trim())"
             @click="handleCreateRace"
           >
             {{ creating ? '创建中…' : '创建' }}
@@ -567,14 +618,42 @@ onMounted(loadData)
 .grade-option input {
   position: absolute;
   opacity: 0;
-  width: 0;
-  height: 0;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
 }
 
 .modal-error {
   color: var(--color-destructive, #C53030);
   font-size: var(--text-body-sm, 14px);
   margin: 0 0 var(--spacing-3, 12px);
+}
+
+.custom-scoring-fields {
+  padding: var(--spacing-3, 12px);
+  background: var(--color-surface-base, #F8FAF7);
+  border-radius: var(--rounded-sm, 6px);
+  margin-bottom: var(--spacing-4, 16px);
+}
+
+.custom-scoring-fields .form-group {
+  margin-bottom: var(--spacing-3, 12px);
+}
+
+.custom-scoring-fields .form-group:last-child {
+  margin-bottom: 0;
+}
+
+.required {
+  color: var(--color-destructive, #C53030);
+}
+
+.field-hint {
+  font-size: var(--text-caption, 12px);
+  color: var(--color-ink-secondary, #4A5A4A);
+  margin: var(--spacing-1, 4px) 0 0;
 }
 
 .modal-actions {

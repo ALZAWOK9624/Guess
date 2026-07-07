@@ -17,13 +17,11 @@ const emit = defineEmits<{
 
 const isEditing = ref(false)
 const editName = ref('')
-const editDate = ref('')
 const nameInput = ref<HTMLInputElement | null>(null)
 
 function enterEdit() {
   if (props.disabled) return
   editName.value = props.name
-  editDate.value = props.date.slice(0, 10)
   isEditing.value = true
   nextTick(() => nameInput.value?.focus())
 }
@@ -38,21 +36,13 @@ function submitEdit() {
     cancelEdit()
     return
   }
-  emit('save', { name: trimmed, date: editDate.value })
+  emit('save', { name: trimmed, date: props.date.slice(0, 10) })
   isEditing.value = false
 }
 
 function handleNameKeydown(e: KeyboardEvent) {
   if (e.key === 'Enter') {
     e.preventDefault()
-    submitEdit()
-  } else if (e.key === 'Escape') {
-    cancelEdit()
-  }
-}
-
-function handleDateKeydown(e: KeyboardEvent) {
-  if (e.key === 'Enter') {
     submitEdit()
   } else if (e.key === 'Escape') {
     cancelEdit()
@@ -80,20 +70,11 @@ watch(
           @keydown="handleNameKeydown"
           @blur="submitEdit"
         />
-        <input
-          v-model="editDate"
-          type="date"
-          class="edit-input date-input"
-          :class="{ 'is-empty': !editDate }"
-          @keydown="handleDateKeydown"
-          @blur="submitEdit"
-        />
       </div>
     </template>
     <template v-else>
       <div class="display-row" @dblclick="enterEdit">
         <h1 class="race-name">{{ name }}</h1>
-        <p class="race-date">{{ date }}</p>
         <button
           class="edit-btn"
           type="button"
@@ -175,6 +156,9 @@ watch(
   font-size: var(--text-body, 16px);
   color: var(--color-ink-primary, #1A2E1A);
   background: var(--color-surface-raised, #FFFFFF);
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .edit-input:focus {
@@ -186,11 +170,6 @@ watch(
   font-family: var(--font-display, 'Barlow Condensed', system-ui, sans-serif);
   font-size: var(--text-heading, 24px);
   font-weight: 600;
-}
-
-.date-input {
-  font-size: var(--text-body, 16px);
-  color: var(--color-ink-secondary, #4A5A4A);
 }
 
 @media (max-width: 767px) {
