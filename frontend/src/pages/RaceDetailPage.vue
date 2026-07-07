@@ -19,6 +19,7 @@ import {
   lockRace,
   removeRaceHorse,
   toggleRaceHidden,
+  deleteRace,
 } from '@/api/races'
 import { submitResults } from '@/api/results'
 import { updateBestWin, refreshRaceHorseSnapshot } from '@/api/horses'
@@ -252,7 +253,24 @@ async function confirmAddHorse() {
   }
 }
 
-// Update horse jockey
+// Delete race
+const showDeleteRaceModal = ref(false)
+const deletingRace = ref(false)
+const deleteRaceError = ref('')
+
+async function handleDeleteRace() {
+  if (!race.value || deletingRace.value) return
+  deletingRace.value = true
+  deleteRaceError.value = ''
+  try {
+    await deleteRace(raceId)
+    router.push('/')
+  } catch (err: any) {
+    deleteRaceError.value = err?.response?.data?.detail?.message || '删除比赛失败'
+  } finally {
+    deletingRace.value = false
+  }
+}
 async function handleUpdateJockey(
   horse: RaceDetail['horses'][0],
   value: string | null,
@@ -755,6 +773,17 @@ onUnmounted(() => {
         <p v-if="bestWinUpdateError" class="admin-error">{{ bestWinUpdateError }}</p>
       </div>
 
+      <!-- Delete race (voting/locked only) -->
+      <div v-if="isAdmin && !isRaceSettled && resultMode === 'idle'" class="admin-actions-bar delete-section">
+        <button
+          class="admin-btn delete-btn"
+          @click="showDeleteRaceModal = true; deleteRaceError = ''"
+        >
+          删除比赛
+        </button>
+        <p v-if="deleteRaceError" class="admin-error">{{ deleteRaceError }}</p>
+      </div>
+
       <!-- Custom scoring info -->
       <div v-if="race.custom_scoring" class="custom-scoring-info">
         <p class="scoring-title">自定义积分规则</p>
@@ -959,6 +988,17 @@ onUnmounted(() => {
       :loading="deleting"
       @confirm="confirmDeleteHorse"
       @cancel="showDeleteConfirm = false"
+    />
+
+    <!-- Delete Race Confirm Modal -->
+    <ConfirmDeleteModal
+      v-if="showDeleteRaceModal && race"
+      title="删除比赛"
+      :item-name="race.name"
+      message="确定删除比赛「{name}」？此操作不可撤销，所有相关数据将被清除。"
+      :loading="deletingRace"
+      @confirm="handleDeleteRace"
+      @cancel="showDeleteRaceModal = false"
     />
   </div>
 </template>
@@ -1199,6 +1239,23 @@ onUnmounted(() => {
 
 .modify-result-btn:hover:not(:disabled) {
   background: var(--color-primary, #1A5632);
+  color: #FFFFFF;
+}
+
+.delete-section {
+  border-top: 1px solid var(--color-border-hairline, #D4DCD0);
+  padding-top: var(--spacing-4, 16px);
+  margin-top: var(--spacing-4, 16px);
+}
+
+.delete-btn {
+  background: transparent;
+  color: var(--color-destructive, #C53030);
+  border: 1px solid var(--color-destructive, #C53030);
+}
+
+.delete-btn:hover {
+  background: var(--color-destructive, #C53030);
   color: #FFFFFF;
 }
 

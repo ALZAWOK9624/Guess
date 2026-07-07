@@ -311,11 +311,12 @@ _This file contains critical rules and patterns that AI agents must follow when 
 - **Leaderboard 公开端点模式**：`GET /api/v1/leaderboard` 无认证依赖（FR-23 要求公开访问），路由前缀 `/api/v1`。前端 `apiClient.get('/leaderboard')` 因 baseURL 为 `/api/v1` 正确匹配。
 - **LeaderboardRow 组件模式**：`LeaderboardRow.vue` 使用原生 `<tr>`/`<td>`（非 div+flex 模拟），接收 `entry: LeaderboardEntry`, `rank: number`, `isCurrentUser: boolean` props。rank 使用 Barlow Condensed 18px bold，前三名使用 `--color-accent` 金色（`color: var(--color-accent, #B8960C)`），其余用 `--color-ink-primary`。积分使用 Barlow Condensed 20px bold `--color-primary`。当前用户行使用 `background: #F0F7F2`。场次/场均使用 body-sm 14px `--color-ink-secondary`。row 使用 `aria-label="{rank}名 {username} {points}分"`。
 - **LeaderboardPage 模式**：`LeaderboardPage.vue` 使用 PageState 枚举（loading/empty/error/success）。success 态渲染原生 `<table>`（`<thead>`+`<th scope="col">`+`<tbody>`+`LeaderboardRow` as `<tr>`）。useDragSort composable 外的结构化表格数据优先使用原生 `<table>` 保证列对齐（与 DashboardPage、HorsesPage 一致）。empty 态条件：`data.length === 0 || data.every(e => e.races_participated === 0)`。
+- **排行榜排除 admin 模式**：`leaderboard_service.get_leaderboard()` 查询中添加 `.where(User.is_admin == False)` 过滤 admin 用户。admin 不能投票，无有效积分，不应出现在排行榜中。
 - **review 通过后的 story 状态转换**：code-review 发现被全部修复后，story 状态从 `review` → `done`。同时 sprint-status.yaml 同步更新。此流程在 code-review 工作流的 Step 6 中自动执行。
 - **catch 规范**：所有 `catch` 块必须使用 `catch (err)`（非裸 `catch`），以便区分错误类型。即使在仅设置 error 状态的简单场景中也需遵守此规范。
 
 **隐藏比赛模式：**
-- **Race 模型新增 `is_hidden` 列**：默认为 `False`，布尔类型。迁移通过 Alembic 新增列并设置 `server_default=false`。该字段仅影响可见性，不影响投票、积分、结算等业务逻辑。
+- **Race 模型新增 `is_hidden` 列**：默认为 `True`（新创建比赛默认隐藏），布尔类型。迁移通过 Alembic 新增列并设置 `server_default=false`。该字段仅影响可见性，不影响投票、积分、结算等业务逻辑。
 - **Service 层 `include_hidden` 参数模式**：`get_races()` 和 `get_race()` 新增 `include_hidden: bool = False` 参数。调用方（端点层）根据当前用户是否为管理员传递该参数。非管理员且 `include_hidden=False` 时，`is_hidden=True` 的比赛从查询结果中排除。
 - **端点 `PATCH /{race_id}/toggle-hidden`**：管理员专用端点，切换 `is_hidden` 标志。Service 层 `toggle_race_hidden()` 执行 `race.is_hidden = not race.is_hidden` 后 `flush()` + `refresh()`。
 - **错误码模式**：非管理员访问隐藏比赛详情时返回 `404` 但错误码为 `RACE_HIDDEN`（区别于通用的 `NOT_FOUND`），便于前端显示"当前比赛已隐藏"。
@@ -329,6 +330,10 @@ _This file contains critical rules and patterns that AI agents must follow when 
 - **积分颜色编码模式**：正分 `--color-primary`（绿色）、负分 `--color-destructive`（红色）、零分 `--color-ink-disabled`（灰色）。所有分值使用 Barlow Condensed 14px bold（`var(--font-display)` + `var(--text-body-sm)`）。DNF 马匹投票固定显示 `0`（灰色），忽略实际 `vote.points` 值。
 - **名次标签模式**：1st/2nd/3rd 金色底 `--color-accent` 白字、4th+ 灰底 `--color-ink-disabled` 白字、DNF 灰底斜体。aria-label 使用中文序数（"第一名"/"第二名"/"弃权"）。DNF 整个 wrapper 为 `opacity: 0.5`，但 `.no-votes` 文字覆盖为 `opacity: 1` 保持可读。
 - **已结算比赛管理员按钮模式**：比赛详情页中 `v-if="isRaceSettled && authStore.isAdmin"` 渲染 "修改结果" 按钮（透明背景 + 竞马绿 1px 边框 + 绿色文字），hover 时反转（绿底白字）。链接到 `/admin/races/${raceId}/results`。使用 `router.push()` SPA 跳转。
+
+**比赛详情页删除比赛模式：**
+- **删除按钮位置**：比赛详情页底部 admin 操作区（`v-if="isAdmin && !isRaceSettled && resultMode === 'idle'"`），用分隔线与上方操作按钮区分。红色主题样式（`--color-destructive`），hover 反转红底白字。已结算比赛不显示。
+- **删除流程**：点击删除按钮 → 弹出 `ConfirmDeleteModal` 确认弹窗（显示比赛名称）→ 确认后调用 `deleteRace()` API → 成功后 `router.push('/')` 跳转回首页。错误信息显示在按钮下方。
 
 **审计日志与重算模式（Story 3.7）：**
 - **ScoreChangeLog 审计模型模式**：`ScoreChangeLog` 模型（`models/change_log.py`）记录每次积分变更。字段包括 `race_id`（FK CASCADE）、`vote_id`（FK CASCADE）、`user_id`（FK CASCADE——投票者）、`admin_user_id`（FK CASCADE——操作管理员）、`old_points`（首次结算为 NULL）、`new_points`、`created_at`。`Vote` 和 `User` 模型各有反向关系指向此表。

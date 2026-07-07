@@ -183,6 +183,7 @@ async def create_race(
         distance=data.distance,
         status=RaceStatus.VOTING,
         custom_scoring=custom_scoring_dict,
+        is_hidden=data.is_hidden,
         creator_id=creator_id,
     )
     db.add(race)

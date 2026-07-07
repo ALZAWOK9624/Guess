@@ -118,6 +118,7 @@ async function handleCreateRace() {
       distance: createForm.value.distance.trim(),
       horse_ids: [],
       custom_scoring: customScoring,
+      is_hidden: true,
     })
     closeCreateModal()
     router.push(`/races/${data.id}`)
@@ -246,16 +247,18 @@ onMounted(loadData)
         </div>
       </div>
 
-      <button
-        v-if="authStore.isAdmin"
-        class="create-race-fab"
-        type="button"
-        aria-label="创建比赛"
-        @click="openCreateModal"
-      >
-        + 创建比赛
-      </button>
     </template>
+
+    <!-- Floating action button — always visible for admin -->
+    <button
+      v-if="authStore.isAdmin"
+      class="create-race-fab"
+      type="button"
+      aria-label="创建比赛"
+      @click="openCreateModal"
+    >
+      + 创建比赛
+    </button>
 
     <!-- Create race modal -->
     <div v-if="showCreateModal" class="modal-backdrop" @click.self="closeCreateModal">
@@ -334,6 +337,7 @@ onMounted(loadData)
           <label for="race-distance">长度</label>
           <input id="race-distance" v-model="createForm.distance" type="text" placeholder="例：1200m" />
         </div>
+
         <!-- Custom scoring fields -->
         <div v-if="showCustomFields" class="custom-scoring-fields">
           <div class="form-group">
@@ -742,6 +746,7 @@ onMounted(loadData)
   color: var(--color-ink-secondary, #4A5A4A);
   margin: var(--spacing-1, 4px) 0 0;
 }
+
 
 .modal-actions {
   display: flex;

@@ -100,6 +100,7 @@ async def get_leaderboard(
             (User.id == Vote.user_id) & Vote.points.isnot(None),
         )
         .group_by(User.id, User.username)
+        .where(User.is_admin == False)
         .order_by(
             total_points_col.desc(),
             avg_points_col.desc(),

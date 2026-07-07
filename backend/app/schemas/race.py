@@ -44,6 +44,7 @@ class RaceCreate(BaseModel):
     horse_weights: dict[int, str] | None = None  # horse_id → weight
     horse_jockeys: dict[int, str] | None = None  # horse_id → jockey
     custom_scoring: CustomScoring | None = None
+    is_hidden: bool = True
 
     @field_validator("name")
     @classmethod

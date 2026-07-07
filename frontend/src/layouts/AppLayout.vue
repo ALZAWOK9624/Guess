@@ -482,13 +482,13 @@ function isAdminItemActive(item: AdminNavItem): boolean {
    ========================================= */
 
 .main-content {
-  min-height: 100vh;
-  min-height: 100dvh;
+  min-height: calc(100dvh - var(--bottom-nav-height) - env(safe-area-inset-bottom, 0));
   padding-bottom: calc(var(--bottom-nav-height) + env(safe-area-inset-bottom, 0));
 }
 
 @media (min-width: 768px) {
   .main-content {
+    min-height: calc(100vh - var(--header-height));
     padding-bottom: 0;
     max-width: var(--max-width);
     margin: 0 auto;

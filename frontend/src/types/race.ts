@@ -107,6 +107,7 @@ export interface RaceCreatePayload {
   horse_weights?: Record<string, string> | null
   horse_jockeys?: Record<string, string> | null
   custom_scoring?: CustomScoring | null
+  is_hidden?: boolean
 }
 
 export interface RaceUpdatePayload {

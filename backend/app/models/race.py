@@ -33,7 +33,7 @@ class Race(Base):
         default=RaceStatus.VOTING,
     )
     custom_scoring: Mapped[dict | None] = mapped_column(JSON, nullable=True)
-    is_hidden: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    is_hidden: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     creator_id: Mapped[int] = mapped_column(
         Integer, ForeignKey("users.id"), nullable=False
     )
