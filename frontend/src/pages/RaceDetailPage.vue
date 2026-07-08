@@ -1912,15 +1912,6 @@ onUnmounted(() => {
     width: 100%;
   }
 
-  .gate-drag-item {
-    touch-action: manipulation;
-  }
-
-  .gate-drag-admin {
-    touch-action: none;
-  }
-
-
   .result-actions {
     flex-direction: column;
   }
