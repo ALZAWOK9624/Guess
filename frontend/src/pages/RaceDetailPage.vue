@@ -1619,16 +1619,7 @@ onUnmounted(() => {
 
 @media (max-width: 767px) {
   .delete-zone {
-    width: 72px;
-    min-height: 72px;
-  }
-
-  .delete-icon {
-    font-size: 20px;
-  }
-
-  .delete-label {
-    font-size: 10px;
+    display: none;
   }
 }
 
