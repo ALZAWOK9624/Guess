@@ -368,6 +368,8 @@ const gateTouchIndex = ref(-1)
 let gateLongPressTimer: ReturnType<typeof setTimeout> | null = null
 
 function handleGateTouchStart(_event: TouchEvent, index: number) {
+  // Only enable gate drag on mobile when admin is in voting state
+  if (!authStore.isAdmin || !isRaceVoting.value) return
   if (gateLongPressTimer) clearTimeout(gateLongPressTimer)
   gateLongPressTimer = setTimeout(() => {
     gateTouchIndex.value = index
@@ -1683,7 +1685,27 @@ onUnmounted(() => {
 
 @media (max-width: 767px) {
   .race-title-row {
-    align-items: flex-start;
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .title-row-right {
+    margin-left: 0;
+    width: 100%;
+  }
+
+  .race-name {
+    font-size: var(--text-subheading, 18px);
+    white-space: normal;
+    word-break: break-word;
+  }
+
+  .race-tags {
+    width: 100%;
+  }
+
+  .gate-drag-item {
+    touch-action: manipulation;
   }
 
   .result-actions {

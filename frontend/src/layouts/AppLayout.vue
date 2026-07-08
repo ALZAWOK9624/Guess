@@ -440,6 +440,7 @@ function isAdminItemActive(item: AdminNavItem): boolean {
 
 .mobile-dropdown {
   position: absolute;
+  top: auto;
   bottom: calc(100% + 8px);
   left: 50%;
   transform: translateX(-50%);
