@@ -205,15 +205,13 @@ const deleting = ref(false)
 
 function handleGateDragItemDragStart(e: DragEvent, horse: RaceDetail['horses'][0]) {
   if (!isAdmin.value || !isRaceVoting.value) return
-  try {
-    e.dataTransfer!.effectAllowed = 'move'
-    e.dataTransfer!.setData(
-      'text/plain',
-      String(horse.race_horse_id),
-    )
-  } catch {
-    // ignore drag data errors — don't let them freeze the drag operation
-  }
+  e.dataTransfer?.setData(
+    'application/json',
+    JSON.stringify({
+      raceHorseId: horse.race_horse_id,
+      name: horse.snapshot_data.name ?? '未知',
+    }),
+  )
 }
 
 function handleDeleteDragEnter() {
@@ -227,14 +225,15 @@ function handleDeleteDragLeave() {
 function handleDeleteDrop(e: DragEvent) {
   e.preventDefault()
   deleteHover.value = false
-  const raw = e.dataTransfer?.getData('text/plain')
+  const raw = e.dataTransfer?.getData('application/json')
   if (!raw) return
-  const raceHorseId = Number(raw)
-  if (!raceHorseId) return
-  const horse = race.value?.horses.find(h => h.race_horse_id === raceHorseId)
-  if (!horse) return
-  deleteTarget.value = { raceHorseId, name: horse.snapshot_data.name ?? '未知' }
-  showDeleteConfirm.value = true
+  try {
+    const data = JSON.parse(raw)
+    deleteTarget.value = { raceHorseId: data.raceHorseId, name: data.name }
+    showDeleteConfirm.value = true
+  } catch {
+    // ignore invalid data
+  }
 }
 
 async function confirmDeleteHorse() {
