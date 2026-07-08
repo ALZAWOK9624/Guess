@@ -1,7 +1,7 @@
 ---
 project_name: 'guess'
 user_name: 'tkd'
-date: '2026-07-06'
+date: '2026-07-08'
 story: 'ui-alignment-and-date-placeholder-fixes'
 sections_completed:
   ['technology_stack', 'language_rules', 'framework_rules', 'testing_rules', 'code_quality', 'workflow', 'critical_rules']
@@ -56,7 +56,7 @@ _This file contains critical rules and patterns that AI agents must follow when 
 - **PageState 枚举模式**：列表页面使用 `type PageState = 'loading' | 'empty' | 'error' | 'success'`，搜索/下拉组件可使用扩展版 `'idle' | 'loading' | 'empty' | 'error' | 'success'`（`idle` 表示初始未搜索状态，下拉隐藏）。骨架屏显示 loading 态，精确微文案显示 empty 态，"加载失败，请刷新重试"+刷新按钮显示 error 态。
 - `RaceCard.vue` 支持 `skeleton` prop，未来故事可直接使用 `<RaceCard skeleton />` 渲染骨架屏。
 - `HorseSearchSelect.vue` 使用 `defineModel<Horse[]>('selectedHorses')` 实现 v-model 双向绑定 — 新增组件应优先使用 `defineModel` 替代手动 `emit('update:...')` 模式。
-- `HorseDetailCard.vue` 用于展示马匹 10 属性快照数据，接收 `snapshotData` prop（可空，通过 `withDefaults` 提供默认值）。新增 `votable`、`voted`、`submitting` 三个 props 支持点击投票交互：`votable` 时显示 `cursor: pointer` + hover 高亮，`voted` 时显示金色边框 + "✓ 已投"徽章。emit `voteToggle` 事件供父组件处理投票逻辑。
+- `HorseDetailCard.vue` 用于展示马匹 10 属性快照数据，接收 `snapshotData` prop（可空，通过 `withDefaults` 提供默认值）。新增 `votable`、`voted`、`submitting` 三个 props 支持点击投票交互：`votable` 时显示 `cursor: pointer` + hover 高亮，`voted` 时显示金色边框 + "✓ 已投"徽章。emit `voteToggle` 事件供父组件处理投票逻辑。移动端 (<768px) 使用独立于桌面端表格的四行 flex 布局（`.mobile-card-layout`），四行依次为：骑手/属地、父/母父、前走、主胜鞍。通过 `.desktop-table`/`.mobile-card-layout` 配合媒体查询切换。移动端添加 `touch-action: manipulation; -webkit-touch-callout: none; user-select: none;` 禁用长按文本选择。
 - `HorseDetailCard.vue` 新增 `refresh` emit 事件 + 刷新按钮（↻图标，仅 `editable` 为 true 时显示）+ 确认弹窗（Teleport to body）。点击刷新按钮 → 弹窗确认 → emit `refresh` 事件，父组件调用 `refreshRaceHorseSnapshot` API 并重新加载数据。
 - `GradeBadge.vue` 用于展示比赛等级徽章：G1（金色底#B8960C）、G2_JPN1（灰色底#6B7280）、YOUNG_G1（亮绿底#2D7A4F）、CUSTOM（灰色底虚线边框）。接收 `grade: string` prop。
 - `StatusBadge.vue` 用于展示比赛状态胶囊：voting（绿底#2D7A4F）、locked（灰底#6B7280 + 🔒）、settled（深绿底#0D3A1F + ✓）。接收 `status: string` prop。
@@ -92,7 +92,7 @@ _This file contains critical rules and patterns that AI agents must follow when 
 - `prefers-reduced-motion: reduce` respected globally in `base.css` — overrides all animations/transitions. 全局 `scroll-behavior: smooth` 也被覆盖为 `auto`。
 - `*:focus-visible` 全局统一样式在 `base.css` 中定义（2px 竞马绿 outline + 2px offset），所有可聚焦元素自动继承。组件内如需自定义 focus 样式，使用 scoped CSS 覆盖。
 - **ARIA combobox 模式**：搜索下拉组件（如 `HorseSearchSelect.vue`）必须遵循 combobox 无障碍模式：`role="combobox"` + `:aria-expanded="showDropdown"`（动态绑定，不能硬编码 `"false"`）+ `aria-controls` 指向 listbox + `role="listbox"` + `role="option"` + `aria-selected`。`aria-expanded` 必须响应式绑定到下拉展开状态。
-- Admin nav in `AppLayout`: desktop header nav-links and mobile bottom nav both have a "管理" dropdown trigger. Dropdown shows 马匹管理/用户管理 (原邀请码). Closes on click-outside, Escape, and route change. Desktop dropdown drops downward; mobile dropdown rises upward from bottom bar.
+- Admin nav in `AppLayout`: desktop header nav-links and mobile bottom nav both have a "管理" dropdown trigger. Dropdown shows 马匹管理/用户管理 (原邀请码). Closes on click-outside, Escape, and route change. Desktop dropdown drops downward; mobile dropdown rises upward from bottom bar, with `top: auto` override to avoid CSS cascade conflict from `.admin-dropdown` default `top` value. Mobile bottom nav also includes login/logout auth items: `<router-link to="/login">` for login, `<div @click="handleLogout">` for logout (exit-door icon + "退出" label).
 
 **FastAPI:**
 - App entry: `app/main.py` with `lifespan` for DB engine lifecycle
@@ -261,6 +261,11 @@ _This file contains critical rules and patterns that AI agents must follow when 
 - **PATCH 编辑模式的关键模式**：`handleSave` 在编辑时必须按字段逐一比较当前值与原始值的差异，**仅发送变更的字段**，而非发送所有字段为 `null`。否则后端 `exclude_unset=True` 无法区分"用户未修改"和"用户将某字段清空为 null"——发送 `null` 会覆盖数据库中的已有值。参考实现：`frontend/src/pages/admin/HorsesPage.vue` 中的 `handleSave`。
 - 新建数据后不推荐 `unshift`，应 `push` 后按显示顺序 `sort()` 避免与后端排序不一致导致的视觉跳跃。
 - **HorseSearchSelect 点击即选模式**：搜索下拉选中马匹后立即关闭下拉框并清空搜索词（`showDropdown = false` + `searchText = ''`），而非在下拉框中打钩多选。点击行为为**追加模式**（`selectedHorses = [...selectedHorses, horse]`），已选马匹不会重复添加。通过上方 tag 展示已选列表，配合父组件的"添加"按钮一次性提交。
+- **移动端触控安全模式**：
+  - `:draggable` 属性必须使用 `:draggable="draggable ? true : undefined"`，避免渲染 `draggable="false"` 属性在移动端浏览器引发长按冻结。
+  - 移动端 touch 事件监听应通过 **模板拆分隔离**：非 admin 用户在 RaceDetailPage 中使用独立的 `<template v-else>`，完全不注册 `@touchstart/@touchmove/@touchend`，从根源避免浏览器进入 touch 手势处理路径。
+  - 所有 touch 事件处理 `@touchend` 必须配套 `@touchcancel`（系统级长按/OS 手势抢占时触发）。
+  - **禁止**在 touch 处理器中设置 `document.body.style.overflow = 'hidden'`——该全局状态在 DevTools 模拟或系统 touchcancel 下无法可靠恢复。改用 CSS `touch-action: none` 阻止拖拽期间滚动。
 - **Date input 原生占位文字隐藏模式**：`<input type="date">` 在中文 locale 下浏览器显示 "yyyy/mm/dd" 原生占位文字。解决方案：在 `base.css` 中全局定义 `input[type="date"].is-empty::-webkit-datetime-edit { visibility: hidden !important; }` + `input[type="date"].is-empty:focus::-webkit-datetime-edit { visibility: visible !important; }`，每个 date input 添加 `:class="{ 'is-empty': !modelVar }"` 让 Vue 响应式追踪空值状态。空值未聚焦时隐藏，聚焦或已有值时正常显示。
 - **CSS 变量使用规范**：`variables.css` 中定义的 spacing 变量名称为 `--spacing-{N}`（N×4px，如 `--spacing-1`=4px、`--spacing-2`=8px、`--spacing-3`=12px、`--spacing-4`=16px、`--spacing-5`=20px、`--spacing-6`=24px、`--spacing-8`=32px、`--spacing-10`=40px、`--spacing-12`=48px、`--spacing-16`=64px）。**不存在** `--spacing-20`、`--spacing-24`、`--spacing-32` 等变量，使用这些不存在的变量会导致整个 CSS 声明失效。页面排版错乱时优先检查是否引用了不存在的 spacing 变量。
 - **Auth session expiry handling**：`authStore` 解析 refresh token 的 `exp` 声明并为管理员用户设置 `setTimeout`；到期后清除登录态并跳转到 `/login?session=expired`。`client.ts` 响应拦截器对任何 401（登录/注册/重置页除外）都跳转同一 URL，并中断请求避免页面先显示“加载失败”。`LoginPage.vue` 读取 `route.query.session === 'expired'` 显示“登录状态已过期，请重新登录”。JWT 解析工具位于 `frontend/src/utils/jwt.ts`。
