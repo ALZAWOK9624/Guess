@@ -39,6 +39,7 @@ const raceId = Number(route.params.id)
 const pageState = ref<PageState>('loading')
 const race = ref<RaceDetail | null>(null)
 const errorMessage = ref('加载失败，请刷新重试')
+const isJiggleMode = ref(false)
 
 const {
   votedHorseName,
@@ -76,6 +77,31 @@ const horsePositions = computed<Record<string, number> | undefined>(() => {
 })
 
 const isAdmin = computed(() => authStore.isAdmin)
+
+const canEnterJiggleMode = computed(() =>
+  isAdmin.value && (
+    isRaceVoting.value ||
+    ((isRaceLocked.value || isRaceSettled.value) && resultMode.value === 'ranking')
+  ),
+)
+
+function toggleJiggleMode() {
+  if (!canEnterJiggleMode.value) return
+  if (isJiggleMode.value) {
+    // Exit jiggle mode: reset all drag state
+    isJiggleMode.value = false
+    gateTouchIndex.value = -1
+    gateDragOverIndex.value = -1
+    if (gateLongPressTimer) { clearTimeout(gateLongPressTimer); gateLongPressTimer = null }
+    gateDragSort.value?.endDrag()
+    resultTouchIndex.value = -1
+    resultDragOverIndex.value = -1
+    resultDragSource.value = 'active'
+    resultDragSort?.endDrag()
+  } else {
+    isJiggleMode.value = true
+  }
+}
 
 const canVote = computed(() =>
   isRaceVoting.value && authStore.isLoggedIn && !authStore.isAdmin,
@@ -158,6 +184,7 @@ async function handleLock() {
     await lockRace(raceId)
     race.value = await getRace(raceId)
     await loadVotes(raceId)
+    isJiggleMode.value = false
   } catch (err: any) {
     lockError.value = err?.response?.data?.detail?.message || '锁定失败'
   } finally {
@@ -370,6 +397,12 @@ let gateLongPressTimer: ReturnType<typeof setTimeout> | null = null
 function handleGateTouchStart(_event: TouchEvent, index: number) {
   // Only enable gate drag on mobile when admin is in voting state
   if (!authStore.isAdmin || !isRaceVoting.value) return
+  if (isJiggleMode.value) {
+    // Jiggle mode: activate immediately, no long-press delay
+    gateTouchIndex.value = index
+    gateDragSort.value?.startDrag(index)
+    return
+  }
   if (gateLongPressTimer) clearTimeout(gateLongPressTimer)
   gateLongPressTimer = setTimeout(() => {
     gateTouchIndex.value = index
@@ -430,6 +463,8 @@ const resultActiveList = computed(() => resultDragSort?.activeList.value ?? [])
 const resultDnfList = computed(() => resultDragSort?.dnfList.value ?? [])
 const isResultDragging = computed(() => resultDragSort?.isDragging.value ?? false)
 const resultDragSource = ref<'active' | 'dnf'>('active')
+const resultTouchIndex = ref(-1)
+let resultTouchStartY = 0
 
 function initResultDragSort() {
   if (!race.value) return
@@ -454,6 +489,7 @@ function enterResultMode() {
 function exitResultMode() {
   resultMode.value = 'idle'
   resultDragSort = null
+  isJiggleMode.value = false
 }
 
 function handleResultDragStart(index: number, source: 'active' | 'dnf' = 'active') {
@@ -502,6 +538,73 @@ function handleDnfDrop(event: DragEvent) {
 
 function handleDnfClick(index: number) {
   resultDragSort?.moveToActive(index)
+}
+
+// Mobile touch result ranking (jiggle mode)
+function handleResultTouchStart(event: TouchEvent, index: number, source: 'active' | 'dnf') {
+  if (!isJiggleMode.value) return
+  resultTouchIndex.value = index
+  resultDragSource.value = source
+  resultTouchStartY = event.touches[0].clientY
+  resultDragSort?.startDrag(index)
+}
+
+function handleResultTouchMove(event: TouchEvent) {
+  if (resultTouchIndex.value < 0 || !resultDragSort) return
+  event.preventDefault()
+
+  const touch = event.touches[0]
+  const cards = document.querySelectorAll('.result-drag-item')
+  for (let i = 0; i < cards.length; i++) {
+    const rect = cards[i].getBoundingClientRect()
+    if (touch.clientY >= rect.top && touch.clientY <= rect.bottom) {
+      if (i !== resultTouchIndex.value && resultDragSource.value === 'active') {
+        const item = resultDragSort.activeList.value.splice(resultTouchIndex.value, 1)[0]
+        if (item) {
+          resultDragSort.activeList.value.splice(i, 0, item)
+          resultTouchIndex.value = i
+          resultDragOverIndex.value = i
+        }
+      }
+      break
+    }
+  }
+}
+
+function handleResultTouchEnd(event: TouchEvent) {
+  if (resultTouchIndex.value < 0) return
+
+  // Check if released over DNF zone
+  if (resultDragSource.value === 'active') {
+    const dnfZone = document.querySelector('.dnf-zone')
+    if (dnfZone) {
+      const dnfRect = dnfZone.getBoundingClientRect()
+      const touchY = event.changedTouches[0].clientY
+      if (touchY >= dnfRect.top && touchY <= dnfRect.bottom) {
+        resultDragSort?.moveToDnf(resultTouchIndex.value)
+      }
+    }
+  } else if (resultDragSource.value === 'dnf') {
+    // DNF card tap → move back to active
+    const activeZone = document.querySelector('.drop-zone')
+    if (activeZone) {
+      const activeRect = activeZone.getBoundingClientRect()
+      const touchY = event.changedTouches[0].clientY
+      if (touchY < activeRect.bottom) {
+        resultDragSort?.moveToActive(resultTouchIndex.value)
+      }
+    }
+  }
+
+  resultTouchIndex.value = -1
+  resultDragOverIndex.value = -1
+  resultDragSort?.endDrag()
+}
+
+function handleResultTouchCancel() {
+  resultTouchIndex.value = -1
+  resultDragOverIndex.value = -1
+  resultDragSort?.endDrag()
 }
 
 const allPositioned = computed(() => {
@@ -631,6 +734,7 @@ onMounted(loadRace)
 
 onUnmounted(() => {
   if (gateLongPressTimer) clearTimeout(gateLongPressTimer)
+  isJiggleMode.value = false
 })
 </script>
 
@@ -663,9 +767,25 @@ onUnmounted(() => {
     <!-- Race Detail -->
     <template v-else-if="race">
       <div class="race-header">
-        <button class="back-btn" @click="router.push('/')" aria-label="返回首页">
-          ← 返回
-        </button>
+        <div class="race-header-top">
+          <button class="back-btn" @click="router.push('/')" aria-label="返回首页">
+            ← 返回
+          </button>
+          <button
+            v-if="canEnterJiggleMode"
+            class="jiggle-toggle-btn mobile-only"
+            :class="{ active: isJiggleMode }"
+            :aria-label="isJiggleMode ? '退出编辑模式' : '进入编辑模式'"
+            :aria-pressed="isJiggleMode"
+            @click="toggleJiggleMode"
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+              <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+            </svg>
+            <span>{{ isJiggleMode ? '完成' : '编辑' }}</span>
+          </button>
+        </div>
 
         <div class="race-title-row">
           <RaceHeaderEditor
@@ -849,12 +969,15 @@ onUnmounted(() => {
                 :position="isRaceSettled ? (horse.position ?? null) : null"
                 :editable="isAdmin && isRaceVoting"
                 :draggable="(isAdmin && isRaceVoting) ? true : undefined"
+                :show-delete-button="isJiggleMode"
+                :is-jiggling="isJiggleMode"
                 :class="{ 'voted-horse-locked': (isRaceLocked || isRaceSettled) && votedHorseName && horse.snapshot_data.name === votedHorseName }"
                 @vote-toggle="handleCardClick(horse)"
                 @update-field="(payload) => handleUpdateJockey(horse, payload.value)"
                 @drag-start="handleGateDragStart(index)"
                 @drag-end="handleGateDragEnd"
                 @refresh="handleRefresh(horse)"
+                @delete-click="deleteTarget = { raceHorseId: horse.race_horse_id, name: horse.snapshot_data.name ?? '未知' }; showDeleteConfirm = true"
               />
             </div>
           </template>
@@ -884,7 +1007,7 @@ onUnmounted(() => {
               />
             </div>
           </template>
-          <div v-if="isAdmin && isRaceVoting" class="add-delete-row">
+          <div v-if="isAdmin && isRaceVoting && !isJiggleMode" class="add-delete-row">
             <AddHorseCard @click="openAddHorseModal" />
             <div
               class="delete-zone"
@@ -912,6 +1035,10 @@ onUnmounted(() => {
               :key="horse.race_horse_id"
               class="result-drag-item"
               :class="{ 'drag-over-top': resultDragOverIndex === index && isResultDragging }"
+              @touchstart="(e: TouchEvent) => handleResultTouchStart(e, index, 'active')"
+              @touchmove="handleResultTouchMove"
+              @touchend="handleResultTouchEnd"
+              @touchcancel="handleResultTouchCancel"
             >
               <HorseDetailCard
                 :snapshot-data="horse.snapshot_data"
@@ -924,9 +1051,12 @@ onUnmounted(() => {
                 :position="index + 1"
                 :draggable="true"
                 :is-dnf="false"
+                :show-delete-button="isJiggleMode"
+                :is-jiggling="isJiggleMode"
                 @drag-start="handleResultDragStart(index, 'active')"
                 @drag-end="handleResultDragEnd"
                 @refresh="handleRefresh(horse)"
+                @delete-click="deleteTarget = { raceHorseId: horse.race_horse_id, name: horse.snapshot_data.name ?? '未知' }; showDeleteConfirm = true"
               />
             </div>
           </div>
@@ -948,6 +1078,10 @@ onUnmounted(() => {
               :key="horse.race_horse_id"
               class="dnf-item"
               @click="handleDnfClick(index)"
+              @touchstart="(e: TouchEvent) => handleResultTouchStart(e, index, 'dnf')"
+              @touchmove="handleResultTouchMove"
+              @touchend="handleResultTouchEnd"
+              @touchcancel="handleResultTouchCancel"
             >
               <HorseDetailCard
                 :snapshot-data="horse.snapshot_data"
@@ -959,9 +1093,12 @@ onUnmounted(() => {
                 :gate="horse.gate"
                 :draggable="true"
                 :is-dnf="true"
+                :show-delete-button="isJiggleMode"
+                :is-jiggling="isJiggleMode"
                 @drag-start="handleResultDragStart(index, 'dnf')"
                 @drag-end="handleResultDragEnd"
                 @refresh="handleRefresh(horse)"
+                @delete-click="deleteTarget = { raceHorseId: horse.race_horse_id, name: horse.snapshot_data.name ?? '未知' }; showDeleteConfirm = true"
               />
             </div>
           </div>
@@ -1045,6 +1182,13 @@ onUnmounted(() => {
   margin-bottom: var(--spacing-6, 24px);
 }
 
+.race-header-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--spacing-3, 12px);
+}
+
 .back-btn {
   background: none;
   border: none;
@@ -1052,7 +1196,6 @@ onUnmounted(() => {
   font-size: var(--text-body, 16px);
   cursor: pointer;
   padding: 0;
-  margin-bottom: var(--spacing-3, 12px);
   min-height: 44px;
   display: inline-flex;
   align-items: center;
@@ -1060,6 +1203,44 @@ onUnmounted(() => {
 
 .back-btn:hover {
   opacity: 0.8;
+}
+
+/* Jiggle mode toggle button (mobile only) */
+.jiggle-toggle-btn {
+  display: none;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  border: 1px solid var(--color-border-strong, #A8B8A4);
+  border-radius: var(--rounded-md, 10px);
+  background: var(--color-surface-raised, #FFFFFF);
+  color: var(--color-ink-primary, #1A2E1A);
+  font-size: var(--text-body, 16px);
+  font-weight: 600;
+  cursor: pointer;
+  min-height: 44px;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+
+.jiggle-toggle-btn:hover {
+  background: var(--color-surface-base, #F8FAF7);
+  border-color: var(--color-primary, #1A5632);
+}
+
+.jiggle-toggle-btn.active {
+  background: var(--color-primary, #1A5632);
+  color: #FFFFFF;
+  border-color: var(--color-primary, #1A5632);
+}
+
+.jiggle-toggle-btn.active:hover {
+  background: var(--color-primary-light, #2D7A4F);
+}
+
+@media (max-width: 767px) {
+  .jiggle-toggle-btn {
+    display: inline-flex;
+  }
 }
 
 .race-title-row {

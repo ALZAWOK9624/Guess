@@ -39,6 +39,8 @@ const props = withDefaults(defineProps<{
   editable?: boolean
   draggable?: boolean
   isDnf?: boolean
+  showDeleteButton?: boolean
+  isJiggling?: boolean
 }>(), {
   snapshotData: () => ({
     name: '',
@@ -67,6 +69,8 @@ const props = withDefaults(defineProps<{
   editable: false,
   draggable: false,
   isDnf: false,
+  showDeleteButton: false,
+  isJiggling: false,
 })
 
 const emit = defineEmits<{
@@ -75,6 +79,7 @@ const emit = defineEmits<{
   dragStart: []
   dragEnd: []
   refresh: []
+  deleteClick: []
 }>()
 
 const showRefreshConfirm = ref(false)
@@ -199,6 +204,7 @@ function handleConfirmKeydown(e: KeyboardEvent) {
       'submitting': submitting && voted,
       'draggable-card': draggable,
       'dnf-card': isDnf,
+      'is-jiggling': isJiggling,
     }"
     :role="votable ? 'button' : undefined"
     :tabindex="votable ? 0 : undefined"
@@ -276,6 +282,12 @@ function handleConfirmKeydown(e: KeyboardEvent) {
       <!-- Mobile 4-row layout (<768px) -->
       <div class="mobile-card-layout">
         <div class="mobile-name-section">
+          <button
+            v-if="showDeleteButton && !isDnf"
+            class="delete-card-btn"
+            aria-label="删除此马匹"
+            @click.stop="emit('deleteClick')"
+          >✕</button>
           <div class="horse-name">{{ safeData.name }}</div>
           <div class="horse-suffix">{{ sexAgeStr }}</div>
           <div v-if="votable && voted" class="vote-badge" aria-hidden="true">
@@ -814,6 +826,59 @@ function handleConfirmKeydown(e: KeyboardEvent) {
   .horse-detail-card,
   .vote-spinner {
     transition: none;
+    animation: none;
+  }
+}
+
+/* Jiggle animation for edit mode (mobile only) */
+@keyframes jiggle {
+  0% { transform: rotate(0deg) translate(0, 0); }
+  25% { transform: rotate(-0.8deg) translate(-1px, 0); }
+  75% { transform: rotate(0.8deg) translate(1px, 1px); }
+  100% { transform: rotate(0deg) translate(0, 0); }
+}
+
+.horse-detail-card.is-jiggling {
+  animation: jiggle 0.3s ease-in-out infinite alternate;
+  touch-action: none;
+}
+
+/* Delete X button (mobile jiggle mode) */
+.delete-card-btn {
+  position: absolute;
+  top: -8px;
+  right: -8px;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: none;
+  background: var(--color-destructive, #C53030);
+  color: #FFFFFF;
+  font-size: 14px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  z-index: 2;
+  padding: 0;
+  line-height: 1;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.2);
+  transition: transform 0.12s, background 0.12s;
+}
+
+.delete-card-btn:hover {
+  transform: scale(1.15);
+  background: #9B2C2C;
+}
+
+.delete-card-btn:focus-visible {
+  outline: 2px solid var(--color-primary, #1A5632);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .horse-detail-card.is-jiggling {
     animation: none;
   }
 }
