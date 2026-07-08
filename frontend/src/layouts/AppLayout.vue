@@ -411,13 +411,15 @@ function isAdminItemActive(item: AdminNavItem): boolean {
   flex: 1;
   display: flex;
   flex-direction: column;
-  align-items: center;
+  align-items: stretch;
   position: relative;
 }
 
 .mobile-dropdown-area .nav-item {
-  flex: none;
+  flex: 1;
   width: 100%;
+  padding: 0;
+  margin: 0;
   background: none;
   border: none;
   cursor: pointer;

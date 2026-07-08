@@ -203,7 +203,7 @@ function handleConfirmKeydown(e: KeyboardEvent) {
     :role="votable ? 'button' : undefined"
     :tabindex="votable ? 0 : undefined"
     :aria-pressed="votable ? voted : undefined"
-    :draggable="draggable"
+    :draggable="draggable ? true : undefined"
     @click="handleClick"
     @keydown.enter="handleClick"
     @keydown.space.prevent="handleClick"

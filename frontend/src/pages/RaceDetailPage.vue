@@ -835,6 +835,7 @@ onUnmounted(() => {
               @touchstart="(e: TouchEvent) => handleGateTouchStart(e, index)"
               @touchmove="handleGateTouchMove"
               @touchend="handleGateTouchEnd"
+              @touchcancel="handleGateTouchEnd"
             >
               <HorseDetailCard
                 :snapshot-data="horse.snapshot_data"
@@ -849,7 +850,7 @@ onUnmounted(() => {
                 :gate="horse.gate"
                 :position="isRaceSettled ? (horse.position ?? null) : null"
                 :editable="isAdmin && isRaceVoting"
-                :draggable="isAdmin && isRaceVoting"
+                :draggable="(isAdmin && isRaceVoting) ? true : undefined"
                 :class="{ 'voted-horse-locked': (isRaceLocked || isRaceSettled) && votedHorseName && horse.snapshot_data.name === votedHorseName }"
                 @vote-toggle="handleCardClick(horse)"
                 @update-field="(payload) => handleUpdateJockey(horse, payload.value)"
