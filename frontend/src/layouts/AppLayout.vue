@@ -219,22 +219,23 @@ function isAdminItemActive(item: AdminNavItem): boolean {
       </div>
 
       <!-- Auth (mobile) -->
-      <div class="nav-item auth-nav-item" @click="authStore.isLoggedIn ? handleLogout() : router.push('/login')">
-        <template v-if="authStore.isLoggedIn">
-          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
-            <circle cx="12" cy="7" r="4" />
-          </svg>
-          <span class="nav-label">{{ authStore.user?.username || '退出' }}</span>
-        </template>
-        <template v-else>
-          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4" />
-            <polyline points="10 17 15 12 10 7" />
-            <line x1="15" y1="12" x2="3" y2="12" />
-          </svg>
-          <span class="nav-label">登录</span>
-        </template>
+      <!-- Login button -->
+      <router-link v-if="!authStore.isLoggedIn" to="/login" class="nav-item auth-nav-item">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4" />
+          <polyline points="10 17 15 12 10 7" />
+          <line x1="15" y1="12" x2="3" y2="12" />
+        </svg>
+        <span class="nav-label">登录</span>
+      </router-link>
+      <!-- Logout button -->
+      <div v-else class="nav-item auth-nav-item logout-nav-item" @click="handleLogout">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+          <polyline points="16 17 21 12 16 7" />
+          <line x1="21" y1="12" x2="9" y2="12" />
+        </svg>
+        <span class="nav-label">退出</span>
       </div>
     </nav>
   </div>
@@ -431,7 +432,6 @@ function isAdminItemActive(item: AdminNavItem): boolean {
   font-weight: 500;
   -webkit-tap-highlight-color: transparent;
   transition: color var(--transition-fast);
-  padding: 4px 0;
 }
 
 .mobile-dropdown-area .nav-item.active-dropdown {

@@ -824,38 +824,67 @@ onUnmounted(() => {
           @dragover.prevent
           @drop="handleGateDrop"
         >
-          <div
-            v-for="(horse, index) in displayHorses"
-            :key="horse.race_horse_id"
-            class="gate-drag-item"
-            :class="{ 'drag-over-top': gateDragOverIndex === index && isGateDragging }"
-            @dragstart="(e: DragEvent) => handleGateDragItemDragStart(e, horse)"
-            @touchstart="(e: TouchEvent) => handleGateTouchStart(e, index)"
-            @touchmove="handleGateTouchMove"
-            @touchend="handleGateTouchEnd"
-          >
-            <HorseDetailCard
-              :snapshot-data="horse.snapshot_data"
-              :horse-id="horse.horse_id"
-              :jockey="horse.jockey"
-              :birth-year="horse.snapshot_data.birth_year"
-              :hemisphere="horse.snapshot_data.hemisphere"
-              :reference-date="race.date"
-              :votable="cardsVotable"
-              :voted="isHorseVoted(horse.race_horse_id)"
-              :submitting="isSubmitting"
-              :gate="horse.gate"
-              :position="isRaceSettled ? (horse.position ?? null) : null"
-              :editable="isAdmin && isRaceVoting"
-              :draggable="isAdmin && isRaceVoting"
-              :class="{ 'voted-horse-locked': (isRaceLocked || isRaceSettled) && votedHorseName && horse.snapshot_data.name === votedHorseName }"
-              @vote-toggle="handleCardClick(horse)"
-              @update-field="(payload) => handleUpdateJockey(horse, payload.value)"
-              @drag-start="handleGateDragStart(index)"
-              @drag-end="handleGateDragEnd"
-              @refresh="handleRefresh(horse)"
-            />
-          </div>
+          <!-- Admin voting: with touch/drag handlers for gate reorder -->
+          <template v-if="isAdmin && isRaceVoting">
+            <div
+              v-for="(horse, index) in displayHorses"
+              :key="horse.race_horse_id"
+              class="gate-drag-item"
+              :class="{ 'drag-over-top': gateDragOverIndex === index && isGateDragging }"
+              @dragstart="(e: DragEvent) => handleGateDragItemDragStart(e, horse)"
+              @touchstart="(e: TouchEvent) => handleGateTouchStart(e, index)"
+              @touchmove="handleGateTouchMove"
+              @touchend="handleGateTouchEnd"
+            >
+              <HorseDetailCard
+                :snapshot-data="horse.snapshot_data"
+                :horse-id="horse.horse_id"
+                :jockey="horse.jockey"
+                :birth-year="horse.snapshot_data.birth_year"
+                :hemisphere="horse.snapshot_data.hemisphere"
+                :reference-date="race.date"
+                :votable="cardsVotable"
+                :voted="isHorseVoted(horse.race_horse_id)"
+                :submitting="isSubmitting"
+                :gate="horse.gate"
+                :position="isRaceSettled ? (horse.position ?? null) : null"
+                :editable="isAdmin && isRaceVoting"
+                :draggable="isAdmin && isRaceVoting"
+                :class="{ 'voted-horse-locked': (isRaceLocked || isRaceSettled) && votedHorseName && horse.snapshot_data.name === votedHorseName }"
+                @vote-toggle="handleCardClick(horse)"
+                @update-field="(payload) => handleUpdateJockey(horse, payload.value)"
+                @drag-start="handleGateDragStart(index)"
+                @drag-end="handleGateDragEnd"
+                @refresh="handleRefresh(horse)"
+              />
+            </div>
+          </template>
+          <!-- Regular users / non-voting: NO touch/drag handlers to avoid mobile freeze -->
+          <template v-else>
+            <div
+              v-for="(horse, index) in displayHorses"
+              :key="horse.race_horse_id"
+              class="gate-drag-item"
+            >
+              <HorseDetailCard
+                :snapshot-data="horse.snapshot_data"
+                :horse-id="horse.horse_id"
+                :jockey="horse.jockey"
+                :birth-year="horse.snapshot_data.birth_year"
+                :hemisphere="horse.snapshot_data.hemisphere"
+                :reference-date="race.date"
+                :votable="cardsVotable"
+                :voted="isHorseVoted(horse.race_horse_id)"
+                :submitting="isSubmitting"
+                :gate="horse.gate"
+                :position="isRaceSettled ? (horse.position ?? null) : null"
+                :editable="isAdmin && isRaceVoting"
+                :class="{ 'voted-horse-locked': (isRaceLocked || isRaceSettled) && votedHorseName && horse.snapshot_data.name === votedHorseName }"
+                @vote-toggle="handleCardClick(horse)"
+                @refresh="handleRefresh(horse)"
+              />
+            </div>
+          </template>
           <div v-if="isAdmin && isRaceVoting" class="add-delete-row">
             <AddHorseCard @click="openAddHorseModal" />
             <div
