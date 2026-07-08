@@ -92,7 +92,6 @@ function toggleJiggleMode() {
     isJiggleMode.value = false
     gateTouchIndex.value = -1
     gateDragOverIndex.value = -1
-    if (gateLongPressTimer) { clearTimeout(gateLongPressTimer); gateLongPressTimer = null }
     gateDragSort.value?.endDrag()
     resultTouchIndex.value = -1
     resultDragOverIndex.value = -1
@@ -390,34 +389,17 @@ async function submitGateOrder() {
   }
 }
 
-// Mobile touch gate drag
+// Mobile touch gate drag (jiggle mode only)
 const gateTouchIndex = ref(-1)
-let gateLongPressTimer: ReturnType<typeof setTimeout> | null = null
 
 function handleGateTouchStart(_event: TouchEvent, index: number) {
-  // Only enable gate drag on mobile when admin is in voting state
-  if (!authStore.isAdmin || !isRaceVoting.value) return
-  if (isJiggleMode.value) {
-    // Jiggle mode: activate immediately, no long-press delay
-    gateTouchIndex.value = index
-    gateDragSort.value?.startDrag(index)
-    return
-  }
-  if (gateLongPressTimer) clearTimeout(gateLongPressTimer)
-  gateLongPressTimer = setTimeout(() => {
-    gateTouchIndex.value = index
-    gateDragSort.value?.startDrag(index)
-  }, 300)
+  if (!authStore.isAdmin || !isRaceVoting.value || !isJiggleMode.value) return
+  gateTouchIndex.value = index
+  gateDragSort.value?.startDrag(index)
 }
 
 function handleGateTouchMove(event: TouchEvent) {
-  if (gateTouchIndex.value < 0) {
-    if (gateLongPressTimer) {
-      clearTimeout(gateLongPressTimer)
-      gateLongPressTimer = null
-    }
-    return
-  }
+  if (gateTouchIndex.value < 0) return
   event.preventDefault()
 
   const cards = document.querySelectorAll('.gate-drag-item')
@@ -439,10 +421,6 @@ function handleGateTouchMove(event: TouchEvent) {
 }
 
 function handleGateTouchEnd() {
-  if (gateLongPressTimer) {
-    clearTimeout(gateLongPressTimer)
-    gateLongPressTimer = null
-  }
   if (gateTouchIndex.value >= 0) {
     submitGateOrder()
   }
@@ -733,7 +711,6 @@ async function loadRace() {
 onMounted(loadRace)
 
 onUnmounted(() => {
-  if (gateLongPressTimer) clearTimeout(gateLongPressTimer)
   isJiggleMode.value = false
 })
 </script>
