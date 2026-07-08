@@ -374,7 +374,6 @@ function handleGateTouchStart(_event: TouchEvent, index: number) {
   gateLongPressTimer = setTimeout(() => {
     gateTouchIndex.value = index
     gateDragSort.value?.startDrag(index)
-    document.body.style.overflow = 'hidden'
   }, 300)
 }
 
@@ -416,7 +415,6 @@ function handleGateTouchEnd() {
   }
   gateTouchIndex.value = -1
   gateDragOverIndex.value = -1
-  document.body.style.overflow = ''
   gateDragSort.value?.endDrag()
 }
 
@@ -1737,6 +1735,11 @@ onUnmounted(() => {
   .gate-drag-item {
     touch-action: manipulation;
   }
+
+  .gate-drag-admin {
+    touch-action: none;
+  }
+
 
   .result-actions {
     flex-direction: column;
