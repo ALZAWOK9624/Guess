@@ -808,6 +808,24 @@ onMounted(loadData)
     left: var(--spacing-4, 16px);
     right: var(--spacing-4, 16px);
     width: auto;
+    bottom: calc(var(--bottom-nav-height, 64px) + var(--spacing-4, 16px) + env(safe-area-inset-bottom, 0px));
+  }
+
+  .card-header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .race-name {
+    white-space: normal;
+    text-overflow: clip;
+    margin-bottom: 8px;
+    font-size: var(--text-body, 16px);
+  }
+
+  .card-header-right {
+    margin-left: 0;
+    width: 100%;
   }
 
   .modal-actions {

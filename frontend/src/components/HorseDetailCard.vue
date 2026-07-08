@@ -130,7 +130,10 @@ function startEdit() {
   if (!props.editable) return
   editingField.value = true
   editValue.value = displayJockey.value || ''
-  nextTick(() => jockeyInput.value?.focus())
+  nextTick(() => {
+    const input = document.querySelector<HTMLInputElement>('.inline-input')
+    input?.focus()
+  })
 }
 
 function submitEdit() {
@@ -216,7 +219,8 @@ function handleConfirmKeydown(e: KeyboardEvent) {
         <span class="refresh-icon">↻</span>
       </div>
 
-      <table class="horse-table">
+      <!-- Desktop table layout (≥768px) -->
+      <table class="horse-table desktop-table">
         <colgroup>
           <col style="width:18%" />
           <col style="width:6%" />
@@ -268,6 +272,51 @@ function handleConfirmKeydown(e: KeyboardEvent) {
           </tr>
         </tbody>
       </table>
+
+      <!-- Mobile 4-row layout (<768px) -->
+      <div class="mobile-card-layout">
+        <div class="mobile-name-section">
+          <div class="horse-name">{{ safeData.name }}</div>
+          <div class="horse-suffix">{{ sexAgeStr }}</div>
+          <div v-if="votable && voted" class="vote-badge" aria-hidden="true">
+            <span class="vote-checkmark">✓</span>
+            <span class="vote-label">已投</span>
+          </div>
+          <div v-if="submitting && voted" class="vote-spinner" aria-hidden="true" />
+        </div>
+        <div class="mobile-info-rows">
+          <div class="mobile-row">
+            <span class="m-lbl">骑手</span>
+            <span class="m-val" :class="{ editable: editable }" @click.stop="startEdit()">
+              <input
+                v-if="editingField"
+                v-model="editValue"
+                class="inline-input"
+                type="text"
+                @blur="submitEdit"
+                @keydown="handleEditKeydown"
+              />
+              <span v-else>{{ displayJockey || '-' }}</span>
+            </span>
+            <span class="m-lbl">属地</span>
+            <span class="m-val">{{ safeData.location || '-' }}</span>
+          </div>
+          <div class="mobile-row">
+            <span class="m-lbl">父</span>
+            <span class="m-val">{{ safeData.sire || '-' }}</span>
+            <span class="m-lbl">母父</span>
+            <span class="m-val">{{ safeData.damsire || '-' }}</span>
+          </div>
+          <div class="mobile-row">
+            <span class="m-lbl">前走</span>
+            <span class="m-val-wide">{{ formatPrevResult(safeData) }}</span>
+          </div>
+          <div class="mobile-row">
+            <span class="m-lbl">主胜</span>
+            <span class="m-val-wide">{{ formatBestWin(safeData) }}</span>
+          </div>
+        </div>
+      </div>
     </div>
 
     <div v-if="gate != null" class="side-badge right-badge">
@@ -434,6 +483,14 @@ function handleConfirmKeydown(e: KeyboardEvent) {
   table-layout: fixed;
 }
 
+.desktop-table {
+  display: table;
+}
+
+.mobile-card-layout {
+  display: none;
+}
+
 .horse-table th,
 .horse-table td {
   border: 1px solid var(--color-border-hairline, #D4DCD0);
@@ -557,6 +614,9 @@ function handleConfirmKeydown(e: KeyboardEvent) {
 @media (max-width: 767px) {
   .horse-detail-card {
     padding: 2px;
+    touch-action: manipulation;
+    -webkit-touch-callout: none;
+    user-select: none;
   }
 
   .horse-name {
@@ -581,6 +641,97 @@ function handleConfirmKeydown(e: KeyboardEvent) {
     padding: 0 2px;
     font-size: 14px;
     min-width: 28px;
+  }
+
+  /* Hide desktop table on mobile */
+  .desktop-table {
+    display: none;
+  }
+
+  /* Show mobile layout on mobile */
+  .mobile-card-layout {
+    display: flex;
+    flex: 1;
+    min-width: 0;
+    gap: 6px;
+  }
+
+  .mobile-name-section {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    min-width: 80px;
+    padding: 4px 6px;
+    position: relative;
+    text-align: center;
+    border: 1px solid var(--color-border-hairline, #D4DCD0);
+    border-radius: var(--rounded-sm, 6px);
+    background: var(--color-surface-base, #F8FAF7);
+  }
+
+  .mobile-info-rows {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-width: 0;
+    gap: 0;
+    border: 1px solid var(--color-border-hairline, #D4DCD0);
+    border-radius: var(--rounded-sm, 6px);
+    overflow: hidden;
+  }
+
+  .mobile-row {
+    display: flex;
+    align-items: center;
+    min-height: 28px;
+  }
+
+  .mobile-row + .mobile-row {
+    border-top: 1px solid var(--color-border-hairline, #D4DCD0);
+  }
+
+  .m-lbl {
+    font-size: 10px;
+    font-weight: 600;
+    color: var(--color-ink-secondary, #4A5A4A);
+    background: var(--color-surface-base, #F8FAF7);
+    text-align: center;
+    padding: 4px 4px;
+    min-width: 28px;
+    flex-shrink: 0;
+    line-height: 1.2;
+  }
+
+  .m-val {
+    font-size: 11px;
+    color: var(--color-ink-primary, #1A2E1A);
+    text-align: center;
+    padding: 4px 4px;
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    line-height: 1.2;
+  }
+
+  .m-val.editable {
+    cursor: text;
+    background: #FAFDFB;
+  }
+
+  .m-val-wide {
+    font-size: 11px;
+    color: var(--color-ink-primary, #1A2E1A);
+    text-align: center;
+    padding: 4px 4px;
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    line-height: 1.2;
   }
 }
 

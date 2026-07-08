@@ -9,3 +9,9 @@
 ## Deferred from: code review of story 3.1-scoring-engine (2026-06-12)
 
 - AC-5 示例描述中数字笔误（"5 points for the 6th position" 应为 "1 point"） — 代码实现正确，仅故事文件示例数字需调整
+
+## Deferred from: one-shot mobile fixes (2026-07-08)
+
+- 移动端管理下拉菜单在低屏幕高度设备上可能溢出视口 — dropdown positioning boundary check
+- 桌面版 scroll-container 的 `position: fixed` 在移动端渲染模式下的 slot 布局待确认
+

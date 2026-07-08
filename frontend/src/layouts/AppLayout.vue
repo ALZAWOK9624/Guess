@@ -179,6 +179,7 @@ function isAdminItemActive(item: AdminNavItem): boolean {
           @click.stop="toggleAdminDropdown"
           :aria-expanded="isAdminDropdownOpen"
           aria-haspopup="true"
+          type="button"
         >
           <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <rect x="3" y="3" width="7" height="7" />
@@ -215,6 +216,25 @@ function isAdminItemActive(item: AdminNavItem): boolean {
             </router-link>
           </nav>
         </transition>
+      </div>
+
+      <!-- Auth (mobile) -->
+      <div class="nav-item auth-nav-item" @click="authStore.isLoggedIn ? handleLogout() : router.push('/login')">
+        <template v-if="authStore.isLoggedIn">
+          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+            <circle cx="12" cy="7" r="4" />
+          </svg>
+          <span class="nav-label">{{ authStore.user?.username || '退出' }}</span>
+        </template>
+        <template v-else>
+          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4" />
+            <polyline points="10 17 15 12 10 7" />
+            <line x1="15" y1="12" x2="3" y2="12" />
+          </svg>
+          <span class="nav-label">登录</span>
+        </template>
       </div>
     </nav>
   </div>
@@ -543,10 +563,23 @@ function isAdminItemActive(item: AdminNavItem): boolean {
 .nav-icon {
   width: 24px;
   height: 24px;
+  flex-shrink: 0;
 }
 
 .nav-label {
   line-height: 1;
+}
+
+/* Auth nav item — clickable bottom tab */
+.auth-nav-item {
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+
+.mobile-dropdown {
+  z-index: 200;
+  isolation: isolate;
 }
 
 /* =========================================
