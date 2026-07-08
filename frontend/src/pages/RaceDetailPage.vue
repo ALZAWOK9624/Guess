@@ -41,9 +41,6 @@ const race = ref<RaceDetail | null>(null)
 const errorMessage = ref('加载失败，请刷新重试')
 const isJiggleMode = ref(false)
 
-// Only enable HTML5 draggable on wider screens (desktop); mobile uses jiggle mode for drag
-const isDesktopScreen = typeof window !== 'undefined' ? window.innerWidth >= 768 : true
-
 const {
   votedHorseName,
   votedRaceHorseId,
@@ -967,7 +964,7 @@ onUnmounted(() => {
               v-for="(horse, index) in displayHorses"
               :key="horse.race_horse_id"
               class="gate-drag-item"
-              @dragstart="isDesktopScreen ? (e: DragEvent) => handleGateDragItemDragStart(e, horse) : undefined"
+              @dragstart="(e: DragEvent) => handleGateDragItemDragStart(e, horse)"
             >
               <HorseDetailCard
                 :snapshot-data="horse.snapshot_data"
@@ -982,12 +979,12 @@ onUnmounted(() => {
                 :gate="horse.gate"
                 :position="isRaceSettled ? (horse.position ?? null) : null"
                 :editable="isAdmin && isRaceVoting"
-                :draggable="isDesktopScreen ? true : undefined"
+                :draggable="(isAdmin && isRaceVoting) ? true : undefined"
                 :class="{ 'voted-horse-locked': (isRaceLocked || isRaceSettled) && votedHorseName && horse.snapshot_data.name === votedHorseName }"
                 @vote-toggle="handleCardClick(horse)"
                 @update-field="(payload) => handleUpdateJockey(horse, payload.value)"
-                @drag-start="isDesktopScreen ? handleGateDragStart(index) : undefined"
-                @drag-end="isDesktopScreen ? handleGateDragEnd : undefined"
+                @drag-start="handleGateDragStart(index)"
+                @drag-end="handleGateDragEnd"
                 @refresh="handleRefresh(horse)"
               />
             </div>
@@ -1060,12 +1057,12 @@ onUnmounted(() => {
                 :reference-date="race.date"
                 :gate="horse.gate"
                 :position="index + 1"
-                :draggable="isDesktopScreen"
+                :draggable="true"
                 :is-dnf="false"
                 :show-delete-button="isJiggleMode"
                 :is-jiggling="isJiggleMode"
-                @drag-start="isDesktopScreen ? handleResultDragStart(index, 'active') : undefined"
-                @drag-end="isDesktopScreen ? handleResultDragEnd : undefined"
+                @drag-start="handleResultDragStart(index, 'active')"
+                @drag-end="handleResultDragEnd"
                 @refresh="handleRefresh(horse)"
                 @delete-click="isJiggleMode ? (deleteTarget = { raceHorseId: horse.race_horse_id, name: horse.snapshot_data.name ?? '未知' }, showDeleteConfirm = true) : undefined"
               />
@@ -1102,12 +1099,12 @@ onUnmounted(() => {
                 :hemisphere="horse.snapshot_data.hemisphere"
                 :reference-date="race.date"
                 :gate="horse.gate"
-                :draggable="isDesktopScreen"
+                :draggable="true"
                 :is-dnf="true"
                 :show-delete-button="isJiggleMode"
                 :is-jiggling="isJiggleMode"
-                @drag-start="isDesktopScreen ? handleResultDragStart(index, 'dnf') : undefined"
-                @drag-end="isDesktopScreen ? handleResultDragEnd : undefined"
+                @drag-start="handleResultDragStart(index, 'dnf')"
+                @drag-end="handleResultDragEnd"
                 @refresh="handleRefresh(horse)"
                 @delete-click="deleteTarget = { raceHorseId: horse.race_horse_id, name: horse.snapshot_data.name ?? '未知' }; showDeleteConfirm = true"
               />
@@ -1918,6 +1915,10 @@ onUnmounted(() => {
 
   .result-actions {
     flex-direction: column;
+  }
+
+  .gate-drag-item {
+    touch-action: manipulation;
   }
 
   .position-badge {
