@@ -919,8 +919,8 @@ onUnmounted(() => {
           @dragover.prevent
           @drop="handleGateDrop"
         >
-          <!-- Admin voting: with touch/drag handlers for gate reorder -->
-          <template v-if="isAdmin && isRaceVoting">
+          <!-- Admin voting: jiggle mode with touch drag handlers -->
+          <template v-if="isAdmin && isRaceVoting && isJiggleMode">
             <div
               v-for="(horse, index) in displayHorses"
               :key="horse.race_horse_id"
@@ -955,6 +955,37 @@ onUnmounted(() => {
                 @drag-end="handleGateDragEnd"
                 @refresh="handleRefresh(horse)"
                 @delete-click="deleteTarget = { raceHorseId: horse.race_horse_id, name: horse.snapshot_data.name ?? '未知' }; showDeleteConfirm = true"
+              />
+            </div>
+          </template>
+          <!-- Admin voting: normal mode, no touch handlers to avoid blocking taps -->
+          <template v-else-if="isAdmin && isRaceVoting">
+            <div
+              v-for="(horse, index) in displayHorses"
+              :key="horse.race_horse_id"
+              class="gate-drag-item"
+              @dragstart="(e: DragEvent) => handleGateDragItemDragStart(e, horse)"
+            >
+              <HorseDetailCard
+                :snapshot-data="horse.snapshot_data"
+                :horse-id="horse.horse_id"
+                :jockey="horse.jockey"
+                :birth-year="horse.snapshot_data.birth_year"
+                :hemisphere="horse.snapshot_data.hemisphere"
+                :reference-date="race.date"
+                :votable="cardsVotable"
+                :voted="isHorseVoted(horse.race_horse_id)"
+                :submitting="isSubmitting"
+                :gate="horse.gate"
+                :position="isRaceSettled ? (horse.position ?? null) : null"
+                :editable="isAdmin && isRaceVoting"
+                :draggable="(isAdmin && isRaceVoting) ? true : undefined"
+                :class="{ 'voted-horse-locked': (isRaceLocked || isRaceSettled) && votedHorseName && horse.snapshot_data.name === votedHorseName }"
+                @vote-toggle="handleCardClick(horse)"
+                @update-field="(payload) => handleUpdateJockey(horse, payload.value)"
+                @drag-start="handleGateDragStart(index)"
+                @drag-end="handleGateDragEnd"
+                @refresh="handleRefresh(horse)"
               />
             </div>
           </template>
@@ -1012,10 +1043,10 @@ onUnmounted(() => {
               :key="horse.race_horse_id"
               class="result-drag-item"
               :class="{ 'drag-over-top': resultDragOverIndex === index && isResultDragging }"
-              @touchstart="(e: TouchEvent) => handleResultTouchStart(e, index, 'active')"
-              @touchmove="handleResultTouchMove"
-              @touchend="handleResultTouchEnd"
-              @touchcancel="handleResultTouchCancel"
+              @touchstart="isJiggleMode ? (e: TouchEvent) => handleResultTouchStart(e, index, 'active') : undefined"
+              @touchmove="isJiggleMode ? handleResultTouchMove : undefined"
+              @touchend="isJiggleMode ? handleResultTouchEnd : undefined"
+              @touchcancel="isJiggleMode ? handleResultTouchCancel : undefined"
             >
               <HorseDetailCard
                 :snapshot-data="horse.snapshot_data"
@@ -1033,7 +1064,7 @@ onUnmounted(() => {
                 @drag-start="handleResultDragStart(index, 'active')"
                 @drag-end="handleResultDragEnd"
                 @refresh="handleRefresh(horse)"
-                @delete-click="deleteTarget = { raceHorseId: horse.race_horse_id, name: horse.snapshot_data.name ?? '未知' }; showDeleteConfirm = true"
+                @delete-click="isJiggleMode ? (deleteTarget = { raceHorseId: horse.race_horse_id, name: horse.snapshot_data.name ?? '未知' }, showDeleteConfirm = true) : undefined"
               />
             </div>
           </div>
@@ -1055,10 +1086,10 @@ onUnmounted(() => {
               :key="horse.race_horse_id"
               class="dnf-item"
               @click="handleDnfClick(index)"
-              @touchstart="(e: TouchEvent) => handleResultTouchStart(e, index, 'dnf')"
-              @touchmove="handleResultTouchMove"
-              @touchend="handleResultTouchEnd"
-              @touchcancel="handleResultTouchCancel"
+              @touchstart="isJiggleMode ? (e: TouchEvent) => handleResultTouchStart(e, index, 'dnf') : undefined"
+              @touchmove="isJiggleMode ? handleResultTouchMove : undefined"
+              @touchend="isJiggleMode ? handleResultTouchEnd : undefined"
+              @touchcancel="isJiggleMode ? handleResultTouchCancel : undefined"
             >
               <HorseDetailCard
                 :snapshot-data="horse.snapshot_data"
