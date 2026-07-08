@@ -1552,6 +1552,7 @@ onUnmounted(() => {
 }
 
 .gate-drag-item {
+  width: 100%;
   transition: transform 0.15s;
 }
 

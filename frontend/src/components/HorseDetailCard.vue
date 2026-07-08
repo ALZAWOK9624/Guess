@@ -627,6 +627,7 @@ function handleConfirmKeydown(e: KeyboardEvent) {
 @media (max-width: 767px) {
   .horse-detail-card {
     padding: 2px;
+    width: 100%;
     touch-action: manipulation;
     -webkit-touch-callout: none;
     user-select: none;
