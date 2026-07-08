@@ -403,7 +403,7 @@ function handleConfirmKeydown(e: KeyboardEvent) {
   justify-content: center;
   min-width: 36px;
   font-family: var(--font-display, 'Barlow Condensed', system-ui, sans-serif);
-  font-size: var(--text-subheading, 18px);
+  font-size: 20px;
   font-weight: 700;
   color: #FFFFFF;
   background: var(--color-primary, #1A5632);
@@ -437,7 +437,7 @@ function handleConfirmKeydown(e: KeyboardEvent) {
 .horse-table th,
 .horse-table td {
   border: 1px solid var(--color-border-hairline, #D4DCD0);
-  padding: 10px 8px;
+  padding: 8px 6px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -453,19 +453,20 @@ function handleConfirmKeydown(e: KeyboardEvent) {
 
 .horse-name {
   font-family: var(--font-display, 'Barlow Condensed', system-ui, sans-serif);
-  font-size: var(--text-subheading, 18px);
+  font-size: 20px;
   font-weight: 600;
   color: var(--color-ink-primary, #1A2E1A);
 }
 
 .horse-suffix {
-  font-size: var(--text-body-sm, 14px);
+  font-size: 13px;
   color: var(--color-ink-secondary, #4A5A4A);
 }
 
 /* Label cells */
 .cl-lbl {
-  font-size: var(--text-caption, 12px);
+  font-size: 11px;
+  line-height: 1.2;
   color: var(--color-ink-secondary, #4A5A4A);
   font-weight: 600;
   text-align: center;
@@ -474,7 +475,8 @@ function handleConfirmKeydown(e: KeyboardEvent) {
 
 /* Value cells */
 .cl-val {
-  font-size: var(--text-body-sm, 14px);
+  font-size: 13px;
+  line-height: 1.2;
   color: var(--color-ink-primary, #1A2E1A);
   text-align: center;
 }
@@ -489,7 +491,8 @@ function handleConfirmKeydown(e: KeyboardEvent) {
 }
 
 .cl-val-wide {
-  font-size: var(--text-body-sm, 14px);
+  font-size: 13px;
+  line-height: 1.2;
   color: var(--color-ink-primary, #1A2E1A);
   text-align: center;
 }
@@ -557,7 +560,7 @@ function handleConfirmKeydown(e: KeyboardEvent) {
   }
 
   .horse-name {
-    font-size: var(--text-body, 16px);
+    font-size: var(--text-subheading, 18px);
   }
 
   .cl-lbl {
