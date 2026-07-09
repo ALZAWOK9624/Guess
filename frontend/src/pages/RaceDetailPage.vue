@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue'
+import { ref, computed, onMounted, onUnmounted, nextTick, shallowRef } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/authStore'
 import StatusBadge from '@/components/StatusBadge.vue'
@@ -96,7 +96,7 @@ function toggleJiggleMode() {
     resultTouchIndex.value = -1
     resultDragOverIndex.value = -1
     resultDragSource.value = 'active'
-    resultDragSort?.endDrag()
+    resultDragSort.value?.endDrag()
   } else {
     isJiggleMode.value = true
   }
@@ -431,15 +431,16 @@ function handleGateTouchEnd() {
 
 // Result ranking mode
 const resultMode = ref<ResultMode>('idle')
+const resultEntryVersion = ref(0)
 const existingPositions = ref<Map<number, number> | undefined>(undefined)
-let resultDragSort: ReturnType<typeof useDragSort> | null = null
+const resultDragSort = shallowRef<ReturnType<typeof useDragSort> | null>(null)
 const resultDragOverIndex = ref(-1)
 const resultSubmitting = ref(false)
 const resultSubmitError = ref('')
 
-const resultActiveList = computed(() => resultDragSort?.activeList.value ?? [])
-const resultDnfList = computed(() => resultDragSort?.dnfList.value ?? [])
-const isResultDragging = computed(() => resultDragSort?.isDragging.value ?? false)
+const resultActiveList = computed(() => resultDragSort.value?.activeList.value ?? [])
+const resultDnfList = computed(() => resultDragSort.value?.dnfList.value ?? [])
+const isResultDragging = computed(() => resultDragSort.value?.isDragging.value ?? false)
 const resultDragSource = ref<'active' | 'dnf'>('active')
 const resultTouchIndex = ref(-1)
 
@@ -453,35 +454,42 @@ function initResultDragSort() {
   } else {
     existingPositions.value = undefined
   }
-  resultDragSort = useDragSort([...race.value.horses], existingPositions.value, { mode: 'result' })
+  resultDragSort.value = useDragSort([...race.value.horses], existingPositions.value, { mode: 'result' })
 }
 
 function enterResultMode() {
   if (!isAdmin.value || (!isRaceLocked.value && !isRaceSettled.value)) return
   resultMode.value = 'ranking'
+  resultEntryVersion.value++
   resultSubmitError.value = ''
+  resultDragOverIndex.value = -1
+  resultTouchIndex.value = -1
+  resultDragSource.value = 'active'
   initResultDragSort()
   isJiggleMode.value = true
 }
 
 function exitResultMode() {
   resultMode.value = 'idle'
-  resultDragSort = null
+  resultDragSort.value = null
   isJiggleMode.value = false
+  resultDragOverIndex.value = -1
+  resultTouchIndex.value = -1
+  resultDragSource.value = 'active'
 }
 
 function handleResultDragStart(index: number, source: 'active' | 'dnf' = 'active') {
-  resultDragSort?.startDrag(index)
+  resultDragSort.value?.startDrag(index)
   resultDragSource.value = source
   resultDragOverIndex.value = -1
 }
 
 function handleResultDrop(event: DragEvent) {
   event.preventDefault()
-  if (!resultDragSort || resultDragSort.draggedIndex.value < 0) return
+  if (!resultDragSort.value || resultDragSort.value.draggedIndex.value < 0) return
 
   if (resultDragSource.value === 'dnf') {
-    resultDragSort.moveToActive(resultDragSort.draggedIndex.value)
+    resultDragSort.value.moveToActive(resultDragSort.value.draggedIndex.value)
   } else {
     const dropZone = event.currentTarget as HTMLElement
     const cards = dropZone.querySelectorAll('.result-drag-item')
@@ -495,27 +503,27 @@ function handleResultDrop(event: DragEvent) {
         break
       }
     }
-    resultDragSort.commitReorder(resultDragSort.draggedIndex.value, targetIndex)
+    resultDragSort.value.commitReorder(resultDragSort.value.draggedIndex.value, targetIndex)
   }
   resultDragOverIndex.value = -1
 }
 
 function handleResultDragEnd() {
-  resultDragSort?.endDrag()
+  resultDragSort.value?.endDrag()
   resultDragOverIndex.value = -1
 }
 
 function handleDnfDrop(event: DragEvent) {
   event.preventDefault()
-  if (resultDragSort && resultDragSort.draggedIndex.value >= 0 && resultDragSource.value === 'active') {
-    resultDragSort.moveToDnf(resultDragSort.draggedIndex.value)
+  if (resultDragSort.value && resultDragSort.value.draggedIndex.value >= 0 && resultDragSource.value === 'active') {
+    resultDragSort.value.moveToDnf(resultDragSort.value.draggedIndex.value)
   }
-  resultDragSort?.endDrag()
+  resultDragSort.value?.endDrag()
   resultDragOverIndex.value = -1
 }
 
 function handleDnfClick(index: number) {
-  resultDragSort?.moveToActive(index)
+  resultDragSort.value?.moveToActive(index)
 }
 
 // Mobile touch result ranking (jiggle mode)
@@ -523,11 +531,11 @@ function handleResultTouchStart(index: number, source: 'active' | 'dnf') {
   if (!isJiggleMode.value) return
   resultTouchIndex.value = index
   resultDragSource.value = source
-  resultDragSort?.startDrag(index)
+  resultDragSort.value?.startDrag(index)
 }
 
 function handleResultTouchMove(event: TouchEvent) {
-  if (resultTouchIndex.value < 0 || !resultDragSort) return
+  if (resultTouchIndex.value < 0 || !resultDragSort.value) return
   event.preventDefault()
 
   const touch = event.touches[0]
@@ -536,9 +544,9 @@ function handleResultTouchMove(event: TouchEvent) {
     const rect = cards[i].getBoundingClientRect()
     if (touch.clientY >= rect.top && touch.clientY <= rect.bottom) {
       if (i !== resultTouchIndex.value && resultDragSource.value === 'active') {
-        const item = resultDragSort.activeList.value.splice(resultTouchIndex.value, 1)[0]
+        const item = resultDragSort.value.activeList.value.splice(resultTouchIndex.value, 1)[0]
         if (item) {
-          resultDragSort.activeList.value.splice(i, 0, item)
+          resultDragSort.value.activeList.value.splice(i, 0, item)
           resultTouchIndex.value = i
           resultDragOverIndex.value = i
         }
@@ -558,7 +566,7 @@ function handleResultTouchEnd(event: TouchEvent) {
       const dnfRect = dnfZone.getBoundingClientRect()
       const touchY = event.changedTouches[0].clientY
       if (touchY >= dnfRect.top && touchY <= dnfRect.bottom) {
-        resultDragSort?.moveToDnf(resultTouchIndex.value)
+        resultDragSort.value?.moveToDnf(resultTouchIndex.value)
       }
     }
   } else if (resultDragSource.value === 'dnf') {
@@ -568,20 +576,20 @@ function handleResultTouchEnd(event: TouchEvent) {
       const activeRect = activeZone.getBoundingClientRect()
       const touchY = event.changedTouches[0].clientY
       if (touchY < activeRect.bottom) {
-        resultDragSort?.moveToActive(resultTouchIndex.value)
+        resultDragSort.value?.moveToActive(resultTouchIndex.value)
       }
     }
   }
 
   resultTouchIndex.value = -1
   resultDragOverIndex.value = -1
-  resultDragSort?.endDrag()
+  resultDragSort.value?.endDrag()
 }
 
 function handleResultTouchCancel() {
   resultTouchIndex.value = -1
   resultDragOverIndex.value = -1
-  resultDragSort?.endDrag()
+  resultDragSort.value?.endDrag()
 }
 
 const allPositioned = computed(() => {
@@ -618,12 +626,14 @@ async function handleConfirmResult() {
 
   try {
     await submitResults(raceId, positions)
+    // Exit result mode first, then refresh data to prevent stale rendering state
+    exitResultMode()
+    await nextTick()
     race.value = await getRace(raceId)
     if (race.value.status === 'settled') {
       await loadVotes(raceId)
       checkUserVote()
     }
-    exitResultMode()
   } catch (err: any) {
     const code = err?.response?.data?.detail?.code
     if (code === 'RACE_NOT_LOCKED') {
@@ -1019,7 +1029,7 @@ onUnmounted(() => {
         </div>
 
         <!-- Result ranking mode -->
-        <div v-else class="result-ranking-area">
+        <div v-else class="result-ranking-area" :key="'ranking-' + resultEntryVersion">
           <div class="instructions">
             拖拽马匹卡片调整名次顺序。<span class="text-muted">第1名在顶部，弃权马匹拖入下方 DNF 区。</span>
           </div>
@@ -1027,7 +1037,7 @@ onUnmounted(() => {
           <div class="drop-zone" @dragover.prevent @drop="handleResultDrop">
             <div
               v-for="(horse, index) in resultActiveList"
-              :key="horse.race_horse_id"
+              :key="'result-active-' + horse.race_horse_id"
               class="result-drag-item"
               :class="{ 'drag-over-top': resultDragOverIndex === index && isResultDragging }"
               @touchstart="handleResultTouchStart(index, 'active')"
@@ -1070,7 +1080,7 @@ onUnmounted(() => {
             </div>
             <div
               v-for="(horse, index) in resultDnfList"
-              :key="horse.race_horse_id"
+              :key="'result-dnf-' + horse.race_horse_id"
               class="dnf-item"
               @click="handleDnfClick(index)"
               @touchstart="handleResultTouchStart(index, 'dnf')"
@@ -1682,7 +1692,7 @@ onUnmounted(() => {
   content: '';
   position: absolute;
   top: -6px;
-  left: 40px;
+  left: 0;
   right: 0;
   height: 3px;
   background: var(--color-primary, #1A5632);
