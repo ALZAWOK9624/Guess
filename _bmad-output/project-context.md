@@ -263,7 +263,8 @@ _This file contains critical rules and patterns that AI agents must follow when 
 - **HorseSearchSelect 点击即选模式**：搜索下拉选中马匹后立即关闭下拉框并清空搜索词（`showDropdown = false` + `searchText = ''`），而非在下拉框中打钩多选。点击行为为**追加模式**（`selectedHorses = [...selectedHorses, horse]`），已选马匹不会重复添加。通过上方 tag 展示已选列表，配合父组件的"添加"按钮一次性提交。
 - **移动端触控安全模式**：
   - `:draggable` 属性必须使用 `:draggable="draggable ? true : undefined"`，避免渲染 `draggable="false"` 属性在移动端浏览器引发长按冻结。
-  - 移动端 touch 事件监听应通过 **模板拆分隔离**：非 admin 用户在 RaceDetailPage 中使用独立的 `<template v-else>`，完全不注册 `@touchstart/@touchmove/@touchend`，从根源避免浏览器进入 touch 手势处理路径。
+  - 移动端 touch 事件通过 **函数内守卫** 而非模板拆分控制——admin voting 使用单一 `<template v-if="isAdmin && isRaceVoting">`，`handleGateTouchStart` 等函数在 `!isJiggleMode.value` 时立即 `return` 无副作用。避免模板拆分导致 Vue 重建 DOM 破坏桌面端 DnD 状态。
+  - 移动端 `.gate-drag-item` 必须设置 `touch-action: manipulation` 以抑制 `draggable="true"` 属性触发的浏览器原生长按拖拽。
   - 所有 touch 事件处理 `@touchend` 必须配套 `@touchcancel`（系统级长按/OS 手势抢占时触发）。
   - **禁止**在 touch 处理器中设置 `document.body.style.overflow = 'hidden'`——该全局状态在 DevTools 模拟或系统 touchcancel 下无法可靠恢复。改用 CSS `touch-action: none` 阻止拖拽期间滚动。
 - **Date input 原生占位文字隐藏模式**：`<input type="date">` 在中文 locale 下浏览器显示 "yyyy/mm/dd" 原生占位文字。解决方案：在 `base.css` 中全局定义 `input[type="date"].is-empty::-webkit-datetime-edit { visibility: hidden !important; }` + `input[type="date"].is-empty:focus::-webkit-datetime-edit { visibility: visible !important; }`，每个 date input 添加 `:class="{ 'is-empty': !modelVar }"` 让 Vue 响应式追踪空值状态。空值未聚焦时隐藏，聚焦或已有值时正常显示。
@@ -307,7 +308,16 @@ _This file contains critical rules and patterns that AI agents must follow when 
 - **结果结算 API 模式**：`PUT /api/v1/races/{race_id}/results` 管理员专用端点，接收 `ResultEntry { positions: ResultPosition[] }`。位置校验由 schema 层执行：无重复正数位置、无负数位置、位置从 1 开始连续（无间隔）、所有 race_horse_id 均被覆盖。服务层额外校验比赛状态（拒绝 VOTING 状态的比赛）。
 - **DragCard 组件模式**：`DragCard.vue` 使用原生 HTML5 `draggable="true"` 属性 + @dragstart/@dragend 事件。**emit 必须传递原生事件**：`emit('dragStart', index)` 和 `emit('dragEnd', $event)`（DragCard 根 div 上的 `@dragend` 必须传递 `$event` 以便父组件检测 DNF 区域拖放）。六点网格手柄（⠿，`touch-action: none`）区分拖拽区域。dragging 态应用 opacity 0.7 + box-shadow lift + scale(1.02)。DNF 态应用 opacity 0.5 + grey bg。骨架屏复用全局 `skeleton-shimmer` 动画。
 - **useDragSort composable 模式**：`useDragSort.ts` 管理两个响应式列表（activeList + dnfList）。初始化时根据 existingPositions Map 进行预排序（重录入模式）。提供 `startDrag`/`commitReorder`/`moveToDnf`/`moveToActive`/`endDrag` 接口。**核心规则：dragover 时只做 preventDefault 不修改列表**（避免 DOM 重排导致浏览器丢失拖拽上下文），列表修改统一在 drop 事件中执行。`commitReorder(fromIndex, toIndex)` 在 activeList 内重排，`moveToDnf(index)` 从 active 移至 dnf，`moveToActive(index)` 从 dnf 移至 active。DNF 区域在 `ResultsPage.vue` 中通过容器级 `@drop="handleDnfDrop"` + `dragSource` 追踪实现，仅 `dragSource === 'active'` 的拖入才触发 `moveToDnf`。DNF 列表使用 `@click="handleDnfClick(index)"` 作为降级交互（桌面端点击移回 active）。
-- **移动端触控拖拽模式**（AC-3）：`ResultsPage.vue` 使用 `@touchstart`（300ms setTimeout 延迟激活，`document.body.style.overflow = 'hidden'` 禁止滚动）→ `@touchmove`（e.preventDefault() + 通过 getBoundingClientRect 计算当前位置）→ `@touchend`（检测 DNF 区域 + 清除 body overflow）。`touch-action: none` 设置在拖拽手柄 CSS 上，避免触控与滚动冲突。拖拽结束后恢复 `document.body.style.overflow = ''`。
+- **移动端触控拖拽模式（ResultsPage）**：`ResultsPage.vue` 使用 `@touchstart`（300ms setTimeout 延迟激活，`document.body.style.overflow = 'hidden'` 禁止滚动）→ `@touchmove`（e.preventDefault() + 通过 getBoundingClientRect 计算当前位置）→ `@touchend`（检测 DNF 区域 + 清除 body overflow）。`touch-action: none` 设置在拖拽手柄 CSS 上，避免触控与滚动冲突。拖拽结束后恢复 `document.body.style.overflow = ''`。
+- **移动端抖动编辑模式（RaceDetailPage，替代旧的 300ms 长按拖拽）**：
+  - `isJiggleMode` ref 控制全局编辑状态。顶部「编辑」按钮仅移动端（`.mobile-only`）admin 可见，仅在 voting 或 `resultMode === 'ranking'` 时可点击。
+  - 激活时：`HorseDetailCard` 添加 `.is-jiggling` class → `@keyframes jiggle` 动画（±0.8deg 旋转 + ±1px 位移，0.3s alternate），`touch-action: none` + `overflow: visible` 防止滚动并允许 ✕ 按钮溢出。
+  - 闸位拖拽：`handleGateTouchStart` 即时激活（无延迟），`handleGateTouchMove` 实时重排，`handleGateTouchEnd` 自动提交 `updateGateOrder`。
+  - 结果排名拖拽：`handleResultTouchStart/Move/End/Cancel` 管理 active/DNF 双列表的触控交互。DNF 卡片松手至 active 区域自动移回。
+  - ✕ 删除按钮：`position: absolute; top: -12px; right: -12px` 相对于 `.horse-detail-card` 根元素定位（`z-index: 2` 确保在投票徽章之上），点击弹出 `ConfirmDeleteModal` 确认后调用 `removeRaceHorse`。仅非 DNF 卡片显示。
+  - 退出时重置所有拖拽状态（`gateTouchIndex`, `gateDragOverIndex`, `resultTouchIndex` 等）；比赛锁定、退出结果模式、组件卸载时自动退出。
+  - 桌面端删除区（`.delete-zone`）在移动端通过 `@media (max-width: 767px) { display: none }` 完全隐藏，避免混淆。
+  - `prefers-reduced-motion: reduce` 时抖动动画禁用（`animation: none`）。
 - **位置连续校验模式**：`ResultEntry.validate_positions()` 在 schema 层校验 `sorted(positive_positions) == list(range(1, len(positive_positions) + 1))`，确保名次无间隔。此校验防止管理员提交 1,3,4,5 等不连续位置导致评分引擎计算错误。
 
 **排行榜模式（Story 3.5）：**
@@ -383,4 +393,4 @@ _This file contains critical rules and patterns that AI agents must follow when 
 - Review quarterly for outdated rules
 - Remove rules that become obvious over time
 
-Last Updated: 2026-07-07 (grade → 6-tag system with surface; sex_restriction="无" hidden; leaderboard filters with multi-select tags & range inputs; GradeBadge removed; EditRacePage/HomerPage/RaceDetailPage updated with tag UI)
+Last Updated: 2026-07-09 (mobile jiggle edit mode: touch drag + X delete replacing 300ms long-press; single-template touch guard pattern; touch-action: manipulation on gate-drag-item; delete-zone hidden on mobile; overflow: visible for jiggling cards; prefers-reduced-motion support)
