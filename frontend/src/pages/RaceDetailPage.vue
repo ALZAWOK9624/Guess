@@ -1017,10 +1017,10 @@ onUnmounted(() => {
               :key="horse.race_horse_id"
               class="result-drag-item"
               :class="{ 'drag-over-top': resultDragOverIndex === index && isResultDragging }"
-              @touchstart="isJiggleMode ? (e: TouchEvent) => handleResultTouchStart(e, index, 'active') : undefined"
-              @touchmove.prevent="isJiggleMode ? handleResultTouchMove : undefined"
-              @touchend="isJiggleMode ? handleResultTouchEnd : undefined"
-              @touchcancel="isJiggleMode ? handleResultTouchCancel : undefined"
+              @touchstart="(e: TouchEvent) => handleResultTouchStart(e, index, 'active')"
+              @touchmove="handleResultTouchMove"
+              @touchend="handleResultTouchEnd"
+              @touchcancel="handleResultTouchCancel"
             >
               <HorseDetailCard
                 :snapshot-data="horse.snapshot_data"
@@ -1060,10 +1060,10 @@ onUnmounted(() => {
               :key="horse.race_horse_id"
               class="dnf-item"
               @click="handleDnfClick(index)"
-              @touchstart="isJiggleMode ? (e: TouchEvent) => handleResultTouchStart(e, index, 'dnf') : undefined"
-              @touchmove.prevent="isJiggleMode ? handleResultTouchMove : undefined"
-              @touchend="isJiggleMode ? handleResultTouchEnd : undefined"
-              @touchcancel="isJiggleMode ? handleResultTouchCancel : undefined"
+              @touchstart="(e: TouchEvent) => handleResultTouchStart(e, index, 'dnf')"
+              @touchmove="handleResultTouchMove"
+              @touchend="handleResultTouchEnd"
+              @touchcancel="handleResultTouchCancel"
             >
               <HorseDetailCard
                 :snapshot-data="horse.snapshot_data"
@@ -1885,7 +1885,8 @@ onUnmounted(() => {
     flex-direction: column;
   }
 
-  .gate-drag-item {
+  .gate-drag-item,
+  .result-drag-item {
     touch-action: manipulation;
   }
 
