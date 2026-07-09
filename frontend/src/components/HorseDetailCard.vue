@@ -637,6 +637,7 @@ function handleContextMenu(e: MouseEvent) {
     width: 100%;
     touch-action: manipulation;
     -webkit-touch-callout: none;
+    -webkit-user-drag: none;
     user-select: none;
   }
 
