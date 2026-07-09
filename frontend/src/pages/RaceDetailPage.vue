@@ -462,6 +462,7 @@ function enterResultMode() {
   resultMode.value = 'ranking'
   resultSubmitError.value = ''
   initResultDragSort()
+  isJiggleMode.value = true
 }
 
 function exitResultMode() {
@@ -748,20 +749,6 @@ onUnmounted(() => {
           <button class="back-btn" @click="router.push('/')" aria-label="返回首页">
             ← 返回
           </button>
-          <button
-            v-if="canEnterJiggleMode"
-            class="jiggle-toggle-btn mobile-only"
-            :class="{ active: isJiggleMode }"
-            :aria-label="isJiggleMode ? '退出编辑模式' : '进入编辑模式'"
-            :aria-pressed="isJiggleMode"
-            @click="toggleJiggleMode"
-          >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
-              <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
-            </svg>
-            <span>{{ isJiggleMode ? '完成' : '编辑' }}</span>
-          </button>
         </div>
 
         <div class="race-title-row">
@@ -837,7 +824,7 @@ onUnmounted(() => {
       </div>
 
       <!-- Admin actions for voting state -->
-      <div v-if="isAdmin && isRaceVoting" class="admin-actions-bar">
+      <div v-if="isAdmin && isRaceVoting && resultMode === 'idle'" class="admin-actions-bar">
         <button
           class="admin-btn lock-btn"
           :disabled="locking"
@@ -845,7 +832,28 @@ onUnmounted(() => {
         >
           {{ locking ? '锁定中…' : '锁定' }}
         </button>
+        <button
+          v-if="canEnterJiggleMode"
+          class="jiggle-toggle-btn mobile-only"
+          :class="{ active: isJiggleMode }"
+          :aria-label="isJiggleMode ? '退出编辑模式' : '进入编辑模式'"
+          :aria-pressed="isJiggleMode"
+          @click="toggleJiggleMode"
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+            <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+          </svg>
+          <span>{{ isJiggleMode ? '完成' : '编辑' }}</span>
+        </button>
+        <button
+          class="admin-btn delete-btn"
+          @click="showDeleteRaceModal = true; deleteRaceError = ''"
+        >
+          删除比赛
+        </button>
         <p v-if="lockError" class="admin-error">{{ lockError }}</p>
+        <p v-if="deleteRaceError" class="admin-error">{{ deleteRaceError }}</p>
       </div>
 
       <!-- Admin result mode entry -->
@@ -853,6 +861,13 @@ onUnmounted(() => {
         <button class="admin-btn end-race-btn" @click="enterResultMode">
           比赛结束
         </button>
+        <button
+          class="admin-btn delete-btn"
+          @click="showDeleteRaceModal = true; deleteRaceError = ''"
+        >
+          删除比赛
+        </button>
+        <p v-if="deleteRaceError" class="admin-error">{{ deleteRaceError }}</p>
       </div>
 
       <div v-if="isAdmin && isRaceSettled && resultMode === 'idle'" class="admin-actions-bar">
@@ -871,16 +886,6 @@ onUnmounted(() => {
         <p v-if="bestWinUpdateError" class="admin-error">{{ bestWinUpdateError }}</p>
       </div>
 
-      <!-- Delete race (voting/locked only) -->
-      <div v-if="isAdmin && !isRaceSettled && resultMode === 'idle'" class="admin-actions-bar delete-section">
-        <button
-          class="admin-btn delete-btn"
-          @click="showDeleteRaceModal = true; deleteRaceError = ''"
-        >
-          删除比赛
-        </button>
-        <p v-if="deleteRaceError" class="admin-error">{{ deleteRaceError }}</p>
-      </div>
 
       <!-- Custom scoring info -->
       <div v-if="race.custom_scoring" class="custom-scoring-info">
@@ -1431,12 +1436,6 @@ onUnmounted(() => {
   color: #FFFFFF;
 }
 
-.delete-section {
-  border-top: 1px solid var(--color-border-hairline, #D4DCD0);
-  padding-top: var(--spacing-4, 16px);
-  margin-top: var(--spacing-4, 16px);
-}
-
 .delete-btn {
   background: transparent;
   color: var(--color-destructive, #C53030);
@@ -1513,7 +1512,7 @@ onUnmounted(() => {
 .horse-list-content {
   display: flex;
   flex-direction: column;
-  gap: var(--spacing-4, 16px);
+  gap: var(--spacing-3, 12px);
   min-height: 80px;
 }
 
@@ -1647,7 +1646,7 @@ onUnmounted(() => {
 .result-ranking-area {
   display: flex;
   flex-direction: column;
-  gap: var(--spacing-2, 8px);
+  gap: var(--spacing-3, 12px);
 }
 
 .instructions {
@@ -1666,7 +1665,7 @@ onUnmounted(() => {
 .drop-zone {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: var(--spacing-3, 12px);
   min-height: 80px;
 }
 
@@ -1745,7 +1744,7 @@ onUnmounted(() => {
 
 .dnf-item {
   cursor: pointer;
-  margin-bottom: 8px;
+  margin-bottom: var(--spacing-3, 12px);
 }
 
 .dnf-item:last-child {

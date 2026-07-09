@@ -193,6 +193,12 @@ function handleConfirmKeydown(e: KeyboardEvent) {
     closeRefreshConfirm()
   }
 }
+
+function handleContextMenu(e: MouseEvent) {
+  if (window.matchMedia('(max-width: 767px)').matches) {
+    e.preventDefault()
+  }
+}
 </script>
 
 <template>
@@ -215,6 +221,7 @@ function handleConfirmKeydown(e: KeyboardEvent) {
     @keydown.space.prevent="handleClick"
     @dragstart="handleDragStart"
     @dragend="handleDragEnd"
+    @contextmenu="handleContextMenu"
   >
     <div v-if="position != null" class="side-badge left-badge" :class="{ 'badge-dnf': position === 0 }">
       {{ position === 0 ? 'DNF' : position }}
@@ -841,9 +848,14 @@ function handleConfirmKeydown(e: KeyboardEvent) {
 }
 
 .horse-detail-card.is-jiggling {
-  animation: jiggle 0.3s ease-in-out infinite alternate;
   touch-action: none;
   overflow: visible;
+}
+
+@media (max-width: 767px) {
+  .horse-detail-card.is-jiggling {
+    animation: jiggle 0.3s ease-in-out infinite alternate;
+  }
 }
 
 /* Delete X button (mobile jiggle mode, positioned at card top-right) */
