@@ -1018,7 +1018,7 @@ onUnmounted(() => {
               class="result-drag-item"
               :class="{ 'drag-over-top': resultDragOverIndex === index && isResultDragging }"
               @touchstart="isJiggleMode ? (e: TouchEvent) => handleResultTouchStart(e, index, 'active') : undefined"
-              @touchmove="isJiggleMode ? handleResultTouchMove : undefined"
+              @touchmove.prevent="isJiggleMode ? handleResultTouchMove : undefined"
               @touchend="isJiggleMode ? handleResultTouchEnd : undefined"
               @touchcancel="isJiggleMode ? handleResultTouchCancel : undefined"
             >
@@ -1061,7 +1061,7 @@ onUnmounted(() => {
               class="dnf-item"
               @click="handleDnfClick(index)"
               @touchstart="isJiggleMode ? (e: TouchEvent) => handleResultTouchStart(e, index, 'dnf') : undefined"
-              @touchmove="isJiggleMode ? handleResultTouchMove : undefined"
+              @touchmove.prevent="isJiggleMode ? handleResultTouchMove : undefined"
               @touchend="isJiggleMode ? handleResultTouchEnd : undefined"
               @touchcancel="isJiggleMode ? handleResultTouchCancel : undefined"
             >

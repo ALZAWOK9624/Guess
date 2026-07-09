@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, nextTick } from 'vue'
+import { computed, ref, nextTick, onMounted } from 'vue'
 import type { HorseSnapshotData } from '@/types/race'
 
 function formatPrevResult(snap: HorseSnapshotData): string {
@@ -81,6 +81,12 @@ const emit = defineEmits<{
   refresh: []
   deleteClick: []
 }>()
+
+const isMobile = ref(false)
+
+onMounted(() => {
+  isMobile.value = window.matchMedia('(max-width: 767px)').matches
+})
 
 const showRefreshConfirm = ref(false)
 const refreshLoading = ref(false)
@@ -215,7 +221,7 @@ function handleContextMenu(e: MouseEvent) {
     :role="votable ? 'button' : undefined"
     :tabindex="votable ? 0 : undefined"
     :aria-pressed="votable ? voted : undefined"
-    :draggable="draggable ? true : undefined"
+    :draggable="draggable && !isMobile ? true : undefined"
     @click="handleClick"
     @keydown.enter="handleClick"
     @keydown.space.prevent="handleClick"
