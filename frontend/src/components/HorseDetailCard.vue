@@ -135,8 +135,6 @@ const displayJockey = computed(() => props.jockey ?? null)
 
 const editingField = ref(false)
 const editValue = ref('')
-const jockeyInput = ref<HTMLInputElement | null>(null)
-
 function startEdit() {
   if (!props.editable) return
   editingField.value = true

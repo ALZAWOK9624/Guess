@@ -442,7 +442,6 @@ const resultDnfList = computed(() => resultDragSort?.dnfList.value ?? [])
 const isResultDragging = computed(() => resultDragSort?.isDragging.value ?? false)
 const resultDragSource = ref<'active' | 'dnf'>('active')
 const resultTouchIndex = ref(-1)
-let resultTouchStartY = 0
 
 function initResultDragSort() {
   if (!race.value) return
@@ -520,11 +519,10 @@ function handleDnfClick(index: number) {
 }
 
 // Mobile touch result ranking (jiggle mode)
-function handleResultTouchStart(event: TouchEvent, index: number, source: 'active' | 'dnf') {
+function handleResultTouchStart(index: number, source: 'active' | 'dnf') {
   if (!isJiggleMode.value) return
   resultTouchIndex.value = index
   resultDragSource.value = source
-  resultTouchStartY = event.touches[0].clientY
   resultDragSort?.startDrag(index)
 }
 
@@ -966,7 +964,7 @@ onUnmounted(() => {
           <!-- Regular users / non-voting: NO touch/drag handlers to avoid mobile freeze -->
           <template v-else>
             <div
-              v-for="(horse, index) in displayHorses"
+              v-for="horse in displayHorses"
               :key="horse.race_horse_id"
               class="gate-drag-item"
             >
@@ -1017,7 +1015,7 @@ onUnmounted(() => {
               :key="horse.race_horse_id"
               class="result-drag-item"
               :class="{ 'drag-over-top': resultDragOverIndex === index && isResultDragging }"
-              @touchstart="(e: TouchEvent) => handleResultTouchStart(e, index, 'active')"
+              @touchstart="handleResultTouchStart(index, 'active')"
               @touchmove="handleResultTouchMove"
               @touchend="handleResultTouchEnd"
               @touchcancel="handleResultTouchCancel"
@@ -1060,7 +1058,7 @@ onUnmounted(() => {
               :key="horse.race_horse_id"
               class="dnf-item"
               @click="handleDnfClick(index)"
-              @touchstart="(e: TouchEvent) => handleResultTouchStart(e, index, 'dnf')"
+              @touchstart="handleResultTouchStart(index, 'dnf')"
               @touchmove="handleResultTouchMove"
               @touchend="handleResultTouchEnd"
               @touchcancel="handleResultTouchCancel"
