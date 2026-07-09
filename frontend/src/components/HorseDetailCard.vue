@@ -663,6 +663,12 @@ function handleContextMenu(e: MouseEvent) {
     font-size: var(--text-body, 16px);
   }
 
+  .badge-dnf {
+    font-size: var(--text-caption, 10px);
+    letter-spacing: 0.3px;
+    min-width: 26px;
+  }
+
   .refresh-btn {
     padding: 0 2px;
     font-size: 14px;

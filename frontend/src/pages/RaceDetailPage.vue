@@ -884,6 +884,21 @@ onUnmounted(() => {
         <p v-if="bestWinUpdateError" class="admin-error">{{ bestWinUpdateError }}</p>
       </div>
 
+      <!-- Admin result confirmation / cancel in ranking mode (at top, same position as 修改结果) -->
+      <div v-if="isAdmin && resultMode === 'ranking'" class="admin-actions-bar ranking-actions-bar">
+        <button
+          class="admin-btn confirm-result-btn"
+          :disabled="confirmResultDisabled"
+          @click="handleConfirmResult"
+        >
+          {{ confirmResultText }}
+        </button>
+        <button class="admin-btn cancel-result-btn" @click="exitResultMode">
+          取消
+        </button>
+        <p v-if="resultSubmitError" class="admin-error">{{ resultSubmitError }}</p>
+      </div>
+
 
       <!-- Custom scoring info -->
       <div v-if="race.custom_scoring" class="custom-scoring-info">
@@ -1083,20 +1098,6 @@ onUnmounted(() => {
             </div>
           </div>
 
-          <p v-if="resultSubmitError" class="submit-error" role="alert">{{ resultSubmitError }}</p>
-
-          <div class="result-actions">
-            <button
-              class="admin-btn confirm-result-btn"
-              :disabled="confirmResultDisabled"
-              @click="handleConfirmResult"
-            >
-              {{ confirmResultText }}
-            </button>
-            <button class="admin-btn cancel-result-btn" @click="exitResultMode">
-              取消
-            </button>
-          </div>
         </div>
       </div>
 
@@ -1749,27 +1750,15 @@ onUnmounted(() => {
   margin-bottom: 0;
 }
 
-.submit-error {
-  font-size: var(--text-body-sm, 14px);
-  color: var(--color-destructive, #C53030);
-  padding: 10px 12px;
-  background: #FED7D7;
-  border-radius: var(--rounded-md, 10px);
-  margin-top: var(--spacing-3, 12px);
-}
-
-.result-actions {
-  display: flex;
-  gap: var(--spacing-3, 12px);
-  margin-top: var(--spacing-6, 24px);
+.ranking-actions-bar {
+  /* Confirm / cancel buttons in the admin-actions-bar at top;
+     buttons inherit admin-btn sizing naturally, side by side on one line */
 }
 
 .confirm-result-btn {
-  flex: 1;
   background: var(--color-accent, #B8960C);
   color: #FFFFFF;
-  font-size: var(--text-subheading, 18px);
-  padding: 14px 24px;
+  padding: 10px 24px;
 }
 
 .confirm-result-btn:hover:not(:disabled) {
@@ -1879,8 +1868,9 @@ onUnmounted(() => {
     width: 100%;
   }
 
-  .result-actions {
-    flex-direction: column;
+  .ranking-actions-bar {
+    flex-wrap: nowrap;
+    width: 100%;
   }
 
   .gate-drag-item,
