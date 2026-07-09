@@ -25,6 +25,7 @@ import { submitResults } from '@/api/results'
 import { updateBestWin, refreshRaceHorseSnapshot } from '@/api/horses'
 import { useVote } from '@/composables/useVote'
 import { useDragSort } from '@/composables/useDragSort'
+import { useDragAutoScroll } from '@/composables/useDragAutoScroll'
 import type { RaceDetail, ResultPosition } from '@/types/race'
 import type { Horse } from '@/types/horse'
 
@@ -376,6 +377,7 @@ function handleGateDrop(event: DragEvent) {
 function handleGateDragEnd() {
   gateDragSort.value?.endDrag()
   gateDragOverIndex.value = -1
+  dragClientY.value = 0
 }
 
 async function submitGateOrder() {
@@ -401,6 +403,7 @@ function handleGateTouchStart(_event: TouchEvent, index: number) {
 function handleGateTouchMove(event: TouchEvent) {
   if (gateTouchIndex.value < 0) return
   event.preventDefault()
+  dragClientY.value = event.touches[0].clientY
 
   const cards = document.querySelectorAll('.gate-drag-item')
   const touchY = event.touches[0].clientY
@@ -426,6 +429,7 @@ function handleGateTouchEnd() {
   }
   gateTouchIndex.value = -1
   gateDragOverIndex.value = -1
+  dragClientY.value = 0
   gateDragSort.value?.endDrag()
 }
 
@@ -443,6 +447,16 @@ const resultDnfList = computed(() => resultDragSort.value?.dnfList.value ?? [])
 const isResultDragging = computed(() => resultDragSort.value?.isDragging.value ?? false)
 const resultDragSource = ref<'active' | 'dnf'>('active')
 const resultTouchIndex = ref(-1)
+
+// Auto-scroll during drag
+const dragClientY = ref(0)
+const autoScrollEnabled = computed(() =>
+  gateDragSort.value?.isDragging.value ||
+  resultDragSort.value?.isDragging.value ||
+  gateTouchIndex.value >= 0 ||
+  resultTouchIndex.value >= 0,
+)
+const { autoScrollDirection } = useDragAutoScroll({ enabled: autoScrollEnabled, clientY: dragClientY })
 
 function initResultDragSort() {
   if (!race.value) return
@@ -511,6 +525,7 @@ function handleResultDrop(event: DragEvent) {
 function handleResultDragEnd() {
   resultDragSort.value?.endDrag()
   resultDragOverIndex.value = -1
+  dragClientY.value = 0
 }
 
 function handleDnfDrop(event: DragEvent) {
@@ -537,6 +552,7 @@ function handleResultTouchStart(index: number, source: 'active' | 'dnf') {
 function handleResultTouchMove(event: TouchEvent) {
   if (resultTouchIndex.value < 0 || !resultDragSort.value) return
   event.preventDefault()
+  dragClientY.value = event.touches[0].clientY
 
   const touch = event.touches[0]
   const cards = document.querySelectorAll('.result-drag-item')
@@ -583,12 +599,14 @@ function handleResultTouchEnd(event: TouchEvent) {
 
   resultTouchIndex.value = -1
   resultDragOverIndex.value = -1
+  dragClientY.value = 0
   resultDragSort.value?.endDrag()
 }
 
 function handleResultTouchCancel() {
   resultTouchIndex.value = -1
   resultDragOverIndex.value = -1
+  dragClientY.value = 0
   resultDragSort.value?.endDrag()
 }
 
@@ -726,6 +744,13 @@ onUnmounted(() => {
 
 <template>
   <div class="race-detail-page">
+    <!-- Auto-scroll hints -->
+    <div class="scroll-hint scroll-hint-up" :class="{ active: autoScrollDirection === 'up' }">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="18 15 12 9 6 15"/></svg>
+    </div>
+    <div class="scroll-hint scroll-hint-down" :class="{ active: autoScrollDirection === 'down' }">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+    </div>
     <!-- Loading -->
     <div v-if="pageState === 'loading'" class="state-container">
       <p>加载中…</p>
@@ -953,7 +978,7 @@ onUnmounted(() => {
               v-for="(horse, index) in displayHorses"
               :key="horse.race_horse_id"
               class="gate-drag-item"
-              :class="{ 'drag-over-top': gateDragOverIndex === index && isGateDragging }"
+              :class="{ 'drag-over-top': gateDragOverIndex === index && isGateDragging, 'touch-dragging': gateTouchIndex >= 0 }"
               @dragstart="(e: DragEvent) => handleGateDragItemDragStart(e, horse)"
               @touchstart="(e: TouchEvent) => handleGateTouchStart(e, index)"
               @touchmove="handleGateTouchMove"
@@ -1039,7 +1064,7 @@ onUnmounted(() => {
               v-for="(horse, index) in resultActiveList"
               :key="'result-active-' + horse.race_horse_id"
               class="result-drag-item"
-              :class="{ 'drag-over-top': resultDragOverIndex === index && isResultDragging }"
+              :class="{ 'drag-over-top': resultDragOverIndex === index && isResultDragging, 'touch-dragging': resultTouchIndex >= 0 }"
               @touchstart="handleResultTouchStart(index, 'active')"
               @touchmove="handleResultTouchMove"
               @touchend="handleResultTouchEnd"
@@ -1888,6 +1913,11 @@ onUnmounted(() => {
     touch-action: manipulation;
   }
 
+  .gate-drag-item.touch-dragging,
+  .result-drag-item.touch-dragging {
+    touch-action: none;
+  }
+
   .position-badge {
     min-width: 24px;
     font-size: var(--text-caption, 11px);
@@ -1899,6 +1929,63 @@ onUnmounted(() => {
   .gate-drag-item,
   .result-drag-item {
     transition: none;
+  }
+}
+
+/* Auto-scroll hints */
+.scroll-hint {
+  position: fixed;
+  left: 0;
+  right: 0;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  z-index: 50;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+  color: var(--color-primary, #1A5632);
+}
+
+.scroll-hint.active {
+  opacity: 1;
+}
+
+.scroll-hint-up {
+  top: var(--header-height, 0px);
+  background: linear-gradient(to bottom, rgba(26, 86, 50, 0.12), transparent);
+}
+
+.scroll-hint-down {
+  bottom: calc(var(--bottom-nav-height, 0px) + env(safe-area-inset-bottom, 0px));
+  background: linear-gradient(to top, rgba(26, 86, 50, 0.12), transparent);
+}
+
+@media (min-width: 768px) {
+  .scroll-hint-down {
+    bottom: 0;
+  }
+}
+
+@media (max-width: 767px) {
+  .scroll-hint-up {
+    top: 0;
+  }
+}
+
+.scroll-hint svg {
+  animation: scroll-bounce 0.6s ease-in-out alternate infinite;
+}
+
+@keyframes scroll-bounce {
+  from { transform: translateY(-4px); }
+  to   { transform: translateY(4px); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .scroll-hint svg {
+    animation: none;
   }
 }
 </style>

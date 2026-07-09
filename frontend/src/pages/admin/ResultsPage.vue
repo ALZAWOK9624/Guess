@@ -10,6 +10,7 @@ import DragCard from '@/components/DragCard.vue'
 import { getRace } from '@/api/races'
 import { submitResults } from '@/api/results'
 import { useDragSort } from '@/composables/useDragSort'
+import { useDragAutoScroll } from '@/composables/useDragAutoScroll'
 import type { RaceDetail, ResultPosition } from '@/types/race'
 
 type PageState = 'loading' | 'empty' | 'error' | 'success'
@@ -34,6 +35,11 @@ let longPressTimer: ReturnType<typeof setTimeout> | null = null
 
 // Track which list the drag originated from
 const dragSource = ref<'active' | 'dnf'>('active')
+
+// Auto-scroll during drag
+const dragClientY = ref(0)
+const autoScrollEnabled = computed(() => isDragging.value || touchDragIndex.value >= 0)
+const { autoScrollDirection } = useDragAutoScroll({ enabled: autoScrollEnabled, clientY: dragClientY })
 
 let isMounted = true
 
@@ -133,6 +139,7 @@ function handleDrop(event: DragEvent) {
 function handleDragEnd() {
   dragSort?.endDrag()
   dragOverIndex.value = -1
+  dragClientY.value = 0
 }
 
 // DNF zone drop
@@ -161,9 +168,6 @@ function handleTouchStart(event: TouchEvent, index: number) {
     touchStartY.value = event.touches[0].clientY
     touchCurrentY.value = event.touches[0].clientY
     dragSort?.startDrag(index)
-
-    // Disable page scroll during drag
-    document.body.style.overflow = 'hidden'
   }, 300)
 }
 
@@ -179,6 +183,7 @@ function handleTouchMove(event: TouchEvent) {
 
   event.preventDefault()
   touchCurrentY.value = event.touches[0].clientY
+  dragClientY.value = event.touches[0].clientY
 
   // Calculate which position the finger is over based on card positions
   const cards = document.querySelectorAll('.drag-item-wrapper')
@@ -223,7 +228,7 @@ function handleTouchEnd(event: TouchEvent) {
 
   touchDragIndex.value = -1
   dragOverIndex.value = -1
-  document.body.style.overflow = ''
+  dragClientY.value = 0
 }
 
 // Validation
@@ -290,6 +295,13 @@ async function handleSubmit() {
 
 <template>
   <div class="results-page">
+    <!-- Auto-scroll hints -->
+    <div class="scroll-hint scroll-hint-up" :class="{ active: autoScrollDirection === 'up' }">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="18 15 12 9 6 15"/></svg>
+    </div>
+    <div class="scroll-hint scroll-hint-down" :class="{ active: autoScrollDirection === 'down' }">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+    </div>
     <div class="page-header">
       <button class="btn btn-back" @click="router.push('/admin')">
         ← 返回
@@ -336,7 +348,7 @@ async function handleSubmit() {
           v-for="(horse, index) in activeList"
           :key="horse.race_horse_id"
           class="drag-item-wrapper"
-          :class="{ 'drag-over-top': dragOverIndex === index && isDragging }"
+          :class="{ 'drag-over-top': dragOverIndex === index && isDragging, 'touch-dragging': touchDragIndex >= 0 }"
         >
           <div class="position-badge">{{ index + 1 }}</div>
           <DragCard
@@ -527,6 +539,10 @@ async function handleSubmit() {
   gap: 8px;
 }
 
+.drag-item-wrapper.touch-dragging {
+  touch-action: none;
+}
+
 /* Green insertion highlight (AC-2) */
 .drag-item-wrapper.drag-over-top {
   position: relative;
@@ -655,6 +671,63 @@ async function handleSubmit() {
   background: #FED7D7;
   border-radius: var(--rounded-md, 10px);
   margin-top: var(--spacing-3, 12px);
+}
+
+/* Auto-scroll hints */
+.scroll-hint {
+  position: fixed;
+  left: 0;
+  right: 0;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  z-index: 50;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+  color: var(--color-primary, #1A5632);
+}
+
+.scroll-hint.active {
+  opacity: 1;
+}
+
+.scroll-hint-up {
+  top: var(--header-height, 0px);
+  background: linear-gradient(to bottom, rgba(26, 86, 50, 0.12), transparent);
+}
+
+.scroll-hint-down {
+  bottom: calc(var(--bottom-nav-height, 0px) + env(safe-area-inset-bottom, 0px));
+  background: linear-gradient(to top, rgba(26, 86, 50, 0.12), transparent);
+}
+
+@media (min-width: 768px) {
+  .scroll-hint-down {
+    bottom: 0;
+  }
+}
+
+@media (max-width: 767px) {
+  .scroll-hint-up {
+    top: 0;
+  }
+}
+
+.scroll-hint svg {
+  animation: scroll-bounce 0.6s ease-in-out alternate infinite;
+}
+
+@keyframes scroll-bounce {
+  from { transform: translateY(-4px); }
+  to   { transform: translateY(4px); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .scroll-hint svg {
+    animation: none;
+  }
 }
 
 /* Mobile */
