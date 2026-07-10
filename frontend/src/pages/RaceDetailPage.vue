@@ -400,22 +400,39 @@ function handleGateTouchStart(_event: TouchEvent, index: number) {
   gateDragSort.value?.startDrag(index)
 }
 
+// Cache card positions to avoid getBoundingClientRect() on every touchmove
+let cachedGateCardRects: { top: number; bottom: number }[] = []
+let gateCardRectsCacheTime = 0
+let cachedResultCardRects: { top: number; bottom: number }[] = []
+let resultCardRectsCacheTime = 0
+
 function handleGateTouchMove(event: TouchEvent) {
   if (gateTouchIndex.value < 0) return
   event.preventDefault()
   dragClientY.value = event.touches[0].clientY
 
-  const cards = document.querySelectorAll('.gate-drag-item')
+  // Refresh card rect cache every 200ms
+  const now = Date.now()
+  if (now - gateCardRectsCacheTime > 200) {
+    const cards = document.querySelectorAll('.gate-drag-item')
+    cachedGateCardRects = []
+    for (let i = 0; i < cards.length; i++) {
+      const rect = cards[i].getBoundingClientRect()
+      cachedGateCardRects.push({ top: rect.top, bottom: rect.bottom })
+    }
+    gateCardRectsCacheTime = now
+  }
+
   const touchY = event.touches[0].clientY
-  for (let i = 0; i < cards.length; i++) {
-    const rect = cards[i].getBoundingClientRect()
-    if (touchY >= rect.top && touchY <= rect.bottom) {
+  for (let i = 0; i < cachedGateCardRects.length; i++) {
+    if (touchY >= cachedGateCardRects[i].top && touchY <= cachedGateCardRects[i].bottom) {
       if (i !== gateTouchIndex.value && gateDragSort.value) {
         const item = gateDragSort.value.activeList.value.splice(gateTouchIndex.value, 1)[0]
         if (item) {
           gateDragSort.value.activeList.value.splice(i, 0, item)
           gateTouchIndex.value = i
           gateDragOverIndex.value = i
+          gateCardRectsCacheTime = 0
         }
       }
       break
@@ -554,17 +571,28 @@ function handleResultTouchMove(event: TouchEvent) {
   event.preventDefault()
   dragClientY.value = event.touches[0].clientY
 
+  // Refresh card rect cache every 200ms
+  const now = Date.now()
+  if (now - resultCardRectsCacheTime > 200) {
+    const cards = document.querySelectorAll('.result-drag-item')
+    cachedResultCardRects = []
+    for (let i = 0; i < cards.length; i++) {
+      const rect = cards[i].getBoundingClientRect()
+      cachedResultCardRects.push({ top: rect.top, bottom: rect.bottom })
+    }
+    resultCardRectsCacheTime = now
+  }
+
   const touch = event.touches[0]
-  const cards = document.querySelectorAll('.result-drag-item')
-  for (let i = 0; i < cards.length; i++) {
-    const rect = cards[i].getBoundingClientRect()
-    if (touch.clientY >= rect.top && touch.clientY <= rect.bottom) {
+  for (let i = 0; i < cachedResultCardRects.length; i++) {
+    if (touch.clientY >= cachedResultCardRects[i].top && touch.clientY <= cachedResultCardRects[i].bottom) {
       if (i !== resultTouchIndex.value && resultDragSource.value === 'active') {
         const item = resultDragSort.value.activeList.value.splice(resultTouchIndex.value, 1)[0]
         if (item) {
           resultDragSort.value.activeList.value.splice(i, 0, item)
           resultTouchIndex.value = i
           resultDragOverIndex.value = i
+          resultCardRectsCacheTime = 0
         }
       }
       break

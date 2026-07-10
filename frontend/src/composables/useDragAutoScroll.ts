@@ -13,6 +13,12 @@ const EDGE_RATIO = 0.2
 const BASE_SPEED = 8
 const MAX_SPEED = 20
 
+// Mobile needs higher speed because:
+// 1. Finger occlusion makes it hard to reach the extreme edge → lower distanceRatio
+// 2. touchmove throttling → fewer coordinate updates per second
+// 3. document-level scrolling (no composited scroll container) → less efficient
+const isMobile = (): boolean => window.innerWidth < 768
+
 function onDocumentDragOver(this: { clientY: Ref<number> }, event: DragEvent) {
   event.preventDefault()
   this.clientY.value = event.clientY
@@ -77,11 +83,18 @@ export function useDragAutoScroll(options: {
 
     const vh = window.innerHeight
     const threshold = vh * EDGE_RATIO
+    const mobile = isMobile()
+
+    // Mobile speed multiplier: compensate for finger occlusion & touchmove throttling
+    // A mobile user's finger tip center usually sits 20-30px from the screen edge,
+    // and thumb occlusion prevents reaching the extreme edge of the trigger zone.
+    const speedMultiplier = mobile ? 2.5 : 1
+    const maxSpeed = mobile ? MAX_SPEED * speedMultiplier : MAX_SPEED
 
     if (y < threshold) {
       autoScrollDirection.value = 'up'
       const distanceRatio = (threshold - y) / threshold
-      const speed = Math.min(BASE_SPEED * distanceRatio * distanceRatio, MAX_SPEED)
+      const speed = Math.min(BASE_SPEED * speedMultiplier * distanceRatio * distanceRatio, maxSpeed)
 
       const container = getScrollContainer()
       if (!isScrolledToTop(container)) {
@@ -95,7 +108,7 @@ export function useDragAutoScroll(options: {
       autoScrollDirection.value = 'down'
       const distanceFromBottom = y - (vh - threshold)
       const distanceRatio = distanceFromBottom / threshold
-      const speed = Math.min(BASE_SPEED * distanceRatio * distanceRatio, MAX_SPEED)
+      const speed = Math.min(BASE_SPEED * speedMultiplier * distanceRatio * distanceRatio, maxSpeed)
 
       const container = getScrollContainer()
       if (!isScrolledToBottom(container)) {

@@ -589,6 +589,7 @@ function isAdminItemActive(item: AdminNavItem): boolean {
    Responsive
    ========================================= */
 
+/* Desktop: scroll container is a fixed composited layer */
 @media (min-width: 768px) {
   .scroll-container {
     position: fixed;
@@ -605,6 +606,21 @@ function isAdminItemActive(item: AdminNavItem): boolean {
 
   .mobile-bottom-nav {
     display: none;
+  }
+}
+
+/* Mobile: scroll container fills the viewport with bottom-nav offset.
+   Must use overflow-y: auto so getScrollContainer() finds a proper
+   scrolling element for auto-scroll during drag operations. */
+@media (max-width: 767px) {
+  .scroll-container {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: var(--bottom-nav-height);
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
   }
 }
 

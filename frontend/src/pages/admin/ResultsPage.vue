@@ -171,6 +171,10 @@ function handleTouchStart(event: TouchEvent, index: number) {
   }, 300)
 }
 
+// Cache card positions to avoid getBoundingClientRect() on every touchmove
+let cachedCardRects: { top: number; bottom: number }[] = []
+let cardRectsCacheTime = 0
+
 function handleTouchMove(event: TouchEvent) {
   if (touchDragIndex.value < 0) {
     // Cancel long-press if finger moved before activation
@@ -185,18 +189,30 @@ function handleTouchMove(event: TouchEvent) {
   touchCurrentY.value = event.touches[0].clientY
   dragClientY.value = event.touches[0].clientY
 
-  // Calculate which position the finger is over based on card positions
-  const cards = document.querySelectorAll('.drag-item-wrapper')
+  // Refresh card rect cache every 200ms (layout changes during drag sorting)
+  const now = Date.now()
+  if (now - cardRectsCacheTime > 200) {
+    const cards = document.querySelectorAll('.drag-item-wrapper')
+    cachedCardRects = []
+    for (let i = 0; i < cards.length; i++) {
+      const rect = cards[i].getBoundingClientRect()
+      cachedCardRects.push({ top: rect.top, bottom: rect.bottom })
+    }
+    cardRectsCacheTime = now
+  }
+
+  // Calculate which position the finger is over based on cached card positions
   const touchY = event.touches[0].clientY
-  for (let i = 0; i < cards.length; i++) {
-    const rect = cards[i].getBoundingClientRect()
-    if (touchY >= rect.top && touchY <= rect.bottom) {
+  for (let i = 0; i < cachedCardRects.length; i++) {
+    if (touchY >= cachedCardRects[i].top && touchY <= cachedCardRects[i].bottom) {
       if (i !== touchDragIndex.value && dragSort) {
         const item = dragSort.activeList.value.splice(touchDragIndex.value, 1)[0]
         if (item) {
           dragSort.activeList.value.splice(i, 0, item)
           touchDragIndex.value = i
           dragOverIndex.value = i
+          // Invalidate cache immediately after reorder
+          cardRectsCacheTime = 0
         }
       }
       break
