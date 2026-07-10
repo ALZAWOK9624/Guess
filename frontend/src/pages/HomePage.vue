@@ -43,7 +43,7 @@ const creating = ref(false)
 const createError = ref('')
 
 const ageRangeOptions = ['2岁', '2+岁', '3岁', '3+岁', '4+岁', '其他']
-const sexRestrictionOptions = ['无', '牝限', '牡限']
+const sexRestrictionOptions = ['无', '牝限', '牡牝限', '牡限']
 const raceGradeOptions = ['G1', 'G2', 'G3', 'JPN1', 'JPN2', '其他', '自定义']
 const countryOptions = ['日本', '英国', '美国', '澳大利亚', '中国香港', '法国', '阿联酋', '爱尔兰', '沙特', '南非', '德国', '加拿大', '新西兰', '韩国', '阿根廷', '乌拉圭', '巴西', '智利', '秘鲁', '其他']
 const surfaceOptions = ['草地', '泥地', '全天候', '其他']

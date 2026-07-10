@@ -65,7 +65,7 @@ class RaceCreate(BaseModel):
     @field_validator("sex_restriction")
     @classmethod
     def validate_sex_restriction(cls, v: str) -> str:
-        allowed = {"无", "牝限", "牡限"}
+        allowed = {"无", "牝限", "牡牝限", "牡限"}
         if v not in allowed:
             raise ValueError(f"无效的性别限定，允许的值: {', '.join(allowed)}")
         return v
@@ -148,7 +148,7 @@ class RaceUpdate(BaseModel):
     @classmethod
     def validate_sex_restriction(cls, v: str | None) -> str | None:
         if v is not None:
-            allowed = {"无", "牝限", "牡限"}
+            allowed = {"无", "牝限", "牡牝限", "牡限"}
             if v not in allowed:
                 raise ValueError(f"无效的性别限定，允许的值: {', '.join(allowed)}")
         return v
