@@ -32,6 +32,7 @@ async def seeded_race(db_session: AsyncSession) -> Race:
         race_grade="G1",
         country="日本",
         distance="1200m",
+        surface="草地",
         status=RaceStatus.LOCKED,
         creator_id=admin.id,
     )
@@ -217,6 +218,7 @@ async def test_submit_results_voting_race_rejected(db_session: AsyncSession):
         race_grade="G1",
         country="日本",
         distance="1200m",
+        surface="草地",
         status=RaceStatus.VOTING,
         creator_id=admin.id,
     )
@@ -528,7 +530,7 @@ async def test_resettle_zero_votes(db_session: AsyncSession):
 
     race = Race(
         name="Zero Vote Race", date=date(2026, 7, 1),
-        age_range="其他", sex_restriction="无", race_grade="G1", country="日本", distance="1200m",
+        age_range="其他", sex_restriction="无", race_grade="G1", country="日本", distance="1200m", surface="草地",
         status=RaceStatus.LOCKED, creator_id=admin.id,
     )
     db_session.add(race)

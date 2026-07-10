@@ -59,7 +59,12 @@ async def _create_voting_race(
         horse_ids = [h1.id, h2.id]
     return await create_race(
         db,
-        RaceCreate(name="Test Race", date=date(2026, 6, 15), grade="G1", horse_ids=horse_ids),
+        RaceCreate(
+            name="Test Race", date=date(2026, 6, 15),
+            age_range="其他", sex_restriction="无", race_grade="G1",
+            country="日本", distance="1200m", surface="草地",
+            horse_ids=horse_ids,
+        ),
         creator_id=1,
     )
 

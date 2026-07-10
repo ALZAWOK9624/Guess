@@ -20,6 +20,7 @@ _DEFAULT_TAGS = {
     "race_grade": "G1",
     "country": "日本",
     "distance": "1200m",
+    "surface": "草地",
 }
 
 
@@ -40,6 +41,7 @@ def _make_race_json(name: str, date_str: str, **overrides) -> dict:
         "race_grade": "G1",
         "country": "日本",
         "distance": "1200m",
+        "surface": "草地",
     }
     payload.update(overrides)
     return payload
@@ -183,11 +185,11 @@ class TestRaceService:
             horse_ids=[h2.id, h3.id],
         ), creator_id=1)
 
-        races = await get_races(db_session)
+        races = await get_races(db_session, include_hidden=True)
         assert len(races) == 2
 
         # Test status filter
-        races_voting = await get_races(db_session, status_filter="voting")
+        races_voting = await get_races(db_session, status_filter="voting", include_hidden=True)
         assert len(races_voting) == 2
 
         await db_session.rollback()
@@ -311,7 +313,7 @@ class TestRaceAPI:
         h2 = await _create_horse(db_session, SAMPLE_HORSE_2)
         await create_race(db_session, RaceCreate(
             name="API Race", date=date(2026, 6, 15), **_make_race_kwargs(),
-            horse_ids=[h1.id, h2.id],
+            horse_ids=[h1.id, h2.id], is_hidden=False,
         ), creator_id=1)
 
         app.dependency_overrides[get_db] = lambda: db_session
@@ -394,7 +396,7 @@ class TestRaceAPI:
         async with AsyncClient(transport=transport, base_url="http://test") as client:
             create_resp = await client.post("/api/v1/races", json=_make_race_json(
                 "DetailTest", "2026-06-15",
-                horse_ids=[h1.id, h2.id],
+                horse_ids=[h1.id, h2.id], is_hidden=False,
             ))
             race_id = create_resp.json()["data"]["id"]
 
@@ -798,7 +800,7 @@ class TestRaceSettledResults:
 
         race = await create_race(db_session, RaceCreate(
             name="APISettled", date=date(2026, 7, 5), **_make_race_kwargs(),
-            horse_ids=[h1.id, h2.id],
+            horse_ids=[h1.id, h2.id], is_hidden=False,
         ), creator_id=1)
         race_id = race.id
 
@@ -842,7 +844,7 @@ class TestRaceSettledResults:
 
         race = await create_race(db_session, RaceCreate(
             name="VotingNoVotes", date=date(2026, 7, 10), **_make_race_kwargs(),
-            horse_ids=[h1.id, h2.id],
+            horse_ids=[h1.id, h2.id], is_hidden=False,
         ), creator_id=1)
         race_id = race.id
 

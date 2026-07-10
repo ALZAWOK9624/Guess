@@ -31,7 +31,7 @@ async def leaderboard_data(db_session: AsyncSession) -> dict:
     # Race 1: G1, 4 horses
     race1 = Race(
         name="Race 1", date=date(2026, 6, 1),
-        age_range="其他", sex_restriction="无", race_grade="G1", country="日本", distance="1200m",
+        age_range="其他", sex_restriction="无", race_grade="G1", country="日本", distance="1200m", surface="草地",
         status=RaceStatus.LOCKED, creator_id=admin.id,
     )
     db_session.add(race1)
@@ -66,7 +66,7 @@ async def leaderboard_data(db_session: AsyncSession) -> dict:
     # Race 2: G1, 3 horses
     race2 = Race(
         name="Race 2", date=date(2026, 6, 8),
-        age_range="其他", sex_restriction="无", race_grade="G1", country="日本", distance="1200m",
+        age_range="其他", sex_restriction="无", race_grade="G1", country="日本", distance="1200m", surface="草地",
         status=RaceStatus.LOCKED, creator_id=admin.id,
     )
     db_session.add(race2)
@@ -137,9 +137,8 @@ async def test_leaderboard_single_race(db_session: AsyncSession, leaderboard_dat
     from app.services.leaderboard_service import get_leaderboard
 
     entries = await get_leaderboard(db_session)
-    # After race 1: user1=10pts, user2=5pts, admin=0, user3=0
-    # After race 2: user1=20pts, user2=10pts, admin=0, user3=0
-    assert len(entries) == 4
+    # Admin excluded from leaderboard; only non-admin users
+    assert len(entries) == 3
 
     # user1 should be first (20 points, avg=10)
     assert entries[0].username == "user1"
@@ -160,11 +159,10 @@ async def test_leaderboard_users_without_votes(db_session: AsyncSession, leaderb
     from app.services.leaderboard_service import get_leaderboard
 
     entries = await get_leaderboard(db_session)
-    # admin and user3 have no votes — they should be at the bottom
+    # Admin excluded from leaderboard; only user3 has no votes
     bottom_users = [e for e in entries if e.total_points == 0]
-    assert len(bottom_users) == 2
+    assert len(bottom_users) == 1
     usernames = {e.username for e in bottom_users}
-    assert "admin" in usernames
     assert "user3" in usernames
 
 
@@ -185,7 +183,7 @@ async def test_leaderboard_tie_breaking(db_session: AsyncSession):
     # Race 1: G1, 4 horses — both users vote
     race1 = Race(
         name="Race 1", date=date(2026, 6, 15),
-        age_range="其他", sex_restriction="无", race_grade="G1", country="日本", distance="1200m",
+        age_range="其他", sex_restriction="无", race_grade="G1", country="日本", distance="1200m", surface="草地",
         status=RaceStatus.LOCKED, creator_id=admin.id,
     )
     db_session.add(race1)
@@ -222,7 +220,7 @@ async def test_leaderboard_tie_breaking(db_session: AsyncSession):
     # Result: user_a=10pts(1 race avg=10), user_b=10pts(2 races avg=5)
     race2 = Race(
         name="Race 2", date=date(2026, 6, 16),
-        age_range="其他", sex_restriction="无", race_grade="G1", country="日本", distance="1200m",
+        age_range="其他", sex_restriction="无", race_grade="G1", country="日本", distance="1200m", surface="草地",
         status=RaceStatus.LOCKED, creator_id=admin.id,
     )
     db_session.add(race2)
@@ -273,7 +271,7 @@ async def test_leaderboard_dnf_handling(db_session: AsyncSession):
 
     race = Race(
         name="DNF Race", date=date(2026, 6, 15),
-        age_range="其他", sex_restriction="无", race_grade="G1", country="日本", distance="1200m",
+        age_range="其他", sex_restriction="无", race_grade="G1", country="日本", distance="1200m", surface="草地",
         status=RaceStatus.LOCKED, creator_id=admin.id,
     )
     db_session.add(race)
@@ -326,7 +324,7 @@ async def test_leaderboard_endpoint_integration(
     resp = await async_client.get("/api/v1/leaderboard")
     assert resp.status_code == 200
     data = resp.json()["data"]
-    assert len(data) == 4
+    assert len(data) == 3
 
     # First entry should be user1 (20pts)
     assert data[0]["username"] == "user1"

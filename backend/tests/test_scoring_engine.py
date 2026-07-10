@@ -124,7 +124,7 @@ class TestCustomScoring:
         assert calculate_score("CUSTOM", 6, 6, custom) == 1
 
     def test_custom_positive_with_penalties(self):
-        """Custom: positive + penalty rules combine."""
+        """Custom: when both positive score and penalty apply, positive wins (penalty waived)."""
         custom = {
             "positive_scores": [10, 7, 5, 3, 2, 1],
             "penalty_rules": [{"position": -1, "points": -5}, {"position": -2, "points": -2}],
@@ -133,10 +133,10 @@ class TestCustomScoring:
         assert calculate_score("CUSTOM", 6, 1, custom) == 10
         # 4th place: 3, no penalty (not last 2)
         assert calculate_score("CUSTOM", 6, 4, custom) == 3
-        # 5th place (2nd-to-last): 2 positive - 2 penalty = 0
-        assert calculate_score("CUSTOM", 6, 5, custom) == 0
-        # 6th place (last): 1 positive - 5 penalty = -4
-        assert calculate_score("CUSTOM", 6, 6, custom) == -4
+        # 5th place (2nd-to-last): positive=2, penalty=-2 → positive wins, penalty waived
+        assert calculate_score("CUSTOM", 6, 5, custom) == 2
+        # 6th place (last): positive=1, penalty=-5 → positive wins, penalty waived
+        assert calculate_score("CUSTOM", 6, 6, custom) == 1
 
     def test_custom_penalty_rules_empty(self):
         """Custom: empty penalty_rules means no deductions."""
