@@ -175,6 +175,7 @@ async function handleHeaderSave({ name, date }: { name: string; date: string }) 
 // Lock
 const locking = ref(false)
 const lockError = ref('')
+const showLockConfirm = ref(false)
 
 async function handleLock() {
   if (!race.value || !isAdmin.value || !isRaceVoting.value || locking.value) return
@@ -182,6 +183,7 @@ async function handleLock() {
   lockError.value = ''
   try {
     await lockRace(raceId)
+    showLockConfirm.value = false
     race.value = await getRace(raceId)
     await loadVotes(raceId)
     isJiggleMode.value = false
@@ -889,15 +891,15 @@ onUnmounted(() => {
         <button
           class="admin-btn lock-btn"
           :disabled="locking"
-          @click="handleLock"
+          @click="showLockConfirm = true; lockError = ''"
         >
-          {{ locking ? '锁定中…' : '锁定' }}
+          锁定
         </button>
         <button
           v-if="canEnterJiggleMode"
           class="jiggle-toggle-btn mobile-only"
           :class="{ active: isJiggleMode }"
-          :aria-label="isJiggleMode ? '退出编辑模式' : '进入编辑模式'"
+          :aria-label="isJiggleMode ? '退出编辑闸位模式' : '进入编辑闸位模式'"
           :aria-pressed="isJiggleMode"
           @click="toggleJiggleMode"
         >
@@ -905,7 +907,7 @@ onUnmounted(() => {
             <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
             <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
           </svg>
-          <span>{{ isJiggleMode ? '完成' : '编辑' }}</span>
+          <span>{{ isJiggleMode ? '完成' : '编辑闸位' }}</span>
         </button>
         <button
           class="admin-btn delete-btn"
@@ -1200,6 +1202,19 @@ onUnmounted(() => {
       :loading="deleting"
       @confirm="confirmDeleteHorse"
       @cancel="showDeleteConfirm = false"
+    />
+
+    <!-- Lock Race Confirm Modal -->
+    <ConfirmDeleteModal
+      v-if="showLockConfirm && race"
+      title="锁定比赛"
+      :item-name="race.name"
+      message="确定锁定比赛「{name}」？锁定后不可再修改闸位与马匹信息。"
+      :loading="locking"
+      confirm-text="确认锁定"
+      loading-text="锁定中…"
+      @confirm="handleLock"
+      @cancel="showLockConfirm = false"
     />
 
     <!-- Delete Race Confirm Modal -->

@@ -18,10 +18,14 @@ const props = withDefaults(defineProps<{
   itemName: string
   message?: string
   loading?: boolean
+  confirmText?: string
+  loadingText?: string
 }>(), {
   title: '确认删除',
   message: '确定删除「{name}」？此操作不可撤销。',
   loading: false,
+  confirmText: '确认删除',
+  loadingText: '删除中…',
 })
 
 const titleId = 'confirm-delete-title'
@@ -72,7 +76,7 @@ function onKeydown(e: KeyboardEvent) {
             :disabled="loading"
             @click="emit('confirm')"
           >
-            {{ loading ? '删除中…' : '确认删除' }}
+            {{ loading ? loadingText : confirmText }}
           </button>
         </div>
       </div>

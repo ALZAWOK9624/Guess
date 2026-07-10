@@ -1,8 +1,8 @@
 ---
 project_name: 'guess'
 user_name: 'tkd'
-date: '2026-07-09'
-story: 'ui-alignment-and-date-placeholder-fixes'
+date: '2026-07-10'
+story: 'lock-confirm-and-edit-gate-label'
 sections_completed:
   ['technology_stack', 'language_rules', 'framework_rules', 'testing_rules', 'code_quality', 'workflow', 'critical_rules']
 status: 'complete'
@@ -60,7 +60,7 @@ _This file contains critical rules and patterns that AI agents must follow when 
 - `HorseDetailCard.vue` 新增 `refresh` emit 事件 + 刷新按钮（↻图标，仅 `editable` 为 true 时显示）+ 确认弹窗（Teleport to body）。点击刷新按钮 → 弹窗确认 → emit `refresh` 事件，父组件调用 `refreshRaceHorseSnapshot` API 并重新加载数据。
 - `GradeBadge.vue` 用于展示比赛等级徽章：G1（金色底#B8960C）、G2_JPN1（灰色底#6B7280）、YOUNG_G1（亮绿底#2D7A4F）、CUSTOM（灰色底虚线边框）。接收 `grade: string` prop。
 - `StatusBadge.vue` 用于展示比赛状态胶囊：voting（绿底#2D7A4F）、locked（灰底#6B7280 + 🔒）、settled（深绿底#0D3A1F + ✓）。接收 `status: string` prop。
-- `ConfirmDeleteModal.vue` 可复用删除确认弹窗组件，接收 `title`, `itemName`, `message`, `loading` props，emit `confirm` / `cancel`。使用 `<Teleport to="body">` + `role="dialog"` + `aria-modal` + Esc 关闭 + 遮罩层点击关闭。不可点击遮罩层外部关闭（防误触）。
+- `ConfirmDeleteModal.vue` 可复用确认弹窗组件（不仅限删除），接收 `title`, `itemName`, `message`, `loading`, `confirmText`（默认"确认删除"）, `loadingText`（默认"删除中…"） props，emit `confirm` / `cancel`。使用 `<Teleport to="body">` + `role="dialog"` + `aria-modal` + Esc 关闭 + 遮罩层点击关闭。不可点击遮罩层外部关闭（防误触）。`RaceDetailPage.vue` 中锁定比赛也复用此组件，传入 `confirm-text="确认锁定"` `loading-text="锁定中…"`。
 - `HomePage.vue` 中弹窗选"自定义"等级时显示正序积分列表和扣分规则输入框，创建比赛时附带 `custom_scoring` 字段。radio 单选框 CSS 使用 `clip: rect(0,0,0,0)` 而非 `width:0;height:0`，避免点击 `<label>` 不触发 v-model 更新。`HorseDetailCard.vue` 的 `<table>` 内 `<tr>` 必须包在 `<tbody>` 中。`RaceHeaderEditor` 只编辑比赛名称，日期在详情页 `race-subinfo` 中双击编辑。
 - 全局 `@keyframes skeleton-shimmer` 定义在 `base.css` 中，所有骨架屏复用此动画。
 
