@@ -269,7 +269,9 @@ _This file contains critical rules and patterns that AI agents must follow when 
   - **禁止**在 touch 处理器中设置 `document.body.style.overflow = 'hidden'`——该全局状态在 DevTools 模拟或系统 touchcancel 下无法可靠恢复。改用 CSS `touch-action: none` 阻止拖拽期间滚动。
 - **Date input 原生占位文字隐藏模式**：`<input type="date">` 在中文 locale 下浏览器显示 "yyyy/mm/dd" 原生占位文字。解决方案：在 `base.css` 中全局定义 `input[type="date"].is-empty::-webkit-datetime-edit { visibility: hidden !important; }` + `input[type="date"].is-empty:focus::-webkit-datetime-edit { visibility: visible !important; }`，每个 date input 添加 `:class="{ 'is-empty': !modelVar }"` 让 Vue 响应式追踪空值状态。空值未聚焦时隐藏，聚焦或已有值时正常显示。
 - **CSS 变量使用规范**：`variables.css` 中定义的 spacing 变量名称为 `--spacing-{N}`（N×4px，如 `--spacing-1`=4px、`--spacing-2`=8px、`--spacing-3`=12px、`--spacing-4`=16px、`--spacing-5`=20px、`--spacing-6`=24px、`--spacing-8`=32px、`--spacing-10`=40px、`--spacing-12`=48px、`--spacing-16`=64px）。**不存在** `--spacing-20`、`--spacing-24`、`--spacing-32` 等变量，使用这些不存在的变量会导致整个 CSS 声明失效。页面排版错乱时优先检查是否引用了不存在的 spacing 变量。
-- **Auth session expiry handling**：`authStore` 解析 refresh token 的 `exp` 声明并为管理员用户设置 `setTimeout`；到期后清除登录态并跳转到 `/login?session=expired`。`client.ts` 响应拦截器对任何 401（登录/注册/重置页除外）都跳转同一 URL，并中断请求避免页面先显示“加载失败”。`LoginPage.vue` 读取 `route.query.session === 'expired'` 显示“登录状态已过期，请重新登录”。JWT 解析工具位于 `frontend/src/utils/jwt.ts`。
+- **Auth session expiry handling**：`authStore` 解析 refresh token 的 `exp` 声明并为管理员用户设置 `setTimeout`；到期后清除登录态并跳转到 `/login?session=expired`。`client.ts` 响应拦截器对任何 401（登录/注册/重置页除外）都跳转同一 URL，并中断请求避免页面先显示"加载失败"。`LoginPage.vue` 读取 `route.query.session === 'expired'` 显示"登录状态已过期，请重新登录"。JWT 解析工具位于 `frontend/src/utils/jwt.ts`。
+- **滚动条偏移防护模式**：`.scroll-container`（`AppLayout.vue` 桌面+移动端媒体查询）使用 `scrollbar-gutter: stable`——始终预留滚动条空间，防止内容高度跨越滚动阈值时触发水平布局偏移。`html` 添加 `overflow: hidden`（`base.css`）兜底——所有页面内容渲染在 `position: fixed` 的 `.scroll-container` 内，body 级别永不出现滚动条。
+- **Axios 数组参数序列化模式**：axios v1.x 默认将数组参数序列化为 bracket notation（`country[]=日本`），FastAPI `Query(list[str])` 只识别 repeated-key 格式（`country=日本&country=美国`）。在 `client.ts` 的 `axios.create()` 中添加 `paramsSerializer`：数组值用 `forEach` 生成重复 key（`encodeURIComponent(key)=encodeURIComponent(v)`），其他值正常编码。所有通过 `apiClient` 发起的请求自动使用此格式，无需每个调用处手动处理。
 
 **VoteButton 状态机（Story 3.3）已迁移为卡片点击投票模式：**
 - `VoteButton.vue` 已被移除，改为 `HorseDetailCard.vue` 直接支持点击投票
@@ -322,10 +324,11 @@ _This file contains critical rules and patterns that AI agents must follow when 
 
 **排行榜模式（Story 3.5）：**
 - **Leaderboard 聚合查询模式**：`leaderboard_service.get_leaderboard()` 使用 `OUTER JOIN votes ON (user.id = vote.user_id AND vote.points IS NOT NULL)` 确保所有用户（含 0 参与用户）出现。聚合列：`COALESCE(SUM(vote.points), 0)` 为 total_points、`COUNT(DISTINCT vote.race_id)` 为 races_participated、`ROUND(CAST(sum / divisor AS NUMERIC), 1)` 为 avg_points。**重要：PostgreSQL 的 `round(numeric, integer)` 要求第一个参数为 `NUMERIC` 类型，`double precision` 会导致 `function round(double precision, integer) does not exist` 错误。必须通过 `sa.cast(expression, Numeric)` 显式转换为 NUMERIC。** 排序：`total_points DESC, avg_points DESC`。Python 层对 NULL avg 做 `float(row.avg_points or 0.0)` 处理。
-- **Leaderboard 筛选模式**：支持按 6 个 tag 筛选（age_range/sex_restriction/race_grade/country/surface 为多选，distance 为米数范围），以及 horse_count 范围筛选。查询通过 Vote→Race LEFT JOIN 实现，筛选条件作用于 Race 表。未命中筛选用户的用户仍以 0 分显示。
+- **Leaderboard 筛选子查询模式**：支持按 6 个 tag 筛选（age_range/sex_restriction/race_grade/country/surface 为多选），以及 distance、horse_count 范围筛选。**CRITICAL**：筛选条件**不能**放在 `Vote LEFT JOIN Race` 的 ON 子句中——LEFT JOIN 保留所有 Vote 行，不匹配的 Race 导致 Race 列为 NULL 但 Vote.points 仍参与 SUM。正确做法：有筛选时构建 `Vote INNER JOIN Race WHERE {filters}` 子查询，无筛选时用 `Vote WHERE points IS NOT NULL` 简版子查询，然后 `User LEFT JOIN subquery ON user_id`。未命中筛选的用户仍以 0 分显示。
 - **Leaderboard 公开端点模式**：`GET /api/v1/leaderboard` 无认证依赖（FR-23 要求公开访问），路由前缀 `/api/v1`。前端 `apiClient.get('/leaderboard')` 因 baseURL 为 `/api/v1` 正确匹配。
 - **LeaderboardRow 组件模式**：`LeaderboardRow.vue` 使用原生 `<tr>`/`<td>`（非 div+flex 模拟），接收 `entry: LeaderboardEntry`, `rank: number`, `isCurrentUser: boolean` props。rank 使用 Barlow Condensed 18px bold，前三名使用 `--color-accent` 金色（`color: var(--color-accent, #B8960C)`），其余用 `--color-ink-primary`。积分使用 Barlow Condensed 20px bold `--color-primary`。当前用户行使用 `background: #F0F7F2`。场次/场均使用 body-sm 14px `--color-ink-secondary`。row 使用 `aria-label="{rank}名 {username} {points}分"`。
 - **LeaderboardPage 模式**：`LeaderboardPage.vue` 使用 PageState 枚举（loading/empty/error/success）。success 态渲染原生 `<table>`（`<thead>`+`<th scope="col">`+`<tbody>`+`LeaderboardRow` as `<tr>`）。useDragSort composable 外的结构化表格数据优先使用原生 `<table>` 保证列对齐（与 DashboardPage、HorsesPage 一致）。empty 态条件：`data.length === 0 || data.every(e => e.races_participated === 0)`。
+- **LeaderboardPage 筛选交互模式**：多选标签和数字范围输入修改后**不立即触发 API**——用户选完所有条件后点击绿色实心"应用筛选"按钮一次性提交。"清除筛选"按钮立即生效。`v-model.number` 清空后产生空字符串 `""` → 使用 `toNum()` 辅助函数（`typeof v === 'number' && !isNaN(v) ? v : undefined`）过滤为非数字值。`hasActiveFilters()` 必须检查所有 7 个筛选维度（6 个 tag 数组 + 4 个数字范围），确保 surface 等维度不遗漏。
 - **排行榜排除 admin 模式**：`leaderboard_service.get_leaderboard()` 查询中添加 `.where(User.is_admin == False)` 过滤 admin 用户。admin 不能投票，无有效积分，不应出现在排行榜中。
 - **review 通过后的 story 状态转换**：code-review 发现被全部修复后，story 状态从 `review` → `done`。同时 sprint-status.yaml 同步更新。此流程在 code-review 工作流的 Step 6 中自动执行。
 - **catch 规范**：所有 `catch` 块必须使用 `catch (err)`（非裸 `catch`），以便区分错误类型。即使在仅设置 error 状态的简单场景中也需遵守此规范。
@@ -392,4 +395,4 @@ _This file contains critical rules and patterns that AI agents must follow when 
 - Review quarterly for outdated rules
 - Remove rules that become obvious over time
 
-Last Updated: 2026-07-10 (fix: mobile drag auto-scroll performance — added mobile scroll container with -webkit-overflow-scrolling, 2.5x speed multiplier for mobile, touchmove rect caching to eliminate forced reflow)
+Last Updated: 2026-07-10 (fix leaderboard filter: corrected subquery pattern + paramsSerializer + scrollbar-gutter + filter UX button)
