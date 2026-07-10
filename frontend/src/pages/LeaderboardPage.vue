@@ -44,7 +44,6 @@ function toggleArrayField(field: 'age_range' | 'sex_restriction' | 'race_grade' 
   } else {
     filters.value[field] = [...(arr || []), value]
   }
-  loadData()
 }
 
 function toNum(v: unknown): number | undefined {
@@ -87,6 +86,10 @@ function clearFilters() {
   loadData()
 }
 
+function applyFilters() {
+  loadData()
+}
+
 onMounted(loadData)
 </script>
 
@@ -102,6 +105,7 @@ onMounted(loadData)
         <span v-if="hasActiveFilters()" class="filter-badge"></span>
       </button>
       <button v-if="hasActiveFilters()" class="clear-btn" @click="clearFilters">清除筛选</button>
+      <button v-if="filterOpen || hasActiveFilters()" class="apply-btn" @click="applyFilters">应用筛选</button>
       <button class="filter-toggle" @click="handleRefresh" :disabled="refreshing" style="margin-left:auto">
         {{ refreshing ? '刷新中…' : '刷新' }}
       </button>
@@ -142,17 +146,17 @@ onMounted(loadData)
       <div class="filter-section">
         <label class="filter-label">长度范围（米）</label>
         <div class="filter-range">
-          <input type="number" v-model.number="distanceMin" placeholder="最小" min="0" @input="loadData" />
+          <input type="number" v-model.number="distanceMin" placeholder="最小" min="0" />
           <span class="range-sep">—</span>
-          <input type="number" v-model.number="distanceMax" placeholder="最大" min="0" @input="loadData" />
+          <input type="number" v-model.number="distanceMax" placeholder="最大" min="0" />
         </div>
       </div>
       <div class="filter-section">
         <label class="filter-label">马匹数量范围</label>
         <div class="filter-range">
-          <input type="number" v-model.number="horseCountMin" placeholder="最少" min="0" @input="loadData" />
+          <input type="number" v-model.number="horseCountMin" placeholder="最少" min="0" />
           <span class="range-sep">—</span>
-          <input type="number" v-model.number="horseCountMax" placeholder="最多" min="0" @input="loadData" />
+          <input type="number" v-model.number="horseCountMax" placeholder="最多" min="0" />
         </div>
       </div>
     </div>
@@ -258,6 +262,23 @@ onMounted(loadData)
 
 .clear-btn:hover {
   background: #FFF5F5;
+}
+
+.apply-btn {
+  padding: 8px 18px;
+  border: none;
+  border-radius: var(--rounded-sm, 6px);
+  background: var(--color-primary, #1A5632);
+  color: #ffffff;
+  font-size: var(--text-body-sm, 14px);
+  font-weight: 600;
+  cursor: pointer;
+  min-height: 40px;
+  transition: background 0.2s;
+}
+
+.apply-btn:hover {
+  background: var(--color-primary-light, #2D7A4F);
 }
 
 /* Filter panel */
