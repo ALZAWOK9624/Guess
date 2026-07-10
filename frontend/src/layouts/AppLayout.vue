@@ -598,6 +598,7 @@ function isAdminItemActive(item: AdminNavItem): boolean {
     right: 0;
     bottom: 0;
     overflow-y: auto;
+    scrollbar-gutter: stable;
   }
 
   .desktop-header {
@@ -621,6 +622,7 @@ function isAdminItemActive(item: AdminNavItem): boolean {
     bottom: var(--bottom-nav-height);
     overflow-y: auto;
     -webkit-overflow-scrolling: touch;
+    scrollbar-gutter: stable;
   }
 }
 
