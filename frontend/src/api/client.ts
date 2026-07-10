@@ -6,6 +6,18 @@ import type { AxiosInstance, InternalAxiosRequestConfig } from 'axios'
 const apiClient: AxiosInstance = axios.create({
   baseURL: '/api/v1',
   headers: { 'Content-Type': 'application/json' },
+  paramsSerializer: (params) => {
+    const parts: string[] = []
+    for (const [key, value] of Object.entries(params)) {
+      if (value == null) continue
+      if (Array.isArray(value)) {
+        value.forEach((v) => parts.push(`${encodeURIComponent(key)}=${encodeURIComponent(String(v))}`))
+      } else {
+        parts.push(`${encodeURIComponent(key)}=${encodeURIComponent(String(value))}`)
+      }
+    }
+    return parts.join('&')
+  },
 })
 
 // Request interceptor: attach auth token
