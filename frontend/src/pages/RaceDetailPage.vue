@@ -1396,6 +1396,8 @@ onUnmounted(() => {
 .date-editable {
   cursor: pointer;
   padding: 2px 6px;
+  margin-left: -6px;
+  margin-right: -6px;
   border-radius: var(--rounded-sm, 6px);
   transition: background 0.15s;
 }

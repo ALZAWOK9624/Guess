@@ -110,6 +110,7 @@ watch(
   font-weight: 600;
   color: var(--color-ink-primary, #1A2E1A);
   margin: 0;
+  line-height: 1.25;
   word-break: break-word;
 }
 
