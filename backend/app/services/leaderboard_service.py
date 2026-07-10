@@ -6,8 +6,9 @@ Supports filtering by race tags, horse count, and distance range.
 """
 
 import sqlalchemy as sa
-from sqlalchemy import Numeric, select, func, and_, case
+from sqlalchemy import Numeric, select, func
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.sql import Subquery
 
 from app.models.user import User
 from app.models.vote import Vote
@@ -34,58 +35,71 @@ async def get_leaderboard(
     no qualifying races still appear with 0 values.
     """
 
-    # Build the vote-race join condition with optional filters
-    vote_race_join = Vote.race_id == Race.id
+    has_filters = any([
+        age_range, sex_restriction, race_grade, country, surface,
+        distance_min is not None, distance_max is not None,
+        horse_count_min is not None, horse_count_max is not None,
+    ])
 
-    # Race tag filters (applied to the join condition)
-    race_filters = [Race.id.isnot(None)]
-    if age_range:
-        race_filters.append(Race.age_range.in_(age_range))
-    if sex_restriction:
-        race_filters.append(Race.sex_restriction.in_(sex_restriction))
-    if race_grade:
-        race_filters.append(Race.race_grade.in_(race_grade))
-    if country:
-        race_filters.append(Race.country.in_(country))
-    if surface:
-        race_filters.append(Race.surface.in_(surface))
-
-    # Distance filter: parse numeric part from distance string
-    if distance_min is not None or distance_max is not None:
-        distance_expr = func.cast(
-            func.regexp_replace(Race.distance, '[^0-9]', '', 'g'),
-            sa.Integer,
+    if has_filters:
+        # Build filtered votes subquery: Vote INNER JOIN Race WHERE race_filters
+        vote_subq_base = (
+            select(Vote.user_id, Vote.points, Vote.race_id)
+            .select_from(Vote)
+            .join(Race, Vote.race_id == Race.id)
+            .where(Vote.points.isnot(None))
         )
-        if distance_min is not None:
-            race_filters.append(distance_expr >= distance_min)
-        if distance_max is not None:
-            race_filters.append(distance_expr <= distance_max)
 
-    # Horse count filter: count race_horses per race using a scalar subquery
-    horse_count_subq = (
-        select(func.count(RaceHorse.id))
-        .where(RaceHorse.race_id == Race.id)
-        .correlate(Race)
-        .scalar_subquery()
-    )
-    if horse_count_min is not None:
-        race_filters.append(horse_count_subq >= horse_count_min)
-    if horse_count_max is not None:
-        race_filters.append(horse_count_subq <= horse_count_max)
+        # Race tag filters
+        if age_range:
+            vote_subq_base = vote_subq_base.where(Race.age_range.in_(age_range))
+        if sex_restriction:
+            vote_subq_base = vote_subq_base.where(Race.sex_restriction.in_(sex_restriction))
+        if race_grade:
+            vote_subq_base = vote_subq_base.where(Race.race_grade.in_(race_grade))
+        if country:
+            vote_subq_base = vote_subq_base.where(Race.country.in_(country))
+        if surface:
+            vote_subq_base = vote_subq_base.where(Race.surface.in_(surface))
 
-    # Build the vote join with race filters
-    vote_join = (
-        Vote.__table__.join(
-            Race.__table__,
-            and_(vote_race_join, *race_filters),
-            isouter=True,
+        # Distance filter: parse numeric part from distance string
+        if distance_min is not None or distance_max is not None:
+            distance_expr = func.cast(
+                func.regexp_replace(Race.distance, '[^0-9]', '', 'g'),
+                sa.Integer,
+            )
+            if distance_min is not None:
+                vote_subq_base = vote_subq_base.where(distance_expr >= distance_min)
+            if distance_max is not None:
+                vote_subq_base = vote_subq_base.where(distance_expr <= distance_max)
+
+        # Horse count filter: count race_horses per race using a scalar subquery
+        if horse_count_min is not None or horse_count_max is not None:
+            horse_count_subq = (
+                select(func.count(RaceHorse.id))
+                .where(RaceHorse.race_id == Race.id)
+                .correlate(Race)
+                .scalar_subquery()
+            )
+            if horse_count_min is not None:
+                vote_subq_base = vote_subq_base.where(horse_count_subq >= horse_count_min)
+            if horse_count_max is not None:
+                vote_subq_base = vote_subq_base.where(horse_count_subq <= horse_count_max)
+
+        filtered_votes: Subquery = vote_subq_base.subquery()
+    else:
+        # No filters: simple subquery of all votes with points
+        filtered_votes: Subquery = (
+            select(Vote.user_id, Vote.points, Vote.race_id)
+            .select_from(Vote)
+            .where(Vote.points.isnot(None))
+            .subquery()
         )
-    )
 
-    total_points_col = func.coalesce(func.sum(Vote.points), 0)
-    races_col = func.count(func.distinct(Vote.race_id))
-    sum_points = func.coalesce(func.sum(Vote.points), 0.0)
-    divisor = func.nullif(func.count(func.distinct(Vote.race_id)), 0)
+    total_points_col = func.coalesce(func.sum(filtered_votes.c.points), 0)
+    races_col = func.count(func.distinct(filtered_votes.c.race_id))
+    sum_points = func.coalesce(func.sum(filtered_votes.c.points), 0.0)
+    divisor = func.nullif(func.count(func.distinct(filtered_votes.c.race_id)), 0)
     avg_points_col = func.round(
         sa.cast(sum_points / divisor, Numeric),
         1,
@@ -99,8 +113,8 @@ async def get_leaderboard(
             avg_points_col.label("avg_points"),
         )
         .outerjoin(
-            vote_join,
-            (User.id == Vote.user_id) & Vote.points.isnot(None),
+            filtered_votes,
+            User.id == filtered_votes.c.user_id,
         )
         .group_by(User.id, User.username)
         .where(User.is_admin == False)

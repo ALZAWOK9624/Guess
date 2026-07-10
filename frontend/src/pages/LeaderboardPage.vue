@@ -30,6 +30,7 @@ function hasActiveFilters(): boolean {
   return !!(
     filters.value.age_range?.length || filters.value.sex_restriction?.length ||
     filters.value.race_grade?.length || filters.value.country?.length ||
+    filters.value.surface?.length ||
     distanceMin.value !== undefined || distanceMax.value !== undefined ||
     horseCountMin.value !== undefined || horseCountMax.value !== undefined
   )
