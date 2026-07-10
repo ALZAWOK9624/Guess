@@ -459,7 +459,7 @@ onUnmounted(() => {
 
     <!-- Create/Edit Modal -->
     <Teleport to="body">
-      <div v-if="showModal" class="modal-overlay" @click.self="showModal = false">
+      <div v-if="showModal" class="modal-overlay">
         <div class="modal-content" role="dialog" :aria-label="editingHorse ? '编辑马匹' : '新建马匹'">
           <h2 class="modal-title">{{ editingHorse ? '编辑马匹' : '新建马匹' }}</h2>
 

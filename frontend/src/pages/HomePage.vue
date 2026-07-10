@@ -265,7 +265,7 @@ onMounted(loadData)
     </button>
 
     <!-- Create race modal -->
-    <div v-if="showCreateModal" class="modal-backdrop" @click.self="closeCreateModal">
+    <div v-if="showCreateModal" class="modal-backdrop">
       <div class="modal-content">
         <h3 class="modal-title">创建比赛</h3>
         <div class="form-group">
