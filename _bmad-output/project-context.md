@@ -316,7 +316,7 @@ _This file contains critical rules and patterns that AI agents must follow when 
   - 闸位拖拽：`handleGateTouchStart` 即时激活（无延迟），`handleGateTouchMove` 实时重排，`handleGateTouchEnd` 自动提交 `updateGateOrder`。
   - 结果排名拖拽：`handleResultTouchStart/Move/End/Cancel` 管理 active/DNF 双列表的触控交互；事件绑定与 gate 模式保持一致（handler 内部守卫，不在模板层动态切换）。DNF 卡片松手至 active 区域自动移回。
   - 进入结果模式：`enterResultMode()` 自动将 `isJiggleMode` 置为 `true`，无需再点编辑按钮。**进入时必须完全重置拖拽状态**：`resultDragOverIndex`、`resultTouchIndex`、`resultDragSource` 全部归位。使用 `resultEntryVersion` ref 计数器递增作为容器 `:key`，强制 Vue 完全销毁并重建整个排名区域子树，确保 `HorseDetailCard` 组件每次都是全新挂载（避免跨 `v-if`/`v-else` 分支的 DOM 复用导致 `onMounted` 不触发）。`handleConfirmResult` 成功后必须**先调用 `exitResultMode()` + `await nextTick()` 完成视图切换，再 `race.value = await getRace(raceId)`** 刷新数据——否则在 ranking 模式下更新 `race.value` 会触发 `gateDragSort` computed 重建 `useDragSort` 实例，造成渲染时序混乱。
-  - ✕ 删除按钮：`position: absolute; top: -12px; right: -12px` 相对于 `.horse-detail-card` 根元素定位（`z-index: 2` 确保在投票徽章之上），点击弹出 `ConfirmDeleteModal` 确认后调用 `removeRaceHorse`。仅非 DNF 卡片显示；**已结算状态（修改结果）不显示删除按钮**。
+  - ✕ 删除按钮：`position: absolute; top: -12px; right: -12px` 相对于 `.horse-detail-card` 根元素定位（`z-index: 2` 确保在投票徽章之上），点击弹出 `ConfirmDeleteModal` 确认后调用 `removeRaceHorse`。仅非 DNF 卡片且在 jiggle 模式下显示（`show-delete-button="isJiggleMode"`，无 `isRaceSettled` 附加条件——"比赛结束"和"修改结果"两种排名模式入口行为一致）。
   - 退出时重置所有拖拽状态（`gateTouchIndex`, `gateDragOverIndex`, `resultTouchIndex` 等）；比赛锁定、退出结果模式、组件卸载时自动退出。
   - 桌面端删除区（`.delete-zone`）在移动端通过 `@media (max-width: 767px) { display: none }` 完全隐藏，避免混淆。
   - `prefers-reduced-motion: reduce` 时抖动动画禁用（`animation: none`）。

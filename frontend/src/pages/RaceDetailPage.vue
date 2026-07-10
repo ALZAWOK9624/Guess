@@ -1111,12 +1111,12 @@ onUnmounted(() => {
                 :position="index + 1"
                 :draggable="true"
                 :is-dnf="false"
-                :show-delete-button="isJiggleMode && !isRaceSettled"
+                :show-delete-button="isJiggleMode"
                 :is-jiggling="isJiggleMode"
                 @drag-start="handleResultDragStart(index, 'active')"
                 @drag-end="handleResultDragEnd"
                 @refresh="handleRefresh(horse)"
-                @delete-click="isJiggleMode && !isRaceSettled ? (deleteTarget = { raceHorseId: horse.race_horse_id, name: horse.snapshot_data.name ?? '未知' }, showDeleteConfirm = true) : undefined"
+                @delete-click="deleteTarget = { raceHorseId: horse.race_horse_id, name: horse.snapshot_data.name ?? '未知' }; showDeleteConfirm = true"
               />
             </div>
           </div>
@@ -1153,12 +1153,12 @@ onUnmounted(() => {
                 :gate="horse.gate"
                 :draggable="true"
                 :is-dnf="true"
-                :show-delete-button="isJiggleMode && !isRaceSettled"
+                :show-delete-button="isJiggleMode"
                 :is-jiggling="isJiggleMode"
                 @drag-start="handleResultDragStart(index, 'dnf')"
                 @drag-end="handleResultDragEnd"
                 @refresh="handleRefresh(horse)"
-                @delete-click="isJiggleMode && !isRaceSettled ? (deleteTarget = { raceHorseId: horse.race_horse_id, name: horse.snapshot_data.name ?? '未知' }, showDeleteConfirm = true) : undefined"
+                @delete-click="deleteTarget = { raceHorseId: horse.race_horse_id, name: horse.snapshot_data.name ?? '未知' }; showDeleteConfirm = true"
               />
             </div>
           </div>
