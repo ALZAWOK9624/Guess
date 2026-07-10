@@ -47,11 +47,21 @@ function toggleArrayField(field: 'age_range' | 'sex_restriction' | 'race_grade' 
   loadData()
 }
 
+function toNum(v: unknown): number | undefined {
+  return typeof v === 'number' && !isNaN(v) ? v : undefined
+}
+
 async function loadData() {
   pageState.value = 'loading'
   errorMessage.value = '加载失败，请刷新重试'
   try {
-    const allFilters: LeaderboardFilters = { ...filters.value, distance_min: distanceMin.value, distance_max: distanceMax.value, horse_count_min: horseCountMin.value, horse_count_max: horseCountMax.value }
+    const allFilters: LeaderboardFilters = {
+      ...filters.value,
+      distance_min: toNum(distanceMin.value),
+      distance_max: toNum(distanceMax.value),
+      horse_count_min: toNum(horseCountMin.value),
+      horse_count_max: toNum(horseCountMax.value),
+    }
     const data = await getLeaderboard(allFilters)
     leaderboard.value = data
     const hasActivity = data.length > 0 && data.some(e => e.races_participated > 0)
