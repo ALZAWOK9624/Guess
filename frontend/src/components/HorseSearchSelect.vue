@@ -46,8 +46,12 @@ async function doSearch(query: string) {
   }
 
   pageState.value = 'loading'
-  showDropdown.value = true
   focusedIndex.value = -1
+
+  // Calculate position BEFORE showing dropdown to prevent flash at top of page
+  await nextTick()
+  updateDropdownPosition()
+  showDropdown.value = true
 
   try {
     const data = await getHorses(query)
