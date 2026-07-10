@@ -56,18 +56,6 @@ const routes: RouteRecordRaw[] = [
     meta: { requiresAuth: true, isAdmin: true, title: '马匹管理' }
   },
   {
-    path: '/admin/races/:id/edit',
-    name: 'admin-edit-race',
-    component: () => import('@/pages/admin/EditRacePage.vue'),
-    meta: { requiresAuth: true, isAdmin: true, title: '编辑比赛' }
-  },
-  {
-    path: '/admin/races/:id/results',
-    name: 'admin-results',
-    component: () => import('@/pages/admin/ResultsPage.vue'),
-    meta: { requiresAuth: true, isAdmin: true, title: '结果录入' }
-  },
-  {
     path: '/admin/invite-codes',
     name: 'admin-invite-codes',
     component: () => import('@/pages/admin/InviteCodesPage.vue'),
