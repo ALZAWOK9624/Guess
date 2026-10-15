@@ -82,7 +82,9 @@ watch(
           :disabled="disabled"
           @click="enterEdit"
         >
-          ✎
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M12 20h9" /><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z" />
+          </svg>
         </button>
       </div>
     </template>
@@ -122,7 +124,7 @@ watch(
 
 .edit-btn {
   position: absolute;
-  top: 0;
+  top: 6px;
   right: 0;
   background: transparent;
   border: none;
@@ -141,6 +143,12 @@ watch(
   opacity: 1;
   background: rgba(255, 255, 255, 0.14);
   transform: rotate(-12deg) scale(1.1);
+}
+
+.edit-btn svg {
+  display: block;
+  width: 18px;
+  height: 18px;
 }
 
 .edit-btn:disabled {

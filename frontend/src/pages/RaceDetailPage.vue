@@ -115,8 +115,9 @@ function toggleJiggleMode() {
 const canVote = computed(() =>
   isRaceVoting.value && authStore.isLoggedIn && !authStore.isAdmin,
 )
+// Guests get clickable cards as well: handleCardClick redirects them to login
 const cardsVotable = computed(() =>
-  isRaceVoting.value && !authStore.isAdmin && authStore.isLoggedIn,
+  isRaceVoting.value && !authStore.isAdmin,
 )
 
 const isGuestVoting = computed(() =>
@@ -887,6 +888,18 @@ onUnmounted(() => {
               :title="isAdmin && isRaceVoting ? '双击修改日期' : undefined"
               @dblclick="startDateEdit"
             >{{ race.date }}</p>
+            <button
+              v-if="isAdmin && isRaceVoting && !dateEditing"
+              type="button"
+              class="hero-edit-btn"
+              aria-label="修改日期"
+              title="修改日期"
+              @click="startDateEdit"
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M12 20h9" /><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z" />
+              </svg>
+            </button>
           </div>
           <p class="race-meta">
             <span class="meta-stat"><strong>{{ race.horses.length }}</strong> 匹参赛</span>
@@ -1016,7 +1029,7 @@ onUnmounted(() => {
           <svg class="hint-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
             <path d="M9 11V6a3 3 0 0 1 6 0v5" /><path d="M5 11h14l-1.5 9a2 2 0 0 1-2 1.7H8.5a2 2 0 0 1-2-1.7z" />
           </svg>
-          <span>点击马匹卡片进行投票，再次点击取消投票</span>
+          <span>看好哪匹就点它的卡片（或右侧「选它」），再点一次取消</span>
         </div>
         <div v-else-if="canVote && votedHorseName" :key="'voted-' + votedHorseName" class="vote-hint voted">
           <svg class="hint-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -1028,7 +1041,7 @@ onUnmounted(() => {
           <svg class="hint-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
             <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4" /><polyline points="10 17 15 12 10 7" /><line x1="15" y1="12" x2="3" y2="12" />
           </svg>
-          <span>点击马匹卡片，登录后即可投票</span>
+          <span>登录后即可投票——点任意马匹会带你去登录</span>
         </div>
       </Transition>
 
@@ -1185,6 +1198,7 @@ onUnmounted(() => {
           >
             <div class="dnf-zone-header">
               <span class="dnf-label">DNF/弃权区</span>
+              <span v-if="resultDnfList.length > 0" class="dnf-tip">点卡片可移回名次区</span>
               <span v-if="resultDnfList.length > 0" class="dnf-count">{{ resultDnfList.length }}匹</span>
             </div>
             <div v-if="resultDnfList.length === 0" class="dnf-empty-hint">
@@ -1236,19 +1250,20 @@ onUnmounted(() => {
 
     <!-- Add Horse Modal -->
     <div v-if="showAddHorseModal" class="modal-backdrop ui-anim-overlay">
-      <div class="modal-content ui-anim-dialog" role="dialog" aria-modal="true" aria-label="添加马匹">
+      <div class="modal-content add-horse-modal ui-anim-dialog" role="dialog" aria-modal="true" aria-label="添加马匹">
         <h3 class="modal-title">添加马匹</h3>
+        <p class="modal-hint">搜索马名后点选，可连续添加多匹，最后一次性提交。</p>
+        <HorseSearchSelect v-model:selected-horses="selectedAddHorse" />
+        <p v-if="addHorseError" class="modal-error">{{ addHorseError }}</p>
         <div class="modal-actions">
-          <button class="ui-btn ui-btn--primary modal-btn" :disabled="addHorseSaving || selectedAddHorse.length === 0" @click="confirmAddHorse">
-            <span v-if="addHorseSaving" class="ui-spinner"></span>
-            {{ addHorseSaving ? '添加中…' : '添加' }}
-          </button>
           <button class="ui-btn ui-btn--ghost modal-btn" @click="closeAddHorseModal">
             取消
           </button>
+          <button class="ui-btn ui-btn--primary modal-btn" :disabled="addHorseSaving || selectedAddHorse.length === 0" @click="confirmAddHorse">
+            <span v-if="addHorseSaving" class="ui-spinner"></span>
+            {{ addHorseSaving ? '添加中…' : selectedAddHorse.length > 0 ? `添加 ${selectedAddHorse.length} 匹` : '添加' }}
+          </button>
         </div>
-        <HorseSearchSelect v-model:selected-horses="selectedAddHorse" />
-        <p v-if="addHorseError" class="modal-error">{{ addHorseError }}</p>
       </div>
     </div>
 
@@ -1483,6 +1498,27 @@ onUnmounted(() => {
 
 .date-editable:hover {
   background: rgba(255, 255, 255, 0.14);
+}
+
+.hero-edit-btn {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  color: rgba(255, 255, 255, 0.75);
+  transition: background var(--duration-fast) ease, color var(--duration-fast) ease, transform var(--duration-fast) var(--ease-spring);
+}
+
+.hero-edit-btn svg {
+  width: 14px;
+  height: 14px;
+}
+
+.hero-edit-btn:hover {
+  color: #FFFFFF;
+  background: rgba(255, 255, 255, 0.16);
+  transform: rotate(-12deg) scale(1.1);
 }
 
 .date-input {
@@ -1965,6 +2001,13 @@ onUnmounted(() => {
   color: var(--color-destructive);
 }
 
+.dnf-tip {
+  margin-left: auto;
+  margin-right: var(--spacing-2);
+  font-size: var(--text-caption);
+  color: var(--color-ink-secondary);
+}
+
 .dnf-count {
   font-size: var(--text-caption);
   font-weight: 600;
@@ -2034,7 +2077,20 @@ onUnmounted(() => {
 .modal-actions {
   display: flex;
   gap: var(--spacing-3);
-  margin-bottom: var(--spacing-3);
+  margin-top: var(--spacing-5);
+}
+
+.modal-hint {
+  margin: calc(-1 * var(--spacing-2)) 0 var(--spacing-4);
+  font-size: var(--text-body-sm);
+  color: var(--color-ink-secondary);
+}
+
+/* The search dropdown is absolutely positioned; let it hang over the
+   backdrop instead of being clipped by the dialog's scroll box. */
+.add-horse-modal {
+  overflow: visible;
+  max-height: none;
 }
 
 .modal-btn {
