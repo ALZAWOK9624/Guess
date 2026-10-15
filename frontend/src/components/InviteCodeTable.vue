@@ -386,4 +386,45 @@ td {
   color: var(--color-ink-secondary, #4A5A4A);
   font-size: var(--text-body, 16px);
 }
+
+/* Table card, row hover and livelier primary button */
+.table-wrapper {
+  background: var(--color-surface-raised);
+  border: 1px solid var(--color-border-hairline);
+  border-radius: var(--rounded-lg);
+  box-shadow: var(--shadow-sm);
+  animation: rise-in var(--duration-slow) var(--ease-out) backwards;
+}
+
+thead tr {
+  background: var(--color-surface-base);
+}
+
+tbody tr {
+  transition: background var(--duration-fast) ease;
+}
+
+tbody tr:hover {
+  background: var(--color-primary-tint);
+}
+
+tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.btn {
+  transition: opacity var(--duration-fast) ease, transform var(--duration-fast) var(--ease-out), filter var(--duration-fast) ease, background var(--duration-fast) ease;
+}
+
+.btn:active:not(:disabled) {
+  transform: scale(0.97);
+}
+
+.btn-primary {
+  background: var(--gradient-brand-soft);
+}
+
+.btn-primary:hover:not(:disabled) {
+  filter: brightness(1.08);
+}
 </style>

@@ -108,7 +108,7 @@ watch(
   font-family: var(--font-display, 'Barlow Condensed', system-ui, sans-serif);
   font-size: var(--text-heading, 24px);
   font-weight: 600;
-  color: var(--color-ink-primary, #1A2E1A);
+  color: inherit;
   margin: 0;
   line-height: 1.25;
   word-break: break-word;
@@ -126,7 +126,9 @@ watch(
   right: 0;
   background: transparent;
   border: none;
-  color: var(--color-primary, #1A5632);
+  color: inherit;
+  opacity: 0.75;
+  transition: opacity var(--duration-fast) ease, background var(--duration-fast) ease, transform var(--duration-fast) var(--ease-spring);
   font-size: var(--text-body, 16px);
   cursor: pointer;
   padding: 4px;
@@ -136,7 +138,9 @@ watch(
 }
 
 .edit-btn:hover:not(:disabled) {
-  background: var(--color-surface-base, #F8FAF7);
+  opacity: 1;
+  background: rgba(255, 255, 255, 0.14);
+  transform: rotate(-12deg) scale(1.1);
 }
 
 .edit-btn:disabled {
@@ -163,7 +167,7 @@ watch(
 }
 
 .edit-input:focus {
-  outline: 2px solid var(--color-primary, #1A5632);
+  outline: 2px solid var(--color-accent-light, #D4B84A);
   outline-offset: 2px;
 }
 

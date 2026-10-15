@@ -368,8 +368,11 @@ onUnmounted(() => {
 
 <template>
   <div class="horses-page">
-    <header class="page-header">
-      <h1 class="page-title">马匹管理</h1>
+    <header class="ui-page-header">
+      <div>
+        <span class="ui-page-eyebrow">Admin</span>
+        <h1 class="ui-page-title">马匹管理</h1>
+      </div>
     </header>
 
     <!-- Skeleton loading -->
@@ -459,8 +462,8 @@ onUnmounted(() => {
 
     <!-- Create/Edit Modal -->
     <Teleport to="body">
-      <div v-if="showModal" class="modal-overlay">
-        <div class="modal-content" role="dialog" :aria-label="editingHorse ? '编辑马匹' : '新建马匹'">
+      <div v-if="showModal" class="modal-overlay ui-anim-overlay">
+        <div class="modal-content ui-anim-dialog" role="dialog" :aria-label="editingHorse ? '编辑马匹' : '新建马匹'">
           <h2 class="modal-title">{{ editingHorse ? '编辑马匹' : '新建马匹' }}</h2>
 
           <div v-if="modalError" class="error-banner">{{ modalError }}</div>
@@ -617,14 +620,6 @@ onUnmounted(() => {
   max-width: 1280px;
   margin: 0 auto;
 }
-.page-header { margin-bottom: var(--spacing-4, 16px); }
-.page-title {
-  font-family: 'Barlow Condensed', system-ui, sans-serif;
-  font-size: var(--text-heading, 24px);
-  font-weight: 600;
-  color: var(--color-primary, #1A5632);
-  margin: 0;
-}
 .toolbar {
   display: flex;
   gap: var(--spacing-3, 12px);
@@ -675,7 +670,7 @@ onUnmounted(() => {
 .btn-danger:hover { background: var(--color-destructive-light, #FED7D7); }
 .btn-cancel { background: var(--color-surface-base, #F8FAF7); border: 1px solid var(--color-border-hairline, #D4DCD0); color: var(--color-ink-primary, #1A2E1A); }
 .text-muted { font-size: var(--text-caption, 12px); color: var(--color-ink-secondary, #4A5A4A); }
-.skeleton-container { display: flex; flex-direction: column; gap: var(--spacing-8); }
+.skeleton-container { display: flex; flex-direction: column; gap: var(--spacing-3); }
 .skeleton-row {
   height: 40px;
   background: linear-gradient(90deg, var(--color-surface-base) 25%, var(--color-border-hairline) 50%, var(--color-surface-base) 75%);
@@ -694,12 +689,12 @@ table { width: 100%; border-collapse: collapse; font-size: var(--text-body-sm, 1
 th { text-align: left; padding: var(--spacing-3, 12px) var(--spacing-2, 8px); font-weight: 600; color: var(--color-ink-secondary, #4A5A4A); border-bottom: 2px solid var(--color-border-hairline, #D4DCD0); white-space: nowrap; }
 td { padding: var(--spacing-3, 12px) var(--spacing-2, 8px); border-bottom: 1px solid var(--color-border-hairline, #D4DCD0); white-space: nowrap; }
 .actions-cell { display: flex; gap: var(--spacing-2, 8px); }
-.modal-overlay { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.4); display: flex; align-items: center; justify-content: center; z-index: 1000; padding: var(--spacing-16); }
-.modal-content { background: var(--color-surface-raised, #FFFFFF); border-radius: var(--rounded-lg, 14px); padding: var(--spacing-20, 24px); width: 100%; max-width: 640px; max-height: 90vh; overflow-y: auto; box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12); }
-.modal-title { font-family: 'Barlow Condensed', system-ui, sans-serif; font-size: 22px; font-weight: 600; color: var(--color-primary, #1A5632); margin-bottom: var(--spacing-16, 20px); }
-.horse-form { display: flex; flex-direction: column; gap: var(--spacing-12, 16px); }
+.modal-overlay { position: fixed; inset: 0; background: rgba(13, 30, 18, 0.5); display: flex; align-items: center; justify-content: center; z-index: 1000; padding: var(--spacing-4); }
+.modal-content { background: var(--color-surface-raised, #FFFFFF); border-radius: var(--rounded-xl); padding: var(--spacing-6); width: 100%; max-width: 640px; max-height: 90vh; overflow-y: auto; }
+.modal-title { font-family: 'Barlow Condensed', system-ui, sans-serif; font-size: 22px; font-weight: 600; color: var(--color-primary, #1A5632); margin-bottom: var(--spacing-5); }
+.horse-form { display: flex; flex-direction: column; gap: var(--spacing-4); }
 .form-row { width: 100%; }
-.form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: var(--spacing-12, 16px); }
+.form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: var(--spacing-4); }
 @media (max-width: 768px) { .form-grid { grid-template-columns: 1fr; } }
 .form-label { display: flex; flex-direction: column; gap: var(--spacing-1, 4px); font-size: var(--text-body-sm, 14px); font-weight: 500; color: var(--color-ink-primary, #1A2E1A); }
 .required { color: var(--color-destructive, #C53030); }
@@ -753,5 +748,46 @@ select.form-input { cursor: pointer; appearance: auto; }
 @media (prefers-reduced-motion: reduce) {
   .skeleton-row { animation: none; background: var(--color-surface-base); }
   .refresh-btn, .btn { transition: none; }
+}
+
+/* Table card, row hover and livelier primary button */
+.table-wrapper {
+  background: var(--color-surface-raised);
+  border: 1px solid var(--color-border-hairline);
+  border-radius: var(--rounded-lg);
+  box-shadow: var(--shadow-sm);
+  animation: rise-in var(--duration-slow) var(--ease-out) backwards;
+}
+
+thead tr {
+  background: var(--color-surface-base);
+}
+
+tbody tr {
+  transition: background var(--duration-fast) ease;
+}
+
+tbody tr:hover {
+  background: var(--color-primary-tint);
+}
+
+tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.btn {
+  transition: opacity var(--duration-fast) ease, transform var(--duration-fast) var(--ease-out), filter var(--duration-fast) ease, background var(--duration-fast) ease;
+}
+
+.btn:active:not(:disabled) {
+  transform: scale(0.97);
+}
+
+.btn-primary {
+  background: var(--gradient-brand-soft);
+}
+
+.btn-primary:hover:not(:disabled) {
+  filter: brightness(1.08);
 }
 </style>
